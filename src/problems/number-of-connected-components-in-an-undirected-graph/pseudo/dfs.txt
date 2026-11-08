@@ -1,0 +1,18 @@
+function countComponents(n, edges)
+  adj = an empty list for every node           # [1] neighbours of every node
+  for each (a, b) in edges
+    add b to adj[a] and a to adj[b]            # [1] both directions
+  group = zeros for every node                 # 0 means not reached yet
+  count = 0
+  for each node start from 0 to n - 1
+    if group[start] is not 0: skip
+    count += 1                                 # [2] a new component begins at start
+    group[start] = count
+    todo = stack holding start
+    while todo is not empty
+      v = pop from todo                        # [3] look at v's neighbours
+      for each w in adj[v]
+        if group[w] is 0                       # [4] unseen neighbour: same component
+          group[w] = count
+          push w on todo
+  return count                                 # [5] one start per component

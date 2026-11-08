@@ -1,0 +1,69 @@
+{
+  "slug": "pacific-atlantic-water-flow",
+  "title": "Pacific Atlantic Water Flow",
+  "category": "Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a grid of heights. The Pacific touches the top row and the left column. The Atlantic touches the bottom row and the right column. Water runs from a cell to a neighbour of equal or lower height. Return every cell [row, col] from which water can reach both oceans.",
+  "example": {
+    "caption": "The top-left cell is high enough for the Pacific only. The green cells drain to both oceans.",
+    "input": [{ "kind": "grid", "label": "heights", "cells": [[1,2,3],[8,9,4],[7,6,5]] }],
+    "output": [
+      { "kind": "grid", "label": "reaches both oceans", "cells": [[1,2,3],[8,9,4],[7,6,5]], "tones": [["dim","dim","hit"],["hit","hit","hit"],["hit","hit","hit"]] },
+      { "kind": "array", "label": "cells found", "items": [7], "tones": ["hit"] }
+    ]
+  },
+  "idea": {
+    "sentence": "Do not follow the water down from every cell. Start at each ocean's coast and walk inland, only to neighbours that are as high or higher. The cells reached from both coasts are the answer.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "run it backwards", "plain": "If water flows from A down to B, then B walks back up to A. Searching from the ocean uphill finds all the cells that drain into it, in one sweep." },
+      { "term": "BFS wave", "plain": "Breadth-first search spreads in rings: first the start cells, then everything one step away, then two steps, and so on." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the heights as rows of numbers, e.g. [[1,2],[2,1]]",
+    "presets": [
+      { "label": "Four by four", "args": [[[1,2,2,3],[3,2,3,4],[2,4,5,3],[6,7,1,4]]] },
+      { "label": "Smooth slope", "args": [[[1,2,3,4],[2,3,4,5],[3,4,5,6],[4,5,6,7]]] },
+      { "label": "Bowl: low centre", "args": [[[3,3,3],[3,1,3],[3,3,3]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of cells in the grid (rows times columns)" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Let water run from every cell", "optimalLabel": "Two backwards sweeps from the coasts", "unit": "cell visits (rough)" },
+    "rows": [
+      { "name": "Flow forward from each cell", "time": "O((rows x cols)²)", "space": "O(rows x cols)", "note": "Each cell starts its own search to see if it reaches both oceans. The searches repeat the same work." },
+      { "name": "Climb back from each ocean", "time": "O(rows x cols)", "space": "O(rows x cols)", "note": "Two sweeps, each visiting a cell at most once, then one pass to find cells seen by both." }
+    ],
+    "takeaway": "Turning the question around makes it two shared searches instead of one search per cell. The same trick works for any 'which sources reach a target' question."
+  },
+  "variants": [
+    { "id": "reverse", "label": "Climb from the coasts", "tsFn": "pacificAtlantic", "goFn": "pacificAtlantic", "stages": [
+      { "n": 1, "title": "Coast cells", "note": "For one ocean, mark its coast cells as reached. Water on the coast flows straight into the ocean." },
+      { "n": 2, "title": "Climb inland", "note": "From each reached cell, step to a neighbour that is not lower. That neighbour drains into this cell, so it reaches the ocean too." },
+      { "n": 3, "title": "Both oceans", "note": "Do stages 1 and 2 for the other ocean. Then list the cells marked by both, in reading order." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "[][]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Single cell", "input": "[[5]]", "output": "[[0,0]]", "why": "The one cell touches all four sides, so it touches both oceans." },
+    { "title": "Flat ground", "input": "[[2,2],[2,2]]", "output": "all four cells", "why": "Water may move to an equal height. The test is lower-than, not lower-or-equal, when climbing." },
+    { "title": "Low centre", "input": "[[3,3,3],[3,1,3],[3,3,3]]", "output": "all but the centre", "why": "The centre is a pit. Nothing is allowed to climb into a lower cell, so the sweeps never reach it." },
+    { "title": "Single row", "input": "[[1,2,3]]", "output": "[[0,0],[0,1],[0,2]]", "why": "Every cell is on the top and the bottom edge, so both coasts cover the whole row." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Build each seen grid with Array.from({ length: rows }, () => new Array(cols).fill(false)). new Array(rows).fill(row) would reuse one row, and a mark in one row would appear in all." },
+    { "lang": "TypeScript", "text": "Return the cells in reading order by scanning r then c at the end. Do not sort with Array.sort(), which compares numbers as text, so [10,0] would come before [2,0]." },
+    { "lang": "Go", "text": "Return [][]int{} for an empty answer, not a nil slice, so it encodes as [] and not null. [2]int for a coordinate is a value type: copying it copies both numbers, so appending it to next is safe." },
+    { "lang": "General", "text": "The corner cells belong to both coasts of their ocean. Marking them twice is harmless. What matters is the direction: climb only to neighbours that are NOT lower. Using strictly higher drops flat plateaus." }
+  ],
+  "recap": {
+    "pattern": "Multi-source BFS, reversed",
+    "key": "Start at each ocean's coast, move inland only to cells that are not lower, and keep cells reached from both.",
+    "complexity": "Time O(rows x cols). Space O(rows x cols).",
+    "moves": ["Seed the Pacific coast, climb inland", "Seed the Atlantic coast, climb inland", "Keep the cells marked by both"]
+  }
+}

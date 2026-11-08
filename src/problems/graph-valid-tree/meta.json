@@ -1,0 +1,70 @@
+{
+  "slug": "graph-valid-tree",
+  "title": "Graph Valid Tree",
+  "category": "Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get n nodes numbered 0 to n-1 and a list of undirected edges. Decide whether these edges form a tree: every node is reachable from every other, and there are no loops.",
+  "example": {
+    "caption": "5 nodes and 4 edges, all reachable from node 0, no loop. That is a tree.",
+    "input": [{ "kind": "graph", "label": "n = 5, edges [[0,1],[0,2],[0,3],[1,4]]", "nodes": [{ "id": "0", "x": 20, "y": 50 }, { "id": "1", "x": 55, "y": 20 }, { "id": "2", "x": 55, "y": 50 }, { "id": "3", "x": 55, "y": 82 }, { "id": "4", "x": 90, "y": 20 }], "edges": [{ "from": "0", "to": "1" }, { "from": "0", "to": "2" }, { "from": "0", "to": "3" }, { "from": "1", "to": "4" }] }],
+    "output": [{ "kind": "graph", "label": "true: n - 1 = 4 edges and everything is reached", "nodes": [{ "id": "0", "x": 20, "y": 50 }, { "id": "1", "x": 55, "y": 20 }, { "id": "2", "x": 55, "y": 50 }, { "id": "3", "x": 55, "y": 82 }, { "id": "4", "x": 90, "y": 20 }], "edges": [{ "from": "0", "to": "1" }, { "from": "0", "to": "2" }, { "from": "0", "to": "3" }, { "from": "1", "to": "4" }], "tones": { "0": "hit", "1": "hit", "2": "hit", "3": "hit", "4": "hit" } }]
+  },
+  "idea": {
+    "sentence": "A graph on n nodes is a tree exactly when it has n - 1 edges and a walk from one node reaches all n nodes.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "tree", "plain": "A connected graph with no loops. It has exactly one path between any two nodes." },
+      { "term": "BFS (breadth-first search)", "plain": "Visit a node, then all its neighbours, then their neighbours, using a queue." },
+      { "term": "connected", "plain": "Every node can be reached from every other node by following edges." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the node count, then the edges, e.g. 5, [[0,1],[0,2],[0,3],[1,4]]",
+    "presets": [
+      { "label": "A tree", "args": [5, [[0, 1], [0, 2], [0, 3], [1, 4]]] },
+      { "label": "Loop plus a split-off pair", "args": [5, [[0, 1], [1, 2], [2, 0], [3, 4]]] },
+      { "label": "Chain", "args": [4, [[0, 1], [1, 2], [2, 3]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }, { "sym": "m", "meaning": "number of edges" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Test every pair for a path, and look for loops", "optimalLabel": "Count edges, then one walk", "unit": "steps (rough)" },
+    "rows": [
+      { "name": "Pairwise path and loop checks", "time": "O(n² · m)", "space": "O(n)", "note": "Check reachability for each pair and search for any loop." },
+      { "name": "Edge count + BFS", "time": "O(n + m)", "space": "O(n + m)", "note": "The count check is constant time. After it, m equals n - 1, and the walk visits each node and edge once." },
+      { "name": "Union-find (alternative)", "time": "O(n · α(n))", "space": "O(n)", "note": "Fail if an edge joins two nodes already in one group. With n - 1 edges and no loop, the graph is connected." }
+    ],
+    "takeaway": "Two facts replace a loop search. With n - 1 edges, connected and loop-free imply each other, so one reachability walk is enough."
+  },
+  "variants": [
+    { "id": "bfs", "label": "Edge count + BFS", "tsFn": "validTree", "goFn": "validTree", "stages": [
+      { "n": 1, "title": "Count the edges", "note": "A tree on n nodes has exactly n - 1 edges. Any other count fails at once." },
+      { "n": 2, "title": "Set up the walk", "note": "Build neighbour lists. Put node 0 in the queue and mark it reached." },
+      { "n": 3, "title": "Take a node", "note": "Pop the front node and look at its neighbours." },
+      { "n": 4, "title": "Reach new nodes", "note": "Mark each unreached neighbour and queue it. Reached ones are skipped." },
+      { "n": 5, "title": "Everyone reached?", "note": "If the queue handled all n nodes the graph is connected, and with n - 1 edges that makes it a tree." }
+    ] }
+  ],
+  "goArgs": ["int", "[][]int"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Single node", "input": "1, []", "output": "true", "why": "Zero edges equals n - 1, and node 0 reaches itself. One lone node is a tree." },
+    { "title": "Too few edges", "input": "4, [[0,1],[2,3]]", "output": "false", "why": "Two edges for four nodes is not 3. The count check fails before any walk." },
+    { "title": "Right count, but a loop", "input": "4, [[0,1],[1,2],[2,0]]", "output": "false", "why": "Three edges for four nodes passes the count. Node 3 is never reached, so the walk catches it." },
+    { "title": "Too many edges", "input": "3, [[0,1],[1,2],[0,2]]", "output": "false", "why": "Three edges for three nodes forms a loop. Everything is reachable, but the count is already one too high." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Connectedness alone is not enough. A triangle is connected and has a loop. The edge count check is what rules loops out." },
+    { "lang": "General", "text": "Mark a node when you queue it, not when you pop it. Otherwise a node reachable by two routes enters the queue twice and the reached count is inflated." },
+    { "lang": "TypeScript", "text": "Array(n).fill([]) shares one array between all nodes, so every neighbour list ends up identical. Use Array.from({ length: n }, () => [])." },
+    { "lang": "Go", "text": "make([][]int, n) leaves nil inner slices, and append on a nil slice is fine. make([]bool, n) is all false, so seen needs no loop to initialise." }
+  ],
+  "recap": {
+    "pattern": "Tree = n-1 edges + connected",
+    "key": "Fail unless there are exactly n - 1 edges, then walk from node 0 and require every node to be reached.",
+    "complexity": "Time O(n + m). Space O(n + m).",
+    "moves": ["Return false unless edges.length is n - 1", "Build neighbour lists in both directions", "BFS from node 0, marking nodes as they are queued", "Return whether the queue handled all n nodes"]
+  }
+}

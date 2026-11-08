@@ -1,0 +1,21 @@
+function solve(board)
+  safe = grid of false                      # safe[r][c]: this O is connected to the border
+  frontier = empty list
+  for every cell (r, c)
+    if (r, c) is on the border and board[r][c] is "O"   # [1] cannot be surrounded
+      safe[r][c] = true
+      add (r, c) to frontier
+
+  while frontier is not empty
+    next = empty list
+    for each cell in frontier, for each of its four neighbours nb
+      if nb is off the board then skip
+      if board[nb] is "O" and not safe[nb]  # [2] touches a safe O, so it is safe too
+        safe[nb] = true
+        add nb to next
+    frontier = next
+
+  result = copy of board                    # [3] flip every O that is not safe
+  for every cell (r, c)
+    if board[r][c] is "O" and not safe[r][c] then result[r][c] = "X"
+  return result

@@ -1,0 +1,72 @@
+{
+  "slug": "number-of-islands",
+  "title": "Number of Islands",
+  "category": "Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a map as a grid of the strings \"1\" (land) and \"0\" (water). An island is a group of land cells joined side to side, up, down, left or right. Diagonals do not join. Return how many separate islands the map has.",
+  "example": {
+    "caption": "Two groups of land. The cell at (1,1) is joined to (0,1) from below, so the left group is one island. The right group is a second one.",
+    "input": [{ "kind": "grid", "label": "map", "cells": [["1","1","0","0"],["0","1","0","1"],["0","0","0","1"]] }],
+    "output": [
+      { "kind": "grid", "label": "islands", "cells": [["1","1","0","0"],["0","1","0","1"],["0","0","0","1"]], "tones": [["keep","keep",null,null],[null,"keep",null,"hit"],[null,null,null,"hit"]] },
+      { "kind": "array", "label": "count", "items": [2], "tones": ["hit"] }
+    ]
+  },
+  "idea": {
+    "sentence": "Scan the map. Each time you meet land that no island owns yet, count one new island and flood outward from it to claim every connected land cell.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "flood fill", "plain": "Start at one cell and keep spreading to every connected neighbour of the same kind, like water filling a pond." },
+      { "term": "connected", "plain": "Two land cells are connected if you can walk from one to the other over land, moving up, down, left or right." },
+      { "term": "DFS", "plain": "Depth-first search: follow one neighbour as far as it goes, then come back and try the next. Here a recursive function does it." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the map as rows of \"1\" and \"0\" strings, e.g. [[\"1\",\"0\"],[\"0\",\"1\"]]",
+    "presets": [
+      { "label": "Three islands", "args": [[["1","1","0","0","0"],["1","1","0","0","0"],["0","0","1","0","0"],["0","0","0","1","1"]]] },
+      { "label": "One big island", "args": [[["1","1","1","1"],["1","1","1","1"],["1","1","1","1"]]] },
+      { "label": "Diagonals do not join", "args": [[["1","0"],["0","1"]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of cells in the map (rows times columns)" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Flood from every land cell and compare the results", "optimalLabel": "Flood each island once", "unit": "cell visits (rough)" },
+    "rows": [
+      { "name": "Flood from every land cell", "time": "O(n²)", "space": "O(n)", "note": "Each flood walks a whole island, and you start one per land cell. You must also merge duplicates." },
+      { "name": "Claim cells while flooding", "time": "O(n)", "space": "O(n)", "note": "The scan visits each cell once. A flood visits each land cell once. Claimed cells are skipped. Space is the island grid plus the recursion depth." }
+    ],
+    "takeaway": "Marking cells as claimed is what makes it linear. Each cell is entered by a flood at most once, so floods never repeat each other's work."
+  },
+  "variants": [
+    { "id": "flood", "label": "Flood fill (DFS)", "tsFn": "numIslands", "goFn": "numIslands", "stages": [
+      { "n": 1, "title": "Nothing claimed", "note": "Make a grid of island numbers, all 0. A cell with 0 has not been claimed by any island yet." },
+      { "n": 2, "title": "New island found", "note": "Land with number 0 must belong to an island we have not seen. Count one more and start a flood there." },
+      { "n": 3, "title": "Flood and claim", "note": "Write the island number on the cell, then do the same for its four neighbours. Water, claimed cells and edges stop the flood." },
+      { "n": 4, "title": "Return the count", "note": "One count was added per flood. When the scan ends, that count is the number of islands." }
+    ] }
+  ],
+  "goArgs": ["[][]string"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "All water", "input": "[[\"0\",\"0\"],[\"0\",\"0\"]]", "output": "0", "why": "No land means no flood ever starts. The count stays 0." },
+    { "title": "Diagonal neighbours", "input": "[[\"1\",\"0\"],[\"0\",\"1\"]]", "output": "2", "why": "Only up, down, left and right join cells. A diagonal does not, so these are two islands." },
+    { "title": "Winding island", "input": "a snake of land that turns several times", "output": "1", "why": "The flood follows every turn. One start cell is enough, so you must not count each bend as new." },
+    { "title": "Empty map", "input": "[]", "output": "0", "why": "There are no rows, so the first row cannot be read. Check the row count before you take the width." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "new Array(rows).fill(new Array(cols).fill(0)) puts the same inner array in every row. Claiming one cell would claim a whole column. Build rows with Array.from({ length: rows }, () => new Array(cols).fill(0))." },
+    { "lang": "TypeScript", "text": "Cells are strings. land[r][c] === 1 is never true for \"1\". Compare with '1'. A truthiness test is also wrong, because \"0\" is a non-empty string and counts as true." },
+    { "lang": "Go", "text": "make([][]int, rows) gives rows nil slices. Allocate each row with make([]int, cols) before writing, or the first write panics." },
+    { "lang": "Go", "text": "A closure that calls itself must be declared first: var flood func(r, c, id int), then assigned. Writing flood := func... cannot refer to flood inside its own body." },
+    { "lang": "General", "text": "Recursion goes as deep as the island is long. A big all-land map can overflow the stack. An explicit queue or stack avoids it, and the idea stays the same." }
+  ],
+  "recap": {
+    "pattern": "Flood fill, count the floods",
+    "key": "Scan every cell. When you meet unclaimed land, add one to the count and flood it so its whole island is claimed.",
+    "complexity": "Time O(rows x cols). Space O(rows x cols).",
+    "moves": ["Make a claimed grid, all empty", "Scan cells in reading order", "On unclaimed land: count one and flood its island", "Return the count"]
+  }
+}

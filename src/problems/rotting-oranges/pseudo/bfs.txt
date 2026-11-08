@@ -1,0 +1,18 @@
+function orangesRotting(oranges)
+  g = copy of oranges                       # keep the input as it was
+  queue = every rotten cell (value 2)       # [1] all rotten oranges start together
+  fresh = number of cells with value 1      # [1] how many we must reach
+  minutes = 0
+
+  while queue is not empty and fresh > 0
+    next = empty list
+    for each cell in queue, for each of its four neighbours nb
+      if nb is off the grid or g[nb] is not 1 then skip
+      g[nb] = 2                             # [2] a fresh neighbour rots this minute
+      fresh = fresh - 1
+      add nb to next
+    queue = next
+    minutes = minutes + 1                   # [2] one whole wave = one minute
+
+  if fresh == 0 then return minutes         # [3] everything rotted
+  return -1                                 # [3] some fresh orange was unreachable

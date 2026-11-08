@@ -1,0 +1,17 @@
+function findRedundantConnection(edges)
+  n = length(edges)                         # n nodes, numbered 1 to n
+  parent[v] = v for every node v            # [1] each node is its own leader
+
+  function find(x)
+    while parent[x] is not x
+      parent[x] = parent[parent[x]]         # [2] path halving: hop closer to the root
+      x = parent[x]
+    return x
+
+  for each edge (a, b) in edges
+    ra = find(a)                            # [2] leader of a's group
+    rb = find(b)                            # [2] leader of b's group
+    if ra == rb
+      return [a, b]                         # [3] already connected: loop closed here
+    parent[ra] = rb                         # [4] merge the two groups
+  return empty list

@@ -1,0 +1,13 @@
+[
+  {"name":"a tree","input":[5,[[0,1],[0,2],[0,3],[1,4]]],"expected":true},
+  {"name":"loop plus split-off pair","input":[5,[[0,1],[1,2],[2,0],[3,4]]],"expected":false},
+  {"name":"chain","input":[4,[[0,1],[1,2],[2,3]]],"expected":true},
+  {"name":"single node","input":[1,[]],"expected":true,"edge":true},
+  {"name":"too few edges","input":[4,[[0,1],[2,3]]],"expected":false,"edge":true},
+  {"name":"right count but a loop","input":[4,[[0,1],[1,2],[2,0]]],"expected":false,"edge":true},
+  {"name":"too many edges","input":[3,[[0,1],[1,2],[0,2]]],"expected":false,"edge":true},
+  {"name":"two nodes one edge","input":[2,[[1,0]]],"expected":true},
+  {"name":"star","input":[6,[[0,1],[0,2],[0,3],[0,4],[0,5]]],"expected":true},
+  {"name":"duplicate edge","input":[3,[[0,1],[0,1]]],"expected":false},
+  {"name":"two nodes no edge","input":[2,[]],"expected":false}
+]

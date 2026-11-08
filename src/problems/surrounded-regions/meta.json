@@ -1,0 +1,66 @@
+{
+  "slug": "surrounded-regions",
+  "title": "Surrounded Regions",
+  "category": "Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a board of the strings \"X\" and \"O\". A group of O cells joined up, down, left or right is surrounded if none of its cells is on the edge of the board. Flip every surrounded group to X. Groups that touch the edge stay as they are. Return the new board.",
+  "example": {
+    "caption": "The three inner O's are walled in, so they become X. The O at the bottom edge is not walled in, so it stays.",
+    "input": [{ "kind": "grid", "label": "board", "cells": [["X","X","X","X"],["X","O","O","X"],["X","X","O","X"],["X","O","X","X"]] }],
+    "output": [{ "kind": "grid", "label": "result", "cells": [["X","X","X","X"],["X","X","X","X"],["X","X","X","X"],["X","O","X","X"]], "tones": [[null,null,null,null],[null,"hit","hit",null],[null,null,"hit",null],[null,"keep",null,null]] }]
+  },
+  "idea": {
+    "sentence": "Ask the opposite question: which O's are safe? Start from the O's on the border and spread through connected O's. Everything else that is an O is surrounded, so flip it.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "connected group", "plain": "O cells you can walk between by moving up, down, left or right, staying on O cells." },
+      { "term": "mark first, flip later", "plain": "Do not change the board while you are still deciding. First mark what is safe, then do one pass that flips the rest." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the board as rows of \"X\" and \"O\" strings.",
+    "presets": [
+      { "label": "Saved and captured", "args": [[["X","O","X","X","X"],["X","O","O","X","X"],["X","X","X","O","X"],["X","X","O","O","X"],["X","X","X","X","X"]]] },
+      { "label": "All O, all safe", "args": [[["O","O","O"],["O","O","O"],["O","O","O"]]] },
+      { "label": "Diagonal is not a link", "args": [[["X","O","X","X"],["X","X","O","X"],["X","X","X","X"]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of cells on the board (rows times columns)" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Flood each O group and check for a border cell", "optimalLabel": "One sweep from the border", "unit": "cell visits (rough)" },
+    "rows": [
+      { "name": "Check every O's group", "time": "O(n²) worst case", "space": "O(n)", "note": "Each O starts a flood to see if its group touches the edge. Without remembering results, groups are re-walked." },
+      { "name": "Spread from border O's", "time": "O(n)", "space": "O(n)", "note": "Each cell enters the wave at most once. Then one pass over the board flips what was never marked." }
+    ],
+    "takeaway": "Searching from the edge is cheaper than asking each region whether it reaches the edge. One sweep marks all the safe cells."
+  },
+  "variants": [
+    { "id": "border", "label": "Spread from border", "tsFn": "solve", "goFn": "solve", "stages": [
+      { "n": 1, "title": "Border O's are safe", "note": "Mark every O on the edge as safe and put it in the first wave. An edge cell is never walled in." },
+      { "n": 2, "title": "Spread through O's", "note": "Each wave looks at the neighbours of the last one. An unmarked O next to a safe O becomes safe. Stop when a wave finds nothing." },
+      { "n": 3, "title": "Flip the rest", "note": "Build the result: any O that was not marked safe becomes X. Everything else is copied unchanged." }
+    ] }
+  ],
+  "goArgs": ["[][]string"],
+  "goRet": "[][]string",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty board", "input": "[]", "output": "[]", "why": "There is no first row to measure. Return an empty board before reading the width." },
+    { "title": "Tiny board", "input": "[[\"O\"]]", "output": "[[\"O\"]]", "why": "The only cell is on the border, so it is safe. A board with no inside cannot have a surrounded group." },
+    { "title": "Diagonal contact", "input": "O at (0,1) and O at (1,2)", "output": "(1,2) flips", "why": "Diagonals are not links. The inner O is walled in by X's up, down, left and right, even though it touches a border O at a corner." },
+    { "title": "Long snake from the edge", "input": "a winding line of O's starting on the border", "output": "no change", "why": "One border cell keeps the whole snake safe, however far it winds into the board." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "board.map(row => row) returns the same row arrays. Editing the result would edit the input. Build new rows with board.map(row => row.map(...)) so the result is a real copy." },
+    { "lang": "TypeScript", "text": "The cells are strings, so compare with 'O' (letter) and not the digit 0. Keep the 'O' check in the flip pass too, or X cells could be overwritten." },
+    { "lang": "Go", "text": "Copying with copy(result, board) copies the outer slice only. Both boards would still share the same rows. Allocate a new row for each result row and copy the cells one by one." },
+    { "lang": "General", "text": "Flipping while you search breaks the search: a flipped O looks like a wall to the cells next to it. Mark safe cells in a separate grid first, then flip in one pass at the end." }
+  ],
+  "recap": {
+    "pattern": "Multi-source BFS from the border",
+    "key": "Mark O's reachable from the border as safe, then flip every O that is not safe.",
+    "complexity": "Time O(rows x cols). Space O(rows x cols).",
+    "moves": ["Mark and queue every border O as safe", "Spread to O's touching a safe O", "Copy the board, flipping O's that are not safe"]
+  }
+}

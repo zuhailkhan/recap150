@@ -1,0 +1,13 @@
+[
+  {"name":"saved and captured","input":[[["X","O","X","X","X"],["X","O","O","X","X"],["X","X","X","O","X"],["X","X","O","O","X"],["X","X","X","X","X"]]],"expected":[["X","O","X","X","X"],["X","O","O","X","X"],["X","X","X","X","X"],["X","X","X","X","X"],["X","X","X","X","X"]]},
+  {"name":"all O","input":[[["O","O","O"],["O","O","O"],["O","O","O"]]],"expected":[["O","O","O"],["O","O","O"],["O","O","O"]],"edge":true},
+  {"name":"empty board","input":[[]],"expected":[],"edge":true},
+  {"name":"single O","input":[[["O"]]],"expected":[["O"]],"edge":true},
+  {"name":"lone inner O","input":[[["X","X","X"],["X","O","X"],["X","X","X"]]],"expected":[["X","X","X"],["X","X","X"],["X","X","X"]]},
+  {"name":"diagonal is not a link","input":[[["X","O","X","X"],["X","X","O","X"],["X","X","X","X"]]],"expected":[["X","O","X","X"],["X","X","X","X"],["X","X","X","X"]],"edge":true},
+  {"name":"snake from the edge","input":[[["O","X","X","X","X"],["O","O","O","O","X"],["X","X","X","O","X"],["X","O","O","O","X"],["X","X","X","X","X"]]],"expected":[["O","X","X","X","X"],["O","O","O","O","X"],["X","X","X","O","X"],["X","O","O","O","X"],["X","X","X","X","X"]]},
+  {"name":"all X","input":[[["X","X"],["X","X"]]],"expected":[["X","X"],["X","X"]]},
+  {"name":"big inner region","input":[[["X","X","X","X","X","X"],["X","O","O","O","O","X"],["X","O","O","O","O","X"],["X","O","O","O","O","X"],["X","X","X","X","X","X"]]],"expected":[["X","X","X","X","X","X"],["X","X","X","X","X","X"],["X","X","X","X","X","X"],["X","X","X","X","X","X"],["X","X","X","X","X","X"]]},
+  {"name":"region touching corner","input":[[["O","X","X","X"],["O","X","O","X"],["X","X","O","X"],["X","X","X","X"]]],"expected":[["O","X","X","X"],["O","X","X","X"],["X","X","X","X"],["X","X","X","X"]]},
+  {"name":"random 6x6","input":[[["O","X","X","O","O","O"],["X","X","X","X","X","X"],["X","O","X","X","X","O"],["O","X","X","X","X","O"],["X","X","X","O","X","X"],["O","O","X","X","O","X"]]],"expected":[["O","X","X","O","O","O"],["X","X","X","X","X","X"],["X","X","X","X","X","O"],["O","X","X","X","X","O"],["X","X","X","X","X","X"],["O","O","X","X","O","X"]]}
+]

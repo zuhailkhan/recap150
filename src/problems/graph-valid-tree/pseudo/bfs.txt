@@ -1,0 +1,15 @@
+function validTree(n, edges)
+  if length(edges) is not n - 1
+    return false                               # [1] too few cannot connect, too many must loop
+  adj = an empty list for every node           # [2] neighbours of every node
+  for each (a, b) in edges
+    add b to adj[a] and a to adj[b]            # [2]
+  seen = false for every node
+  queue = [0]                                  # [2] start the walk at node 0
+  seen[0] = true
+  for each node v taken from the queue front   # [3]
+    for each w in adj[v]
+      if not seen[w]                           # [4] a new node: mark and queue it
+        seen[w] = true
+        add w to queue
+  return length(queue) == n                    # [5] reached everything: connected

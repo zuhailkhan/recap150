@@ -1,0 +1,69 @@
+{
+  "slug": "clone-graph",
+  "title": "Clone Graph",
+  "category": "Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get one node of a connected, undirected graph. Each node has a value and a list of neighbour nodes. Build a deep copy: new nodes with the same values and the same links, sharing nothing with the original. Return the copy of the node you were given. The test input is an adjacency list where node i+1 has neighbours list[i].",
+  "example": {
+    "caption": "A square: 1-2, 2-3, 3-4, 4-1. The copy has the same shape, but every node is a new object.",
+    "input": [{ "kind": "graph", "label": "original", "nodes": [{ "id": "1" }, { "id": "2" }, { "id": "3" }, { "id": "4" }], "edges": [{ "from": "1", "to": "2" }, { "from": "2", "to": "3" }, { "from": "3", "to": "4" }, { "from": "4", "to": "1" }] }],
+    "output": [{ "kind": "graph", "label": "copy (new nodes)", "nodes": [{ "id": "1" }, { "id": "2" }, { "id": "3" }, { "id": "4" }], "edges": [{ "from": "1", "to": "2" }, { "from": "2", "to": "3" }, { "from": "3", "to": "4" }, { "from": "4", "to": "1" }], "tones": { "1": "hit", "2": "hit", "3": "hit", "4": "hit" } }]
+  },
+  "idea": {
+    "sentence": "Keep a map from each original node to its copy. Register a copy before copying its neighbours, so a node met again is reused instead of copied twice.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "deep copy", "plain": "A copy that shares no objects with the original. Changing one side can never change the other." },
+      { "term": "cycle", "plain": "A path that leads back to a node you already passed. In a graph, naive copying would follow it forever." },
+      { "term": "adjacency list", "plain": "For each node, the list of nodes it touches. Here node i+1 touches the nodes in list[i]." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the adjacency list. Node i+1 has neighbours list[i], e.g. [[2],[1,3],[2]] is the path 1-2-3.",
+    "presets": [
+      { "label": "Square with a cycle", "args": [[[2, 4], [1, 3], [2, 4], [1, 3]]] },
+      { "label": "Path of three", "args": [[[2], [1, 3], [2]]] },
+      { "label": "Single node", "args": [[[]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "V", "meaning": "number of nodes" }, { "sym": "E", "meaning": "number of edges" }],
+    "compare": { "brute": "2n", "optimal": "n", "bruteLabel": "Copy without a map (loops on any cycle)", "optimalLabel": "Copy each node once, reuse it after", "unit": "copies made (no map blows up, shown as 2n)" },
+    "rows": [
+      { "name": "No map of copies", "time": "never ends on a cycle", "space": "grows without bound", "note": "Every walk around a cycle makes new copies of the same nodes." },
+      { "name": "Map original to copy", "time": "O(V + E)", "space": "O(V)", "note": "Each node is copied once. Each edge is looked at twice, once from each side. The map and the recursion hold up to V entries." }
+    ],
+    "takeaway": "The map does two jobs: it stops loops and it makes sure each original has exactly one copy, so shared neighbours stay shared."
+  },
+  "variants": [
+    { "id": "dfs", "label": "DFS with a map", "tsFn": "cloneGraphDriver", "goFn": "cloneGraphDriver", "stages": [
+      { "n": 1, "title": "Map of copies", "note": "An empty map from original node to its copy. It answers: have I already copied this node?" },
+      { "n": 2, "title": "Copy and register", "note": "Make a new node with the same value and no links. Put it in the map before looking at neighbours." },
+      { "n": 3, "title": "Reuse the copy", "note": "If the node is already in the map, return its copy. This is where a cycle stops." },
+      { "n": 4, "title": "Link the neighbours", "note": "For each original neighbour, get its copy by the same function and add it to this copy's list." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "[][]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "No nodes", "input": "[]", "output": "[]", "why": "The given node is null. Return null at once. There is nothing to put in a map." },
+    { "title": "One node, no neighbours", "input": "[[]]", "output": "[[]]", "why": "One copy with an empty list. The copy must still be a new object." },
+    { "title": "Triangle", "input": "[[2,3],[1,3],[1,2]]", "output": "[[2,3],[1,3],[1,2]]", "why": "Every node is reached from two sides. Without reuse you would build a second copy of the same node." },
+    { "title": "Neighbour order", "input": "[[3,2],[1],[1]]", "output": "[[3,2],[1],[1]]", "why": "Copy the neighbours in the order given. The copy lists them in the same order." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Key the Map by the node object, not by node.val. Object keys use identity, which is exactly what you want here. Do not write neighbors: [] once and reuse it. Each copy needs its own array." },
+    { "lang": "TypeScript", "text": "JSON.parse(JSON.stringify(node)) cannot copy a graph: it throws on a cycle, and it would turn a shared neighbour into two separate copies. Use your own map." },
+    { "lang": "Go", "text": "Use map[*Node]*Node. Pointer keys compare by address, which is what identifies a node. The recursive closure must be declared first with var dup func(n *Node) *Node." },
+    { "lang": "Go", "text": "A copy with no neighbours has a nil Neighbors slice, not an empty one. That is fine to range over, but a test that compares nil with an empty slice can disagree." },
+    { "lang": "General", "text": "Register the copy before recursing into neighbours. If you register it afterwards, a cycle comes back to the node before the map knows about it, and the recursion never ends." }
+  ],
+  "recap": {
+    "pattern": "DFS with an original-to-copy map",
+    "key": "Copy a node, register it at once, then link it to the (possibly reused) copies of its neighbours.",
+    "complexity": "Time O(V + E). Space O(V).",
+    "moves": ["Return null for a null node", "If the node is in the map, return its copy", "Make the copy and register it", "Fill its neighbours by copying each original neighbour"]
+  }
+}

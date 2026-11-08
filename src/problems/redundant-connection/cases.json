@@ -1,0 +1,12 @@
+[
+  {"name":"loop of four","input":[[[1,2],[2,3],[3,4],[1,4],[1,5]]],"expected":[1,4]},
+  {"name":"triangle","input":[[[1,2],[1,3],[2,3]]],"expected":[2,3]},
+  {"name":"extra edge last","input":[[[1,5],[3,4],[2,3],[1,4],[1,2]]],"expected":[1,2]},
+  {"name":"smallest loop","input":[[[1,2],[1,2]]],"expected":[1,2],"edge":true},
+  {"name":"long chain then back-edge","input":[[[1,2],[2,3],[3,4],[4,5],[1,5]]],"expected":[1,5],"edge":true},
+  {"name":"extra edge in the middle","input":[[[1,4],[3,4],[1,3],[1,2],[4,5]]],"expected":[1,3]},
+  {"name":"star plus chord","input":[[[1,2],[1,3],[1,4],[1,5],[2,3]]],"expected":[2,3]},
+  {"name":"reversed ends","input":[[[2,1],[3,2],[1,3]]],"expected":[1,3]},
+  {"name":"chain built backwards","input":[[[5,4],[4,3],[3,2],[2,1],[1,5]]],"expected":[1,5]},
+  {"name":"two cycle candidates, last wins","input":[[[1,2],[2,3],[3,1],[3,4],[4,5]]],"expected":[3,1]}
+]

@@ -1,0 +1,14 @@
+[
+  {"name":"diamond","input":[5,[[1,0],[2,0],[3,1],[3,2],[4,3]]],"expected":true},
+  {"name":"cycle at the end","input":[4,[[1,0],[2,1],[1,2],[3,2]]],"expected":false},
+  {"name":"no prerequisites","input":[3,[]],"expected":true,"edge":true},
+  {"name":"two-course loop","input":[2,[[1,0],[0,1]]],"expected":false,"edge":true},
+  {"name":"cycle after a good start","input":[4,[[1,0],[2,1],[3,2],[1,3]]],"expected":false,"edge":true},
+  {"name":"self prerequisite","input":[1,[[0,0]]],"expected":false,"edge":true},
+  {"name":"single course","input":[1,[]],"expected":true},
+  {"name":"two chains","input":[6,[[1,0],[2,1],[4,3],[5,4]]],"expected":true},
+  {"name":"long loop","input":[5,[[1,0],[2,1],[3,2],[4,3],[0,4]]],"expected":false},
+  {"name":"duplicate pairs","input":[3,[[1,0],[1,0],[2,1]]],"expected":true},
+  {"name":"wide fan-in","input":[6,[[5,0],[5,1],[5,2],[5,3],[5,4]]],"expected":true},
+  {"name":"loop hidden among valid","input":[7,[[1,0],[2,1],[3,1],[4,2],[4,3],[5,4],[6,5],[3,6]]],"expected":false}
+]

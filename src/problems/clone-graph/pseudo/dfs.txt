@@ -1,0 +1,14 @@
+function cloneGraph(node)
+  if node is null then return null
+  copies = empty map                       # [1] original node -> its copy
+
+  function dup(n)
+    if n is in copies
+      return copies[n]                     # [3] already copied: reuse it
+    clone = new node with value n.val and no neighbours   # [2] a new copy
+    copies[n] = clone                      # [2] register it BEFORE visiting neighbours
+    for each neighbour in n.neighbours
+      add dup(neighbour) to clone.neighbours   # [4] link to the copies of the neighbours
+    return clone
+
+  return dup(node)

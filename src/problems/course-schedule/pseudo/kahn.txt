@@ -1,0 +1,12 @@
+function canFinish(numCourses, prerequisites)
+  next = an empty list for every course        # [1] next[a] = courses a unlocks
+  indeg = zeros for every course               # [1] prerequisites still not done
+  for each (course, pre) in prerequisites
+    add course to next[pre]                    # [1] arrow: pre -> course
+    indeg[course] += 1
+  queue = every course whose indeg is 0        # [2] nothing blocks these
+  for each course c taken from the queue front # [3] c is done
+    for each x in next[c]
+      indeg[x] -= 1                            # [4] x waits for one less course
+      if indeg[x] == 0: add x to queue         # [4] x is free now
+  return queue.length == numCourses            # [5] all queued once: no cycle

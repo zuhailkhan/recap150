@@ -1,0 +1,15 @@
+function numIslands(land)
+  island = grid of 0s, same size as land   # [1] island number per cell, 0 = unclaimed
+  count = 0
+
+  function flood(r, c, id)
+    if (r, c) is off the map then return
+    if land[r][c] is water or island[r][c] != 0 then return
+    island[r][c] = id                      # [3] claim this cell
+    flood the four neighbours with the same id
+
+  for every cell (r, c) in reading order
+    if land[r][c] is land and island[r][c] == 0   # [2] a new island starts here
+      count = count + 1
+      flood(r, c, count)
+  return count                             # [4] one count per flood started

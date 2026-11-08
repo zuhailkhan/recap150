@@ -1,0 +1,12 @@
+[
+  {"name":"three components","input":[6,[[0,1],[1,2],[3,4]]],"expected":3},
+  {"name":"all one component","input":[4,[[0,1],[1,2],[2,3]]],"expected":1},
+  {"name":"no edges","input":[4,[]],"expected":4,"edge":true},
+  {"name":"single node","input":[1,[]],"expected":1,"edge":true},
+  {"name":"duplicate and reversed edges","input":[3,[[0,1],[1,0],[0,1]]],"expected":2,"edge":true},
+  {"name":"one long chain","input":[5,[[0,1],[1,2],[2,3],[3,4]]],"expected":1},
+  {"name":"two pairs and a loner","input":[5,[[0,1],[2,3]]],"expected":3},
+  {"name":"loop","input":[4,[[0,1],[1,2],[2,0]]],"expected":2},
+  {"name":"bridge joins two groups","input":[6,[[0,1],[1,2],[3,4],[4,5],[2,3]]],"expected":1},
+  {"name":"edges listed from far end","input":[5,[[4,3],[3,2],[1,0]]],"expected":2}
+]

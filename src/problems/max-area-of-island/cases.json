@@ -1,0 +1,13 @@
+[
+  {"name":"four islands","input":[[[0,1,0,0,1],[0,1,1,0,1],[0,0,0,0,0],[1,1,0,1,0]]],"expected":3},
+  {"name":"tie between two","input":[[[1,1,0],[0,0,0],[0,1,1]]],"expected":2},
+  {"name":"ring around water","input":[[[1,1,1],[1,0,1],[1,1,1]]],"expected":8},
+  {"name":"no land","input":[[[0,0],[0,0]]],"expected":0,"edge":true},
+  {"name":"empty map","input":[[]],"expected":0,"edge":true},
+  {"name":"single land cell","input":[[[1]]],"expected":1,"edge":true},
+  {"name":"all land","input":[[[1,1,1],[1,1,1],[1,1,1]]],"expected":9},
+  {"name":"diagonal land","input":[[[1,0],[0,1]]],"expected":1},
+  {"name":"biggest is last","input":[[[1,0,1,0,1,1],[0,0,0,0,1,1],[0,0,0,0,1,0]]],"expected":5},
+  {"name":"u shape","input":[[[1,0,1],[1,0,1],[1,1,1]]],"expected":7},
+  {"name":"random 6x6","input":[[[1,0,0,1,0,0],[0,0,1,1,1,1],[1,0,0,0,1,1],[1,0,0,1,1,0],[0,0,0,0,0,1],[0,0,0,1,1,1]]],"expected":9}
+]

@@ -1,0 +1,69 @@
+{
+  "slug": "rotting-oranges",
+  "title": "Rotting Oranges",
+  "category": "Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a grid. 0 is an empty cell, 1 is a fresh orange and 2 is a rotten one. Every minute, each fresh orange that touches a rotten one (up, down, left or right) becomes rotten. Return the number of minutes until no fresh orange is left, or -1 if some fresh orange can never rot.",
+  "example": {
+    "caption": "One rotten orange in the corner. The rot spreads outward one step each minute, and the last orange rots at minute 4.",
+    "input": [{ "kind": "grid", "label": "minute 0", "cells": [[2,1,1],[1,1,0],[0,1,1]], "tones": [["focus",null,null],[null,null,"dim"],["dim",null,null]] }],
+    "output": [
+      { "kind": "grid", "label": "minute 4", "cells": [[2,2,2],[2,2,0],[0,2,2]], "tones": [["hit","hit","hit"],["hit","hit","dim"],["dim","hit","hit"]] },
+      { "kind": "array", "label": "minutes", "items": [4], "tones": ["hit"] }
+    ]
+  },
+  "idea": {
+    "sentence": "Put every rotten orange in a queue at once. Each pass over the queue rots all their fresh neighbours together, and one pass is one minute.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "multi-source BFS", "plain": "Breadth-first search that starts from many cells at the same time. It spreads in rings, so a cell is reached by whichever start is closest." },
+      { "term": "level", "plain": "One ring of the spread. Here, everything that rots in the same minute." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the grid as rows of 0, 1 and 2, e.g. [[2,1,1],[1,1,0]]",
+    "presets": [
+      { "label": "One source", "args": [[[2,1,1],[1,1,0],[0,1,1]]] },
+      { "label": "One orange cut off", "args": [[[2,1,1],[0,1,1],[1,0,1]]] },
+      { "label": "Two sources at once", "args": [[[2,1,1,1,2],[1,1,1,1,1]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of cells in the grid (rows times columns)" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Re-scan the whole grid every minute", "optimalLabel": "Queue of rotten oranges, each handled once", "unit": "cell checks (rough)" },
+    "rows": [
+      { "name": "Scan the grid each minute", "time": "O(n²)", "space": "O(n)", "note": "Every minute you look at all n cells to find rotten ones. A long chain needs about n minutes." },
+      { "name": "Multi-source BFS", "time": "O(n)", "space": "O(n)", "note": "Each orange joins the queue once, when it rots, and is processed once. Space is the grid copy and the queue." }
+    ],
+    "takeaway": "The queue holds only the oranges that can spread right now. Looking at those instead of the whole grid is what saves the work."
+  },
+  "variants": [
+    { "id": "bfs", "label": "Multi-source BFS", "tsFn": "orangesRotting", "goFn": "orangesRotting", "stages": [
+      { "n": 1, "title": "Queue all rotten", "note": "Queue every rotten orange as a starting point, and count the fresh ones. All sources begin at minute 0." },
+      { "n": 2, "title": "One wave = one minute", "note": "Rot every fresh neighbour of the current queue and make those the next queue. Then add one minute." },
+      { "n": 3, "title": "Check what is left", "note": "If no fresh orange is left, return the minutes. If some remain, nothing can reach them, so return -1." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "No fresh oranges", "input": "[[0,2]]", "output": "0", "why": "Nothing needs to rot. The loop stops at once, so no minute is counted." },
+    { "title": "Fresh but no rotten", "input": "[[1]]", "output": "-1", "why": "The queue starts empty, so nothing can spread. A fresh orange remains." },
+    { "title": "Walled-off orange", "input": "[[2,0,1]]", "output": "-1", "why": "An empty cell blocks the rot. The fresh orange behind it is never reached." },
+    { "title": "Empty grid", "input": "[]", "output": "0", "why": "No cells, no fresh oranges, nothing to do. Do not read the first row before checking it exists." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Copy each row with oranges.map(row => [...row]). A shallow copy such as [...oranges] still shares the row arrays, so rotting a cell would change the caller's grid." },
+    { "lang": "TypeScript", "text": "Do not count a minute for the last wave if no fresh orange remains. The loop condition queue.length > 0 && fresh > 0 stops right after the minute in which the last fresh one rots." },
+    { "lang": "Go", "text": "append([]int(nil), row...) makes a true copy of a row. Writing g[r] = oranges[r] only copies the slice header, so both grids would share the same cells." },
+    { "lang": "General", "text": "Process the queue one level at a time: take the whole current wave, build the next wave, then add one minute. Adding a minute per orange popped gives a far too big answer." }
+  ],
+  "recap": {
+    "pattern": "Multi-source BFS by levels",
+    "key": "Queue all rotten oranges together. Each full wave rots its fresh neighbours and costs one minute. Fresh left over means -1.",
+    "complexity": "Time O(rows x cols). Space O(rows x cols).",
+    "moves": ["Queue every rotten orange, count the fresh", "Rot all neighbours of the current wave, add a minute", "Stop when no fresh is left or the queue is empty", "Return minutes, or -1 if fresh remain"]
+  }
+}

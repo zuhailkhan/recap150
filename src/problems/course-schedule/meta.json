@@ -1,0 +1,69 @@
+{
+  "slug": "course-schedule",
+  "title": "Course Schedule",
+  "category": "Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "There are numCourses courses, numbered from 0. Each pair [a, b] says you must finish course b before you can take course a. Decide whether it is possible to finish every course.",
+  "example": {
+    "caption": "Courses 1 and 2 each need the other, so neither can ever start. Course 0 is fine.",
+    "input": [{ "kind": "graph", "label": "pairs [[1,0],[2,1],[1,2]]. Arrow = must come first", "nodes": [{ "id": "0", "x": 15, "y": 50 }, { "id": "1", "x": 50, "y": 20 }, { "id": "2", "x": 50, "y": 80 }], "edges": [{ "from": "0", "to": "1", "directed": true }, { "from": "1", "to": "2", "directed": true }, { "from": "2", "to": "1", "directed": true }] }],
+    "output": [{ "kind": "graph", "label": "false: 1 and 2 are stuck in a cycle", "nodes": [{ "id": "0", "x": 15, "y": 50 }, { "id": "1", "x": 50, "y": 20 }, { "id": "2", "x": 50, "y": 80 }], "edges": [{ "from": "0", "to": "1", "directed": true }, { "from": "1", "to": "2", "directed": true, "tone": "miss" }, { "from": "2", "to": "1", "directed": true, "tone": "miss" }], "tones": { "0": "dim", "1": "miss", "2": "miss" } }]
+  },
+  "idea": {
+    "sentence": "Keep finishing courses that have nothing left to wait for. If you run out of such courses before all are done, the rest must be waiting on each other in a cycle.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "in-degree", "plain": "How many arrows point into a node. Here: how many prerequisites a course still waits for." },
+      { "term": "cycle", "plain": "A loop of arrows that leads back to where it started. Courses on a loop can never be started." },
+      { "term": "Kahn's algorithm", "plain": "Repeatedly remove nodes with in-degree 0. It is a breadth-first search over a directed graph." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the course count, then the pairs, e.g. 4, [[1,0],[2,1],[1,2]]",
+    "presets": [
+      { "label": "Diamond, finishable", "args": [5, [[1, 0], [2, 0], [3, 1], [3, 2], [4, 3]]] },
+      { "label": "Cycle", "args": [4, [[1, 0], [2, 1], [1, 2], [3, 2]]] },
+      { "label": "No prerequisites", "args": [3, []] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of courses" }, { "sym": "m", "meaning": "number of prerequisite pairs" }],
+    "compare": { "brute": "2n", "optimal": "n", "bruteLabel": "Try every possible order (grows like n!, drawn as 2^n)", "optimalLabel": "Queue pass over courses and pairs", "unit": "steps (rough)" },
+    "rows": [
+      { "name": "Try every order", "time": "O(n! · m)", "space": "O(n)", "note": "Check each ordering of the courses against all pairs." },
+      { "name": "Kahn's algorithm", "time": "O(n + m)", "space": "O(n + m)", "note": "Each course is queued once and each pair is looked at once. The lists hold every pair." }
+    ],
+    "takeaway": "You never need to find the order. Peeling off free courses one by one either reaches everyone or gets stuck on a cycle."
+  },
+  "variants": [
+    { "id": "kahn", "label": "Kahn (queue)", "tsFn": "canFinish", "goFn": "canFinish", "stages": [
+      { "n": 1, "title": "Build arrows", "note": "For each pair add an arrow pre to course, and count each course's incoming arrows (in-degree)." },
+      { "n": 2, "title": "Seed the queue", "note": "Every course with in-degree 0 has no prerequisites. Put them all in the queue." },
+      { "n": 3, "title": "Finish a course", "note": "Take the front course off the queue. It is done." },
+      { "n": 4, "title": "Unlock courses", "note": "Lower the in-degree of each course that needed it. Any that reach 0 join the queue." },
+      { "n": 5, "title": "Count them", "note": "If every course went through the queue, there is no cycle. Otherwise some are stuck." }
+    ] }
+  ],
+  "goArgs": ["int", "[][]int"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "No prerequisites", "input": "3, []", "output": "true", "why": "Every course starts with in-degree 0, so all go straight into the queue." },
+    { "title": "Two-course loop", "input": "2, [[1,0],[0,1]]", "output": "false", "why": "Both courses wait for each other. The queue starts empty and nothing is ever finished." },
+    { "title": "Cycle away from the start", "input": "4, [[1,0],[2,1],[3,2],[1,3]]", "output": "false", "why": "Course 0 finishes, but 1, 2 and 3 form a loop. Finishing some courses does not prove all can finish." },
+    { "title": "Prerequisite on itself", "input": "1, [[0,0]]", "output": "false", "why": "A course that needs itself has in-degree 1 forever, so it is never queued." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The pair is [course, prerequisite], in that order. The arrow goes from the second number to the first. Swapping them still detects cycles but breaks any later ordering logic." },
+    { "lang": "TypeScript", "text": "Array(n).fill([]) gives every course the same inner array. Use Array.from({ length: n }, () => []) so each course gets its own list." },
+    { "lang": "TypeScript", "text": "queue.shift() is O(n) on big arrays. Walk a head index over a growing array, as here, to keep the loop linear." },
+    { "lang": "Go", "text": "Appending to a nil slice is fine, so next[pre] = append(next[pre], course) works on a make([][]int, n) with no setup. Reading a nil slice in range is also safe." }
+  ],
+  "recap": {
+    "pattern": "Topological sort (Kahn) for cycle check",
+    "key": "Repeatedly finish courses whose in-degree is 0. If everything gets finished there is no cycle.",
+    "complexity": "Time O(n + m). Space O(n + m).",
+    "moves": ["Build next-lists and in-degrees from the pairs", "Queue every course with in-degree 0", "Pop a course, lower the in-degree of what it unlocks, queue new zeros", "Return whether the queue handled all n courses"]
+  }
+}

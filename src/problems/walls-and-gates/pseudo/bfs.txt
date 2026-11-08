@@ -1,0 +1,16 @@
+function wallsAndGates(rooms)               # -1 wall, 0 gate, INF empty room
+  out = copy of rooms                       # keep the input as it was
+  queue = every gate (value 0)              # [1] all gates start together at distance 0
+  d = 0
+
+  while queue is not empty
+    d = d + 1
+    next = empty list
+    for each cell in queue, for each of its four neighbours nb
+      if nb is off the grid then skip
+      if out[nb] is not INF then skip       # [2] wall, gate, or already reached by a closer gate
+      out[nb] = d                           # [2] first visit is the shortest distance
+      add nb to next
+    queue = next
+
+  return out                                # [3] unreachable rooms keep INF

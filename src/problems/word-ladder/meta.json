@@ -1,0 +1,69 @@
+{
+  "slug": "word-ladder",
+  "title": "Word Ladder",
+  "category": "Graphs",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "You get a start word, an end word and a list of allowed words, all the same length. In one move you may change a single letter, and the new word must be in the list. Return how many words the shortest chain has, counting both the start and the end word. Return 0 if there is no chain. The start word need not be in the list.",
+  "example": {
+    "caption": "hit, hot, dot, dog, cog changes one letter each time. That chain has 5 words.",
+    "input": [{ "kind": "array", "label": "begin hit, end cog, list below", "items": ["hot", "dot", "dog", "lot", "log", "cog"] }],
+    "output": [{ "kind": "array", "label": "shortest chain, length 5", "items": ["hit", "hot", "dot", "dog", "cog"], "tones": ["hit", "hit", "hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Treat words as graph nodes and one-letter changes as edges, then run a breadth-first search. Find neighbours by hiding one letter (h*t) and reading the bucket of words with that pattern.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "BFS (breadth-first search)", "plain": "Explore all words one move away, then all two moves away, and so on. The first time you reach the end word is the shortest way." },
+      { "term": "wildcard pattern", "plain": "A word with one letter replaced by *. Words that fit the same pattern differ only in that letter." },
+      { "term": "layer", "plain": "All words at the same distance from the start." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Three arguments: begin word, end word, word list, e.g. \"hit\", \"cog\", [\"hot\",\"dot\",\"dog\",\"lot\",\"log\",\"cog\"]",
+    "presets": [
+      { "label": "Classic, length 5", "args": ["hit", "cog", ["hot", "dot", "dog", "lot", "log", "cog"]] },
+      { "label": "No path", "args": ["hit", "cog", ["hot", "dot", "cog"]] },
+      { "label": "One-letter words", "args": ["a", "c", ["a", "b", "c"]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "N", "meaning": "number of words in the list" }, { "sym": "L", "meaning": "length of each word" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Compare every word with every other word", "optimalLabel": "Pattern buckets", "unit": "word comparisons (rough, ignoring L)" },
+    "rows": [
+      { "name": "Compare every pair", "time": "O(N² · L)", "space": "O(N)", "note": "For every word, scan the whole list for words one letter off." },
+      { "name": "Pattern buckets + BFS", "time": "O(N · L²)", "space": "O(N · L²)", "note": "Each word makes L patterns and each pattern string costs L to build. The buckets store all those patterns." }
+    ],
+    "takeaway": "Hiding a letter turns the question which words are close to me into a map lookup. Each word is queued once, and BFS makes the first hit the shortest."
+  },
+  "variants": [
+    { "id": "bfs", "label": "BFS with pattern buckets", "tsFn": "ladderLength", "goFn": "ladderLength", "stages": [
+      { "n": 1, "title": "Pattern buckets", "note": "For every list word and every position, hide that letter and file the word under the pattern." },
+      { "n": 2, "title": "Start the queue", "note": "Put the start word in the queue with ladder length 1." },
+      { "n": 3, "title": "Take a word", "note": "Pop the oldest word and read its patterns, one per position." },
+      { "n": 4, "title": "Queue new neighbours", "note": "Words in those buckets are one letter away. Unseen ones get length + 1 and join the queue." },
+      { "n": 5, "title": "End word found", "note": "Reaching the end word returns its length. An empty queue means no chain, so return 0." }
+    ] }
+  ],
+  "goArgs": ["string", "string", "[]string"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "End word missing", "input": "\"hit\", \"cog\", [\"hot\",\"dot\",\"dog\"]", "output": "0", "why": "Neighbours come only from the list, so the end word can never be reached. The search ends with an empty queue." },
+    { "title": "Start not in the list", "input": "\"hit\", \"hot\", [\"hot\"]", "output": "2", "why": "The start word is only patterns to look up. It never needs a bucket entry of its own." },
+    { "title": "One step apart", "input": "\"a\", \"c\", [\"c\"]", "output": "2", "why": "Single-letter words have the one pattern *. The answer counts words, so one change gives length 2, not 1." },
+    { "title": "Dead-end branch", "input": "\"hit\", \"cog\", [\"hot\",\"dot\",\"tog\",\"cog\"]", "output": "0", "why": "hot and dot are reachable, but cog needs a word like dog or log and tog is two letters from dot. Exploring everything ends in 0." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The answer counts words, not moves. Start the length at 1 for the start word. Off-by-one here is the most common wrong answer." },
+    { "lang": "General", "text": "Mark a word as seen when you queue it, not when you pop it. A word that sits in many buckets would otherwise be queued many times." },
+    { "lang": "TypeScript", "text": "groups.get(pattern) can be undefined, because the start word has patterns that no list word shares. Use groups.get(pattern) ?? [] when reading." },
+    { "lang": "Go", "text": "Ranging over a missing map key is safe: groups[pattern] gives a nil slice and the loop runs zero times. Slicing the string as w[:i] + \"*\" + w[i+1:] is fine for lowercase ASCII, but would split a multi-byte rune." }
+  ],
+  "recap": {
+    "pattern": "BFS over wildcard patterns",
+    "key": "Hide one letter at a time to find words one change away. BFS from the start makes the first time you reach the end the shortest.",
+    "complexity": "Time O(N · L²). Space O(N · L²).",
+    "moves": ["Group every list word under each of its L patterns", "Queue the start word with length 1", "Pop a word, read each pattern's bucket", "Queue unseen words at length + 1, return when the end word appears"]
+  }
+}

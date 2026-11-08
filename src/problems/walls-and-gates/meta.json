@@ -1,0 +1,66 @@
+{
+  "slug": "walls-and-gates",
+  "title": "Walls And Gates",
+  "category": "Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a grid of rooms. -1 is a wall, 0 is a gate, and 2147483647 (call it INF) is an empty room. You can move up, down, left or right, never through a wall. Give each empty room the number of steps to its nearest gate. A room that no gate can reach stays INF.",
+  "example": {
+    "caption": "Two gates in opposite corners. Each room takes the distance to whichever gate is closer. The wall stays -1.",
+    "input": [{ "kind": "grid", "label": "rooms (∞ = INF)", "cells": [["∞","∞",0],["∞",-1,"∞"],[0,"∞","∞"]], "tones": [[null,null,"focus"],[null,"dim",null],["focus",null,null]] }],
+    "output": [{ "kind": "grid", "label": "distance to nearest gate", "cells": [[2,1,0],[1,-1,1],[0,1,2]], "tones": [["hit","hit","keep"],["hit","dim","hit"],["keep","hit","hit"]] }]
+  },
+  "idea": {
+    "sentence": "Start from all the gates at once and spread outward one ring at a time. The first time a ring reaches a room is its shortest distance, so write the ring number there.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "multi-source BFS", "plain": "Breadth-first search that starts from many cells at once. All starts are at distance 0, and each ring is one step further out." },
+      { "term": "INF", "plain": "A big number that stands for 'not reached yet'. Here 2147483647. A room that still holds it was never reached." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the rooms as rows of numbers. Use -1 for a wall, 0 for a gate and 2147483647 for an empty room.",
+    "presets": [
+      { "label": "Two gates", "args": [[[2147483647,2147483647,0],[2147483647,-1,2147483647],[0,2147483647,2147483647]]] },
+      { "label": "Walled-off rooms", "args": [[[0,-1,2147483647],[2147483647,-1,2147483647],[2147483647,-1,2147483647]]] },
+      { "label": "Four by four", "args": [[[2147483647,-1,0,2147483647],[2147483647,2147483647,2147483647,-1],[2147483647,-1,2147483647,2147483647],[0,-1,2147483647,2147483647]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of cells in the grid (rows times columns)" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Search from every room to find its nearest gate", "optimalLabel": "One spread from all gates", "unit": "cell visits (rough)" },
+    "rows": [
+      { "name": "BFS from each empty room", "time": "O(n²)", "space": "O(n)", "note": "Every room runs its own search until it meets a gate. Most of the work repeats." },
+      { "name": "BFS from all gates together", "time": "O(n)", "space": "O(n)", "note": "Each room is reached once and written once. The grid copy and the queue are the extra memory." }
+    ],
+    "takeaway": "Searching from the targets instead of from every room turns many searches into one. The first visit of a room is always the closest gate."
+  },
+  "variants": [
+    { "id": "bfs", "label": "Multi-source BFS", "tsFn": "wallsAndGates", "goFn": "wallsAndGates", "stages": [
+      { "n": 1, "title": "Queue all gates", "note": "Every gate goes into the queue. They all sit at distance 0, so they spread at the same speed." },
+      { "n": 2, "title": "One ring per distance", "note": "Each pass gives distance d to every INF neighbour of the current ring. Walls, gates and written rooms are skipped." },
+      { "n": 3, "title": "Return the grid", "note": "Rooms that were never reached still hold INF. They have no path to any gate." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "[][]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "No gates", "input": "[[INF,INF],[INF,INF]]", "output": "unchanged", "why": "The queue starts empty, so no ring is ever made. Every room stays INF." },
+    { "title": "Room behind a wall", "input": "[[0,-1,INF]]", "output": "[[0,-1,INF]]", "why": "The wall blocks the only path. The room is not reachable, so it keeps INF." },
+    { "title": "Equal distance to two gates", "input": "[[0,INF,0]]", "output": "[[0,1,0]]", "why": "Both gates reach the middle room at the same ring. Either way the distance is 1." },
+    { "title": "Empty grid", "input": "[]", "output": "[]", "why": "No rows to scan. The queue is empty and the result is an empty grid." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Use rooms.map(row => [...row]) to copy. A plain [...rooms] shares the row arrays, so the caller's grid would be overwritten as well." },
+    { "lang": "TypeScript", "text": "Do not test cells for truthiness. A gate is 0, which is falsy, but a wall is -1, which is truthy. Compare with === INF so each of the three kinds of cell is treated on purpose." },
+    { "lang": "Go", "text": "int is 64-bit on most machines, so 2147483647 is safe. In int32 code, 2147483647 + 1 wraps to a negative number. Only ever compare against INF." },
+    { "lang": "General", "text": "Test out[nb] === INF, not out[nb] > d. A gate (0) and a wall (-1) are both below INF, so they are skipped. A room already written has a smaller number, so it is skipped too." }
+  ],
+  "recap": {
+    "pattern": "Multi-source BFS from the targets",
+    "key": "Queue every gate, spread ring by ring, and write the ring number on each INF room on first visit.",
+    "complexity": "Time O(rows x cols). Space O(rows x cols).",
+    "moves": ["Queue every gate", "Each ring: give distance d to INF neighbours", "Skip walls, gates and written rooms", "Rooms left at INF are unreachable"]
+  }
+}

@@ -1,0 +1,19 @@
+function pacificAtlantic(heights)
+  function reach(starts)                    # cells whose water can run down to the starts
+    seen = grid of false
+    mark every start cell as seen           # [1] coast cells touch the ocean
+    frontier = starts
+    while frontier is not empty
+      next = empty list
+      for each cell in frontier, for each of its four neighbours nb
+        if nb is off the map or seen then skip
+        if height[nb] < height[cell] then skip    # [2] water at nb could not climb up to cell
+        mark nb as seen                     # [2] nb drains into cell, so it reaches the ocean
+        add nb to next
+      frontier = next
+    return seen
+
+  pacific  = reach(top row and left column)
+  atlantic = reach(bottom row and right column)
+
+  return every cell (in reading order) that is seen in both   # [3] reaches both oceans

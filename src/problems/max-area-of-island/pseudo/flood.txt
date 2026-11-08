@@ -1,0 +1,16 @@
+function maxAreaOfIsland(land)
+  owner = grid of 0s, same size as land     # [1] island number per cell, 0 = unclaimed
+  best = 0, islands = 0
+
+  function area(r, c, id)                   # claims the island, returns its size
+    if (r, c) is off the map then return 0
+    if land[r][c] is water or owner[r][c] != 0 then return 0
+    owner[r][c] = id                        # [3] claim this cell
+    return 1 + area of each of the four neighbours   # [3] this cell plus what they add
+
+  for every cell (r, c) in reading order
+    if land[r][c] is land and owner[r][c] == 0      # [2] a new island starts here
+      islands = islands + 1
+      size = area(r, c, islands)            # [3] flood and count
+      best = max(best, size)                # [4] keep the biggest area seen
+  return best                               # [4] 0 when there is no land

@@ -1,0 +1,14 @@
+[
+  {"name":"one source","input":[[[2,1,1],[1,1,0],[0,1,1]]],"expected":4},
+  {"name":"one orange cut off","input":[[[2,1,1],[0,1,1],[1,0,1]]],"expected":-1},
+  {"name":"two sources","input":[[[2,1,1,1,2],[1,1,1,1,1]]],"expected":3},
+  {"name":"no fresh oranges","input":[[[0,2]]],"expected":0,"edge":true},
+  {"name":"fresh but no rotten","input":[[[1]]],"expected":-1,"edge":true},
+  {"name":"walled off","input":[[[2,0,1]]],"expected":-1,"edge":true},
+  {"name":"empty grid","input":[[]],"expected":0,"edge":true},
+  {"name":"only empty cells","input":[[[0,0],[0,0]]],"expected":0},
+  {"name":"long chain","input":[[[2,1,1,1,1]]],"expected":4},
+  {"name":"already all rotten","input":[[[2,2],[2,2]]],"expected":0},
+  {"name":"rotten in the middle","input":[[[1,1,1],[1,2,1],[1,1,1]]],"expected":2},
+  {"name":"random 5x5","input":[[[1,1,0,0,1],[2,1,0,0,0],[2,1,1,0,0],[1,0,1,1,1],[1,1,1,1,1]]],"expected":-1}
+]

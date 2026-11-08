@@ -1,0 +1,70 @@
+{
+  "slug": "max-area-of-island",
+  "title": "Max Area of Island",
+  "category": "Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a grid of 0 (water) and 1 (land). An island is a group of land cells joined up, down, left or right. Its area is how many cells it has. Return the largest area of any island, or 0 if the grid has no land.",
+  "example": {
+    "caption": "Two islands, with areas 3 and 2. The answer is the bigger one, 3.",
+    "input": [{ "kind": "grid", "label": "map", "cells": [[0,1,0,0,1],[0,1,1,0,1],[0,0,0,0,0]] }],
+    "output": [
+      { "kind": "grid", "label": "largest island", "cells": [[0,1,0,0,1],[0,1,1,0,1],[0,0,0,0,0]], "tones": [[null,"hit",null,null,"dim"],[null,"hit","hit",null,"dim"],[null,null,null,null,null]] },
+      { "kind": "array", "label": "max area", "items": [3], "tones": ["hit"] }
+    ]
+  },
+  "idea": {
+    "sentence": "Flood each island once and let the flood return how many cells it claimed: one for the current cell plus whatever its four neighbours add. Keep the largest total.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "flood fill", "plain": "Start at one cell and spread to every connected land cell, claiming each one so it is never visited twice." },
+      { "term": "area", "plain": "The number of land cells in one island." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the map as rows of 0 and 1, e.g. [[1,1,0],[0,1,0]]",
+    "presets": [
+      { "label": "Four islands", "args": [[[0,1,0,0,1],[0,1,1,0,1],[0,0,0,0,0],[1,1,0,1,0]]] },
+      { "label": "Tie between two", "args": [[[1,1,0],[0,0,0],[0,1,1]]] },
+      { "label": "Ring around water", "args": [[[1,1,1],[1,0,1],[1,1,1]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of cells in the map (rows times columns)" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Flood from every land cell with a fresh visited set", "optimalLabel": "Flood each island once, keep the claims", "unit": "cell visits (rough)" },
+    "rows": [
+      { "name": "Fresh flood per land cell", "time": "O(n²)", "space": "O(n)", "note": "Every land cell starts its own flood over its whole island, and the visited set is rebuilt each time." },
+      { "name": "Claim cells and keep them", "time": "O(n)", "space": "O(n)", "note": "Each cell is claimed once. Space is the owner grid plus the recursion depth, which can reach n." }
+    ],
+    "takeaway": "Same as counting islands, with one change: the flood returns a number instead of nothing. Claimed cells stay claimed, so no cell is counted twice."
+  },
+  "variants": [
+    { "id": "flood", "label": "Flood fill (DFS)", "tsFn": "maxAreaOfIsland", "goFn": "maxAreaOfIsland", "stages": [
+      { "n": 1, "title": "Nothing claimed", "note": "A grid of island numbers, all 0. A cell with 0 has no owner yet." },
+      { "n": 2, "title": "New island found", "note": "Land with no owner starts a new island. Give it the next number and flood from here." },
+      { "n": 3, "title": "Flood and add up", "note": "Claim the cell and return 1 plus what each of the four neighbours returns. Water, claimed cells and edges return 0." },
+      { "n": 4, "title": "Keep the best", "note": "After each flood, best becomes the larger of best and the new area. The result is best, 0 if no land." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "No land", "input": "[[0,0],[0,0]]", "output": "0", "why": "No flood starts, so best stays at its start value. Starting best at 0 gives the right answer." },
+    { "title": "Everything is land", "input": "3 by 3 grid of 1s", "output": "9", "why": "One flood covers all nine cells. A wrong version that forgets to claim cells would loop or double count." },
+    { "title": "Ring around water", "input": "[[1,1,1],[1,0,1],[1,1,1]]", "output": "8", "why": "The flood goes round the ring. The water in the middle is not counted." },
+    { "title": "Diagonal land", "input": "[[1,0],[0,1]]", "output": "1", "why": "Diagonals do not join. Each cell is its own island of area 1." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "new Array(rows).fill(new Array(cols).fill(0)) shares one inner array between all rows. Claiming a cell would then claim it in every row. Use Array.from({ length: rows }, () => new Array(cols).fill(0))." },
+    { "lang": "TypeScript", "text": "Do not test land[r][c] for truthiness before checking the bounds. land[-1] is undefined, and undefined[c] throws. Check the bounds first, then the cell." },
+    { "lang": "Go", "text": "Each row of make([][]int, rows) starts nil. Allocate every row before the first write. The recursive closure needs var area func(r, c, id int) int declared before it is assigned." },
+    { "lang": "General", "text": "Count the cell when you claim it, not when you look at it. If you add 1 before the claimed check, a cell reached from two sides is added twice." }
+  ],
+  "recap": {
+    "pattern": "Flood fill that returns a size",
+    "key": "area(cell) = 1 + the areas of its unclaimed land neighbours. Claim before recursing. Keep the max over all floods.",
+    "complexity": "Time O(rows x cols). Space O(rows x cols).",
+    "moves": ["Make an owner grid, all empty", "Scan for land with no owner", "Flood it: 1 + each neighbour's area", "best = max(best, area)"]
+  }
+}

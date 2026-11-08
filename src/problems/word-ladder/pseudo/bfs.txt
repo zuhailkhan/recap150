@@ -1,0 +1,18 @@
+function ladderLength(beginWord, endWord, wordList)
+  groups = empty map from pattern to list of words    # [1] h*t -> hot, hat, ...
+  for each word w in wordList
+    for each position i in w
+      pattern = w with letter i replaced by *         # [1] hide one letter
+      add w to groups[pattern]
+  dist = map with beginWord -> 1                      # [2] ladder length to each reached word
+  queue = [beginWord]
+  for each word taken from the queue front            # [3] oldest word first
+    for each position i in word
+      pattern = word with letter i replaced by *      # [3] same patterns as above
+      for each next in groups[pattern]                # [4] one letter away
+        if next is endWord
+          return dist[word] + 1                       # [5] found the end word
+        if next is not in dist                        # [4] a new word
+          dist[next] = dist[word] + 1
+          add next to the queue
+  return 0                                            # [5] queue empty: no ladder

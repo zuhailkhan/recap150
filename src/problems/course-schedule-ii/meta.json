@@ -1,0 +1,69 @@
+{
+  "slug": "course-schedule-ii",
+  "title": "Course Schedule II",
+  "category": "Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Courses are numbered from 0. Each pair [a, b] means course b must be finished before course a. Return one order in which all courses can be taken. Several orders may be right and any of them is accepted. If the courses cannot all be taken, return an empty list.",
+  "example": {
+    "caption": "Course 0 comes first, 3 comes last. 1 and 2 can swap, so [0,1,2,3] and [0,2,1,3] are both right.",
+    "input": [{ "kind": "graph", "label": "pairs [[1,0],[2,0],[3,1],[3,2]]", "nodes": [{ "id": "0", "x": 12, "y": 50 }, { "id": "1", "x": 45, "y": 18 }, { "id": "2", "x": 45, "y": 82 }, { "id": "3", "x": 88, "y": 50 }], "edges": [{ "from": "0", "to": "1", "directed": true }, { "from": "0", "to": "2", "directed": true }, { "from": "1", "to": "3", "directed": true }, { "from": "2", "to": "3", "directed": true }] }],
+    "output": [{ "kind": "array", "label": "one valid order", "items": [0, 1, 2, 3], "tones": ["hit", "hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Walk to a course's prerequisites first and write the course down only after they are all written. The written list is then already a valid order.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "topological order", "plain": "A list of nodes in which every arrow points forward: the start of each arrow comes before its end." },
+      { "term": "DFS (depth-first search)", "plain": "Follow one chain of links as deep as it goes before trying the next branch. Recursion does this for you." },
+      { "term": "on the path", "plain": "A course we entered but have not finished. Meeting one again means we looped back to ourselves." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the course count, then the pairs, e.g. 4, [[1,0],[2,0],[3,1],[3,2]]",
+    "presets": [
+      { "label": "Diamond", "args": [4, [[1, 0], [2, 0], [3, 1], [3, 2]]] },
+      { "label": "Cycle, empty result", "args": [3, [[0, 1], [1, 2], [2, 0]]] },
+      { "label": "Chain, listed backwards", "args": [3, [[0, 1], [1, 2]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of courses" }, { "sym": "m", "meaning": "number of prerequisite pairs" }],
+    "compare": { "brute": "2n", "optimal": "n", "bruteLabel": "Try every ordering (grows like n!, drawn as 2^n)", "optimalLabel": "One depth-first pass", "unit": "steps (rough)" },
+    "rows": [
+      { "name": "Try every order", "time": "O(n! · m)", "space": "O(n)", "note": "Generate orderings and check each against all pairs." },
+      { "name": "DFS with three states", "time": "O(n + m)", "space": "O(n + m)", "note": "Each course is entered once and each pair followed once. Recursion can go n deep." }
+    ],
+    "takeaway": "Writing a course after its prerequisites makes the finished list valid by construction. The same walk spots cycles for free."
+  },
+  "variants": [
+    { "id": "dfs", "label": "DFS, three states", "tsFn": "findOrderDriver", "goFn": "findOrderDriver", "stages": [
+      { "n": 1, "title": "Needs lists", "note": "For each course keep the list of courses it needs first." },
+      { "n": 2, "title": "Enter a course", "note": "Mark it as on the current path, then visit everything it needs." },
+      { "n": 3, "title": "Write it down", "note": "All its needs are written. Mark it done and append it to the order." },
+      { "n": 4, "title": "Already seen", "note": "A done course is skipped. A course still on the path means a cycle, so give up." },
+      { "n": 5, "title": "Start everywhere", "note": "Start a walk from every course. Return the order, or an empty list after a cycle." }
+    ] }
+  ],
+  "goArgs": ["int", "[][]int"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One course", "input": "1, []", "output": "[0]", "why": "No pairs. The single course is written down straight away." },
+    { "title": "Cycle gives empty list", "input": "2, [[1,0],[0,1]]", "output": "[]", "why": "Course 0 enters, needs 1, enters, needs 0 which is still on the path. The answer is an empty list, not a partial order." },
+    { "title": "Cycle after a good start", "input": "3, [[1,0],[2,1],[1,2]]", "output": "[]", "why": "Course 0 gets written first, but 1 and 2 loop. A partial order is wrong. Return nothing." },
+    { "title": "Independent courses", "input": "3, []", "output": "[0, 1, 2]", "why": "Any order is valid. This one starts at 0 and takes each course as it comes." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Two states are not enough. A plain visited flag cannot tell a harmless repeat (diamond shape) from a real cycle. You need the third state: on the current path." },
+    { "lang": "General", "text": "Tests here use a driver that checks the order is valid and returns [length, 1 or 0]. Many orders are right, so comparing to one fixed list would reject correct answers." },
+    { "lang": "TypeScript", "text": "Array(n).fill([]) shares one inner array between all courses. Use Array.from({ length: n }, () => []) so each course has its own needs list." },
+    { "lang": "Go", "text": "A recursive closure must be declared first with var visit func(int) bool, then assigned. Writing visit := func... cannot call itself. Return []int{} for a cycle so callers see an empty list, not nil." }
+  ],
+  "recap": {
+    "pattern": "DFS topological order with 3 states",
+    "key": "Visit prerequisites first, then write the course. Meeting a course that is still on the path means a cycle.",
+    "complexity": "Time O(n + m). Space O(n + m).",
+    "moves": ["Build the needs list of every course", "Enter a course and mark it on the path", "Visit its needs, then mark it done and append it", "Return an empty list if you meet a course on the path"]
+  }
+}

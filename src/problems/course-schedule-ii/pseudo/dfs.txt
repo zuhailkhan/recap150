@@ -1,0 +1,20 @@
+function findOrder(numCourses, prerequisites)
+  needs = an empty list for every course       # [1] needs[c] = courses before c
+  for each (course, pre) in prerequisites
+    add pre to needs[course]                   # [1]
+  state = zeros for every course               # 0 unseen, 1 on the path, 2 written
+  order = empty list
+
+  function visit(c)
+    if state[c] == 2: return true              # [4] already written: skip
+    if state[c] == 1: return false             # [4] still on the path: cycle
+    state[c] = 1                               # [2] enter c: it is on the path
+    for each p in needs[c]
+      if visit(p) is false: return false
+    state[c] = 2                               # [3] all needs written: write c
+    add c to the end of order                  # [3]
+    return true
+
+  for each course c from 0 to numCourses - 1
+    if visit(c) is false: return empty list    # [5] a cycle means no order
+  return order                                 # [5]

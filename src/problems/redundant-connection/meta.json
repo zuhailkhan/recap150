@@ -1,0 +1,68 @@
+{
+  "slug": "redundant-connection",
+  "title": "Redundant Connection",
+  "category": "Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "A tree on n nodes (numbered 1 to n) had one extra edge added, so the list now has n edges. Find an edge that can be removed to leave a tree again. If several edges qualify, return the one that appears last in the list.",
+  "example": {
+    "caption": "Edges 1-2, 2-3, 3-4 already connect 1 and 4. The edge 1-4 closes the loop, so it is the answer.",
+    "input": [{ "kind": "graph", "label": "edges [[1,2],[2,3],[3,4],[1,4],[1,5]]", "nodes": [{ "id": "1", "x": 15, "y": 20 }, { "id": "2", "x": 15, "y": 80 }, { "id": "3", "x": 55, "y": 80 }, { "id": "4", "x": 55, "y": 20 }, { "id": "5", "x": 88, "y": 20 }], "edges": [{ "from": "1", "to": "2" }, { "from": "2", "to": "3" }, { "from": "3", "to": "4" }, { "from": "1", "to": "4" }, { "from": "1", "to": "5" }] }],
+    "output": [{ "kind": "graph", "label": "[1, 4] closes the loop 1-2-3-4", "nodes": [{ "id": "1", "x": 15, "y": 20 }, { "id": "2", "x": 15, "y": 80 }, { "id": "3", "x": 55, "y": 80 }, { "id": "4", "x": 55, "y": 20 }, { "id": "5", "x": 88, "y": 20 }], "edges": [{ "from": "1", "to": "2" }, { "from": "2", "to": "3" }, { "from": "3", "to": "4" }, { "from": "1", "to": "4", "tone": "miss" }, { "from": "1", "to": "5" }], "tones": { "1": "miss", "4": "miss" } }]
+  },
+  "idea": {
+    "sentence": "Add the edges one by one and keep track of which nodes are connected. The first edge whose two ends are already connected is the redundant one.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "union-find", "plain": "A structure that remembers groups. find(x) names the group leader of x, and union merges two groups." },
+      { "term": "root (leader)", "plain": "The node at the top of a group. It is its own parent. Two nodes are in the same group when they have the same root." },
+      { "term": "path compression", "plain": "While climbing to the root, point nodes closer to it. Later climbs are shorter." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the list of edges, e.g. [[1,2],[1,3],[2,3]]",
+    "presets": [
+      { "label": "Loop of four", "args": [[[1, 2], [2, 3], [3, 4], [1, 4], [1, 5]]] },
+      { "label": "Triangle", "args": [[[1, 2], [1, 3], [2, 3]]] },
+      { "label": "Extra edge last", "args": [[[1, 5], [3, 4], [2, 3], [1, 4], [1, 2]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes (and edges)" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Search for a path before adding each edge", "optimalLabel": "One union-find step per edge", "unit": "steps (rough)" },
+    "rows": [
+      { "name": "DFS per edge", "time": "O(n²)", "space": "O(n)", "note": "Before adding an edge, search the graph so far for a path between its ends." },
+      { "name": "Union-find", "time": "O(n · α(n))", "space": "O(n)", "note": "Each edge costs two finds and maybe one union. α is the inverse Ackermann function, below 5 for any real input, so treat it as constant." }
+    ],
+    "takeaway": "You never need the path itself, only whether the ends are already connected. Union-find answers that in almost constant time."
+  },
+  "variants": [
+    { "id": "unionfind", "label": "Union-find", "tsFn": "findRedundantConnection", "goFn": "findRedundantConnection", "stages": [
+      { "n": 1, "title": "Everyone alone", "note": "Make a parent array where every node is its own leader." },
+      { "n": 2, "title": "Find both leaders", "note": "Climb from each end of the edge to its group leader. Hop closer to the root as you go (path halving)." },
+      { "n": 3, "title": "Same leader: loop", "note": "The ends already share a group, so this edge closes a loop. It is the answer." },
+      { "n": 4, "title": "Merge the groups", "note": "Different leaders: make one leader point to the other. The edge joins two groups." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Smallest loop", "input": "[[1,2],[1,2]]", "output": "[1, 2]", "why": "Two nodes with the same edge twice. The second copy finds both ends already connected." },
+    { "title": "Triangle", "input": "[[1,2],[1,3],[2,3]]", "output": "[2, 3]", "why": "Any of the three edges could be removed. The rule picks the last one in the list, which is the one the scan reaches last." },
+    { "title": "Long chain then back-edge", "input": "[[1,2],[2,3],[3,4],[4,5],[1,5]]", "output": "[1, 5]", "why": "A chain keeps merging groups. The final edge sees both ends already in the one big group." },
+    { "title": "Extra edge is not last", "input": "[[1,4],[3,4],[1,3],[1,2],[4,5]]", "output": "[1, 3]", "why": "The edge that closes the loop can sit in the middle of the list. Edges after it are still tree edges." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Nodes are numbered from 1, so the parent array needs n + 1 slots. Using size n crashes on the last node." },
+    { "lang": "General", "text": "Without path compression a long chain makes every find walk the whole chain, which is O(n²) overall. Compress while climbing, or merge the smaller group into the bigger one." },
+    { "lang": "TypeScript", "text": "A node number outside 1..n makes parent[x] undefined, and the while loop then never ends. Trust the input range or guard it." },
+    { "lang": "Go", "text": "Go needs a final return even though valid input never reaches it. The find closure captures the parent slice, so path halving updates the same slice that the loop reads." }
+  ],
+  "recap": {
+    "pattern": "Union-find: ends already joined",
+    "key": "Connect edges one at a time. The first edge whose ends already have the same root is redundant.",
+    "complexity": "Time O(n · α(n)). Space O(n).",
+    "moves": ["Make parent[v] = v for every node", "find both ends, hopping closer to the root", "Same root: return this edge", "Different roots: point one root at the other"]
+  }
+}

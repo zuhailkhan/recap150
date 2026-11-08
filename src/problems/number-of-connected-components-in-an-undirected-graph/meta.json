@@ -1,0 +1,70 @@
+{
+  "slug": "number-of-connected-components-in-an-undirected-graph",
+  "title": "Number of Connected Components In An Undirected Graph",
+  "category": "Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get n nodes numbered 0 to n-1 and a list of undirected edges. A connected component is a group of nodes that can all reach each other through edges. Return how many components the graph has. A node with no edges is a component by itself.",
+  "example": {
+    "caption": "Nodes 0, 1, 2 are linked. 3 and 4 are linked. 5 is alone. That makes 3 components.",
+    "input": [{ "kind": "graph", "label": "n = 6, edges [[0,1],[1,2],[3,4]]", "nodes": [{ "id": "0", "x": 10, "y": 30 }, { "id": "1", "x": 30, "y": 70 }, { "id": "2", "x": 50, "y": 30 }, { "id": "3", "x": 70, "y": 70 }, { "id": "4", "x": 90, "y": 30 }, { "id": "5", "x": 90, "y": 85 }], "edges": [{ "from": "0", "to": "1" }, { "from": "1", "to": "2" }, { "from": "3", "to": "4" }] }],
+    "output": [{ "kind": "graph", "label": "3 components", "nodes": [{ "id": "0", "x": 10, "y": 30 }, { "id": "1", "x": 30, "y": 70 }, { "id": "2", "x": 50, "y": 30 }, { "id": "3", "x": 70, "y": 70 }, { "id": "4", "x": 90, "y": 30 }, { "id": "5", "x": 90, "y": 85 }], "edges": [{ "from": "0", "to": "1" }, { "from": "1", "to": "2" }, { "from": "3", "to": "4" }], "tones": { "0": "keep", "1": "keep", "2": "keep", "3": "hit", "4": "hit", "5": "focus" }, "notes": { "0": "#1", "1": "#1", "2": "#1", "3": "#2", "4": "#2", "5": "#3" } }]
+  },
+  "idea": {
+    "sentence": "Walk through the nodes. Each time you meet a node no earlier walk reached, start a new walk that marks everything connected to it, and count that start.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "connected component", "plain": "A maximal group of nodes where any one can reach any other by following edges." },
+      { "term": "adjacency list", "plain": "For each node, the list of nodes it shares an edge with." },
+      { "term": "flood fill", "plain": "Starting at one node, keep visiting unvisited neighbours until nothing new is reachable." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the node count, then the edges, e.g. 6, [[0,1],[1,2],[3,4]]",
+    "presets": [
+      { "label": "Three components", "args": [6, [[0, 1], [1, 2], [3, 4]]] },
+      { "label": "All one component", "args": [4, [[0, 1], [1, 2], [2, 3]]] },
+      { "label": "No edges", "args": [4, []] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }, { "sym": "m", "meaning": "number of edges" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Test every pair of nodes for a path", "optimalLabel": "One walk per component", "unit": "steps (rough)" },
+    "rows": [
+      { "name": "Path check for every pair", "time": "O(n² · (n + m))", "space": "O(n)", "note": "Ask for each pair whether a path exists." },
+      { "name": "DFS flood fill", "time": "O(n + m)", "space": "O(n + m)", "note": "Each node is marked once and each edge is looked at twice. The lists hold every edge." },
+      { "name": "Union-find (alternative)", "time": "O(n + m · α(n))", "space": "O(n)", "note": "Start with n groups and subtract one for every edge that merges two groups. See Redundant Connection." }
+    ],
+    "takeaway": "Marking nodes as you reach them means no node is walked twice. The number of fresh starts equals the number of components."
+  },
+  "variants": [
+    { "id": "dfs", "label": "DFS flood fill", "tsFn": "countComponents", "goFn": "countComponents", "stages": [
+      { "n": 1, "title": "Neighbour lists", "note": "Store every edge in both directions so each node knows its neighbours." },
+      { "n": 2, "title": "New component", "note": "At the next node nobody has reached, count a new component and number it." },
+      { "n": 3, "title": "Take a node", "note": "Pop a node off the stack and look at each of its neighbours." },
+      { "n": 4, "title": "Reach neighbours", "note": "Mark each unreached neighbour with the current component number and push it." },
+      { "n": 5, "title": "Return the count", "note": "Every node has a component number. The number of starts is the answer." }
+    ] }
+  ],
+  "goArgs": ["int", "[][]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "No edges", "input": "4, []", "output": "4", "why": "Each node is its own component. The outer loop starts a walk at every node." },
+    { "title": "Single node", "input": "1, []", "output": "1", "why": "One node and nothing else is still one component." },
+    { "title": "Duplicate and reversed edges", "input": "3, [[0,1],[1,0],[0,1]]", "output": "2", "why": "Repeated edges change nothing. The group mark stops a node being pushed twice. Node 2 is alone." },
+    { "title": "One long chain", "input": "5, [[0,1],[1,2],[2,3],[3,4]]", "output": "1", "why": "One walk from node 0 reaches everything. The stack replaces recursion, so a long chain cannot overflow." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Add each undirected edge in both directions. If you only add a to b, a walk that begins at b never gets back to a." },
+    { "lang": "General", "text": "Mark a node when you push it, not when you pop it. Otherwise the same node can sit on the stack many times." },
+    { "lang": "TypeScript", "text": "Array(n).fill([]) makes every node share one neighbour list. Use Array.from({ length: n }, () => []). Also todo.pop() is typed number | undefined, so assert it is present after checking the length." },
+    { "lang": "Go", "text": "make([][]int, n) gives n nil inner slices. append works on a nil slice, so adj[a] = append(adj[a], b) needs no setup. Popping is todo = todo[:len(todo)-1]." }
+  ],
+  "recap": {
+    "pattern": "Flood fill: count the starts",
+    "key": "Scan nodes. A node not yet reached starts a new component. Flood from it to mark its whole component.",
+    "complexity": "Time O(n + m). Space O(n + m).",
+    "moves": ["Build neighbour lists in both directions", "Scan nodes and start at any unreached one, count it", "Pop, and mark and push each unreached neighbour", "Return the number of starts"]
+  }
+}
