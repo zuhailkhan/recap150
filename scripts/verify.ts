@@ -81,7 +81,7 @@ for (const slug of slugs) {
       go: stagesIn(stripGoPackage(goRaw)),
     }
     for (const [lang, st] of Object.entries(got)) if (!eq(st, want)) fail(slug, `${v.id}: ${lang} stages [${st}] differ from meta stages [${want}]`)
-    if (/\bt\.step\b|Tracer/.test(stripTraceCode(tsRaw))) fail(slug, `${v.id}: tracer code leaked into the displayed TypeScript`)
+    if (/\bt\.step\b|Tracer|[,(]\s*t\s*[,)]/.test(stripTraceCode(tsRaw))) fail(slug, `${v.id}: tracer code leaked into the displayed TypeScript`)
     const driver = join(dir, 'ts', `${v.id}.driver.ts`)
     ;(v as any)._mod = existsSync(driver) ? driver : paths.ts
     const gdriver = join(dir, 'go', `${v.id}.driver.go`)

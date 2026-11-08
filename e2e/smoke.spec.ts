@@ -47,8 +47,8 @@ for (const size of sizes) {
         for (const lang of ['Pseudocode', 'TypeScript', 'Go']) {
           await page.getByRole('button', { name: `Reveal ${lang}` }).click()
         }
-        await expect(page.getByRole('button', { name: 'Hide' })).toHaveCount(3)
-        await expect(page.getByRole('button', { name: 'Copy' })).toHaveCount(3)
+        await expect(page.getByRole('button', { name: 'Hide', exact: true })).toHaveCount(3)
+        await expect(page.getByRole('button', { name: 'Copy', exact: true })).toHaveCount(3)
         await expect(page.locator('.howto')).toHaveCount(3)
         await noSidewaysScroll(page, `${slug} at ${size.name}`)
         expect(errors, errors.join('\n')).toEqual([])

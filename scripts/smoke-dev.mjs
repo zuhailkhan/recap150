@@ -32,6 +32,13 @@ for (const [name, viewport] of [['phone', { width: 360, height: 740 }], ['deskto
       await page.waitForSelector('h1', { timeout: 15000 })
       const next = page.getByRole('button', { name: 'Next', exact: true })
       await next.waitFor({ timeout: 15000 })
+      const png = (suffix) => new URL(`../screenshots/${slug}-${name}-${suffix}.png`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
+      if (shots) {
+        // small crops that are easy to judge: the idea demo, and the stepper about 40% through
+        await page.locator('#idea').screenshot({ path: png('idea') })
+        for (let i = 0; i < 6 && (await next.isEnabled()); i++) await next.click()
+        await page.locator('#watch').screenshot({ path: png('watch') })
+      }
       for (let i = 0; i < 80 && (await next.isEnabled()); i++) await next.click()
       if (!(await page.locator('.result').count())) failures.push(`${tag}: no result shown at the last step`)
       // every preset must run
@@ -41,7 +48,7 @@ for (const [name, viewport] of [['phone', { width: 360, height: 740 }], ['deskto
         for (let k = 0; k < 80 && (await next.isEnabled()); k++) await next.click()
       }
       for (const lang of ['Pseudocode', 'TypeScript', 'Go']) await page.getByRole('button', { name: `Reveal ${lang}` }).click()
-      const hides = await page.getByRole('button', { name: 'Hide' }).count()
+      const hides = await page.getByRole('button', { name: 'Hide', exact: true }).count()
       if (hides !== 3) failures.push(`${tag}: expected 3 Hide buttons, got ${hides}`)
       const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
       if (over > 0) failures.push(`${tag}: page scrolls sideways by ${over}px`)

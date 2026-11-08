@@ -11,7 +11,7 @@ const cls = (id: string) => { const t = props.tone(id); return t ? `t-${t}` : ''
 </script>
 
 <template>
-  <svg :width="width" :height="height" :viewBox="`0 0 ${width} ${height}`" role="img" aria-label="tree diagram">
+  <svg :width="width" :height="height" :viewBox="`0 0 ${width} ${height}`" style="max-width: 100%; height: auto" role="img" aria-label="tree diagram">
     <line v-for="e in layout.edges" :key="e.from + '>' + e.to" class="sve" :class="props.hot?.(e.to) ? 't-focus' : ''" :x1="pos.get(e.from)!.x" :y1="pos.get(e.from)!.y" :x2="pos.get(e.to)!.x" :y2="pos.get(e.to)!.y" />
     <g v-for="n in layout.nodes" :key="n.id">
       <circle v-if="n.end" class="svn" :class="cls(n.id)" :cx="pos.get(n.id)!.x" :cy="pos.get(n.id)!.y" :r="R + 4" style="fill: none" />
