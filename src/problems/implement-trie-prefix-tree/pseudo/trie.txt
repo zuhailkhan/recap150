@@ -1,0 +1,25 @@
+class Trie
+  root = new empty node                    # [1] stands for the empty prefix
+
+  insert(word)
+    node = root
+    for each letter in word
+      if node has no child for letter
+        node.child[letter] = new node      # [2] shared prefixes reuse nodes
+      node = node.child[letter]
+    node.isEnd = true                      # [3] mark where the word finishes
+
+  walk(text)
+    node = root
+    for each letter in text
+      if node has no child for letter
+        return nothing                     # [4] the path breaks here
+      node = node.child[letter]            # [4] one letter, one step down
+    return node
+
+  search(word)
+    node = walk(word)
+    return node exists and node.isEnd      # [5] the word must end here
+
+  startsWith(prefix)
+    return walk(prefix) exists             # [5] a full path is enough

@@ -1,0 +1,72 @@
+{
+  "slug": "word-search-ii",
+  "title": "Word Search II",
+  "category": "Tries",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "You get a grid of lowercase letters and a list of words. A word is on the grid if you can spell it by moving between side-by-side cells, never using the same cell twice in one word. Return every word from the list that is on the grid, each one once, in any order.",
+  "example": {
+    "caption": "Board o a t / e t h, words oat and oath. Both start with o-a-t, so one walk through the grid finds both.",
+    "input": [{ "kind": "grid", "label": "board", "cells": [["o", "a", "t"], ["e", "t", "h"]] }],
+    "output": [{ "kind": "grid", "label": "oath: o, a, t, h", "cells": [["o", "a", "t"], ["e", "t", "h"]], "tones": [["hit", "hit", "hit"], [null, null, "hit"]] }]
+  },
+  "idea": {
+    "sentence": "Put all the words in one trie and walk the grid once with it, so every step checks all words together and a path that no word starts with is dropped at once.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "trie", "plain": "A tree where each edge is one letter, so words with the same start share nodes." },
+      { "term": "prune", "plain": "Stop exploring a branch early because it cannot lead to an answer." },
+      { "term": "backtracking", "plain": "Try a path, and when it is finished, undo your marks and step back to try another path." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the board as rows of single letters, then the word list, e.g. [[\"o\",\"a\"],[\"e\",\"t\"]], [\"oat\"]",
+    "presets": [
+      { "label": "Shared prefix", "args": [[["o", "a", "t"], ["e", "t", "h"]], ["oat", "oath"]] },
+      { "label": "Prefix but no word", "args": [[["a", "b"], ["c", "d"]], ["ab", "abcd"]] },
+      { "label": "No cell reuse", "args": [[["a", "b"]], ["aba", "ab"]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "m", "meaning": "number of cells on the board" }, { "sym": "W", "meaning": "number of words" }, { "sym": "L", "meaning": "length of the longest word" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Search the whole board once per word", "optimalLabel": "One walk, all words at once via the trie", "unit": "work, growing with the number of words" },
+    "rows": [
+      { "name": "One search per word", "time": "O(W * m * 4^L)", "space": "O(L)", "note": "Every word repeats its own search from every cell." },
+      { "name": "Trie + DFS", "time": "O(m * 4^L)", "space": "O(total letters)", "note": "One walk covers all words. Paths nobody starts with are cut off at once, so in practice it explores far less." }
+    ],
+    "takeaway": "The trie turns a question asked once per word into one question for all words together. Pruning on a missing child is what makes it fast."
+  },
+  "variants": [
+    { "id": "trie", "label": "Trie + DFS", "tsFn": "findWords", "goFn": "findWords", "stages": [
+      { "n": 1, "title": "Build the trie", "note": "Insert every word into one trie and mark where each word ends." },
+      { "n": 2, "title": "Step onto a cell", "note": "If the trie has a child for this cell's letter, extend the path, mark the cell used and look at its neighbours." },
+      { "n": 3, "title": "Prune", "note": "If the trie has no child for this letter, no word starts with this path. Return without going deeper." },
+      { "n": 4, "title": "Word found", "note": "If the node ends a word, record the path and clear the flag so the word is reported only once." },
+      { "n": 5, "title": "Backtrack", "note": "After all neighbours, unmark the cell so other paths can use it." }
+    ] }
+  ],
+  "goArgs": ["[][]string", "[]string"],
+  "goRet": "[]string",
+  "compare": "sortedFlat",
+  "edges": [
+    { "title": "Cell used twice", "input": "board a b, word aba", "output": "not found", "why": "The third letter would need the first cell again. The used mark blocks it." },
+    { "title": "Same word, many paths", "input": "board of all a, word aa", "output": "reported once", "why": "Many paths spell it. Clearing the end flag after the first find keeps the answer free of duplicates." },
+    { "title": "Word inside another", "input": "words ab and abc on a b c", "output": "both found", "why": "ab ends on the way to abc. Record it and keep walking, do not stop at the first word end." },
+    { "title": "No words", "input": "word list is empty", "output": "[]", "why": "The trie has no children, so every cell is pruned at once. Return an empty list, not null." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Do not stop the walk when you find a word. A longer word may continue along the same path, like oat and oath." },
+    { "lang": "General", "text": "Unmark the cell when you backtrack. If the used mark stays, later paths wrongly think that cell is taken." },
+    { "lang": "General", "text": "Clear the end flag after reporting a word. Otherwise a word with several paths is added several times." },
+    { "lang": "TypeScript", "text": "Use a Map for the children. A plain object breaks on keys like \"constructor\" or \"__proto__\"." },
+    { "lang": "Go", "text": "With [26]*node arrays the index is letter - 'a'. Board cells here are strings, so take board[r][c][0] first. A letter outside a to z would index out of range." },
+    { "lang": "Go", "text": "Start found as []string{}, not var found []string. A nil slice becomes null in JSON when there is no answer." },
+    { "lang": "Go", "text": "A recursive closure must be declared first (var dfs func(...)) and assigned after, or it cannot call itself." }
+  ],
+  "recap": {
+    "pattern": "Trie + backtracking on a grid",
+    "key": "Walk the grid once with a trie of all words. Cut a path when the trie has no child for the next letter.",
+    "complexity": "O(m * 4^L) worst case, much less with pruning. Space O(total letters).",
+    "moves": ["Insert all words into one trie", "DFS from every cell, following trie children", "No child for this letter: prune", "Word end: record it and clear the flag. Unmark on the way back"]
+  }
+}

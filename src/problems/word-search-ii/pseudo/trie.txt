@@ -1,0 +1,24 @@
+findWords(board, words)
+  root = new trie node
+  for each word in words
+    insert word into the trie              # [1] one trie for all the words
+    mark its last node as isEnd
+  found = empty list
+  seen = grid of false                     # cells on the current path
+
+  dfs(r, c, node, path)
+    next = node.child[board[r][c]]
+    if next is missing: return             # [3] prune: no word starts like this
+    path = path + board[r][c]
+    seen[r][c] = true                      # [2] cell is on the path
+    if next.isEnd
+      add path to found                    # [4] a whole word is spelled
+      next.isEnd = false                   # report it once
+    for each neighbour (up, down, left, right)
+      if inside the board and not seen
+        dfs(neighbour, next, path)
+    seen[r][c] = false                     # [5] backtrack
+
+  for every cell (r, c)
+    dfs(r, c, root, "")
+  return found

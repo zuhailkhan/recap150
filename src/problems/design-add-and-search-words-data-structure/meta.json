@@ -1,0 +1,71 @@
+{
+  "slug": "design-add-and-search-words-data-structure",
+  "title": "Design Add And Search Words Data Structure",
+  "category": "Tries",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Build a word store with addWord(word) and search(pattern). A pattern is made of lowercase letters and dots, and a dot stands for any single letter. search returns true when some stored word has the same length as the pattern and matches it letter by letter.",
+  "example": {
+    "caption": "Stored: bad, dad, mad, dot. The pattern d.t starts with d, then the dot tries a and o. Only the o branch can end in t.",
+    "input": [{ "kind": "trie", "label": "stored: bad, dad, mad, dot", "words": ["bad", "dad", "mad", "dot"] }],
+    "output": [{ "kind": "trie", "label": "search(d.t) is true through d, o, t", "words": ["bad", "dad", "mad", "dot"], "hot": "dot", "hotTone": "hit" }]
+  },
+  "idea": {
+    "sentence": "A plain letter has one way down the trie, but a dot branches into every child, so the search becomes a depth-first search that tries each branch and backs up on failure.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "wildcard", "plain": "A symbol that matches many things. Here a dot matches any one letter." },
+      { "term": "depth-first search (DFS)", "plain": "Go as deep as you can down one branch. If it fails, back up one step and try the next branch." },
+      { "term": "trie", "plain": "A tree where each edge is one letter and shared prefixes are stored once." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then their arguments, e.g. [\"WordDictionary\",\"addWord\",\"search\"], [[],[\"bad\"],[\"b.d\"]]",
+    "presets": [
+      { "label": "Wildcard branches", "args": [["WordDictionary", "addWord", "addWord", "addWord", "addWord", "search", "search", "search"], [[], ["bad"], ["dad"], ["mad"], ["dot"], ["pad"], ["d.t"], [".ad"]]] },
+      { "label": "Every branch fails", "args": [["WordDictionary", "addWord", "addWord", "search"], [[], ["mad"], ["man"], ["m.t"]]] },
+      { "label": "Prefix only", "args": [["WordDictionary", "addWord", "search", "search"], [[], ["apple"], ["app"], ["appl."]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "L", "meaning": "length of the pattern" }, { "sym": "n", "meaning": "number of stored words" }],
+    "compare": { "brute": "n", "optimal": "n", "bruteLabel": "Compare the pattern with every stored word", "optimalLabel": "Trie walk (worst case, all dots)", "unit": "steps per search. With no dots a trie search is only L steps, which is far less" },
+    "rows": [
+      { "name": "List of words", "time": "O(n * L)", "space": "O(n * L)", "note": "Every search compares against every word of the same length." },
+      { "name": "Trie, no dots", "time": "O(L)", "space": "O(total letters)", "note": "One path down, one node per letter." },
+      { "name": "Trie, with dots", "time": "O(nodes visited)", "space": "O(L) stack", "note": "Each dot fans out. Worst case, a pattern of only dots visits every node up to depth L." }
+    ],
+    "takeaway": "The trie helps most when letters are known: a wrong letter cuts a whole branch at once. Dots give that back, so only dots cost a fan-out."
+  },
+  "variants": [
+    { "id": "dictionary", "label": "Trie with DFS wildcards", "tsFn": "run", "goFn": "run", "stages": [
+      { "n": 1, "title": "Empty root", "note": "Make one empty root node for the empty prefix." },
+      { "n": 2, "title": "addWord", "note": "Walk down the word, reusing or creating a child per letter, then set the end flag on the last node." },
+      { "n": 3, "title": "Plain letter", "note": "Look up the one child with that letter. If it is missing, this branch fails." },
+      { "n": 4, "title": "Dot: try every child", "note": "Recurse into each child in turn with the next letter. Return true as soon as one branch works." },
+      { "n": 5, "title": "Pattern used up", "note": "When all letters are consumed, succeed only if this node ends a stored word." }
+    ] }
+  ],
+  "goArgs": ["[]string", "[][]string"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty dictionary", "input": "search(.) before any addWord", "output": "false", "why": "A dot needs at least one child to try. The root has none, so the loop runs zero times." },
+    { "title": "Pattern longer than the word", "input": "stored a, search(..)", "output": "false", "why": "After a there are no children, so the second dot has nothing to match. A dot never matches nothing." },
+    { "title": "Pattern is a prefix", "input": "stored apple, search(app)", "output": "false", "why": "All letters match, but the node is not a word end. The end flag is the last check." },
+    { "title": "All dots", "input": "stored ab, cb, db, search(..)", "output": "true", "why": "The first branch already works, so the search stops there and does not touch the others." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "A dot must match exactly one letter. A shorter or longer stored word never matches, which is why the end flag is checked only when the pattern is used up." },
+    { "lang": "General", "text": "Do not return false after the first failed child. Return false only after the loop has tried all children." },
+    { "lang": "TypeScript", "text": "A plain object as the children map breaks on keys such as \"constructor\" or \"__proto__\". Use a Map, which also gives you for...of over the children for the dot case." },
+    { "lang": "Go", "text": "A map field is nil until you make it, and writing to a nil map panics. Create children together with the node." },
+    { "lang": "Go", "text": "Go map iteration order is random, so the dot branches are tried in a different order each run. The boolean answer is the same, only the work done may differ." }
+  ],
+  "recap": {
+    "pattern": "Trie + DFS wildcard",
+    "key": "A letter follows one child. A dot recurses into all children and succeeds if any branch does.",
+    "complexity": "addWord O(L). search O(L) without dots, up to O(nodes) with. Space O(letters).",
+    "moves": ["addWord: insert into a trie and flag the last node", "Plain letter: follow the single child or fail", "Dot: try every child, return true on the first success", "Pattern used up: succeed only on a word-end node"]
+  }
+}

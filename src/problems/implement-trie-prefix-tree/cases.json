@@ -1,0 +1,10 @@
+[
+  {"name":"classic","input":[["Trie","insert","search","search","startsWith","insert","search"],[[],["apple"],["apple"],["app"],["app"],["app"],["app"]]],"expected":[null,null,true,false,true,null,true]},
+  {"name":"prefix is not a word","input":[["Trie","insert","search","startsWith"],[[],["hello"],["hell"],["hell"]]],"expected":[null,null,false,true],"edge":true},
+  {"name":"empty trie","input":[["Trie","search","startsWith"],[[],["a"],["a"]]],"expected":[null,false,false],"edge":true},
+  {"name":"word longer than stored","input":[["Trie","insert","search","startsWith"],[[],["car"],["cars"],["cars"]]],"expected":[null,null,false,false]},
+  {"name":"shared prefixes","input":[["Trie","insert","insert","insert","search","search","startsWith","startsWith","search"],[[],["tea"],["ten"],["to"],["te"],["ten"],["te"],["tom"],["to"]]],"expected":[null,null,null,null,false,true,true,false,true]},
+  {"name":"single letters","input":[["Trie","insert","search","search","startsWith"],[[],["a"],["a"],["b"],["a"]]],"expected":[null,null,true,false,true],"edge":true},
+  {"name":"insert twice","input":[["Trie","insert","insert","search"],[[],["dog"],["dog"],["dog"]]],"expected":[null,null,null,true]},
+  {"name":"odd key names","input":[["Trie","insert","search","search","startsWith"],[[],["constructor"],["constructor"],["__proto__"],["__proto__"]]],"expected":[null,null,true,false,false],"edge":true}
+]

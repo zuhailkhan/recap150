@@ -1,0 +1,11 @@
+[
+  {"name":"classic","input":[["WordDictionary","addWord","addWord","addWord","search","search","search","search"],[[],["bad"],["dad"],["mad"],["pad"],["bad"],[".ad"],["b.."]]],"expected":[null,null,null,null,false,true,true,true]},
+  {"name":"wildcard dead branch","input":[["WordDictionary","addWord","addWord","addWord","addWord","search","search","search","search"],[[],["bad"],["dad"],["mad"],["dot"],["d.t"],["m.t"],["d.d"],["..."]]],"expected":[null,null,null,null,null,true,false,true,true]},
+  {"name":"empty dictionary","input":[["WordDictionary","search","search"],[[],["."],["a"]]],"expected":[null,false,false],"edge":true},
+  {"name":"only dots longer than words","input":[["WordDictionary","addWord","addWord","search","search","search"],[[],["a"],["ab"],[".."],["..."],["."]]],"expected":[null,null,null,true,false,true],"edge":true},
+  {"name":"prefix is not a word","input":[["WordDictionary","addWord","search","search","search","search"],[[],["apple"],["app"],["app."],["apple"],["appl."]]],"expected":[null,null,false,false,true,true]},
+  {"name":"dot at the end and start","input":[["WordDictionary","addWord","addWord","addWord","search","search","search","search","search"],[[],["cat"],["car"],["cot"],["ca."],[".at"],["c.t"],["c.."],[".."]]],"expected":[null,null,null,null,true,true,true,true,false]},
+  {"name":"single letter words","input":[["WordDictionary","addWord","addWord","search","search","search"],[[],["a"],["b"],["."],["a"],["c"]]],"expected":[null,null,null,true,true,false],"edge":true},
+  {"name":"same word twice","input":[["WordDictionary","addWord","addWord","search","search","search"],[[],["go"],["go"],["g."],["go"],[".o"]]],"expected":[null,null,null,true,true,true]},
+  {"name":"wildcard picks later branch","input":[["WordDictionary","addWord","addWord","addWord","addWord","search","search","search","search"],[[],["ab"],["cb"],["db"],["xyz"],[".b"],["..z"],[".y."],["x.."]]],"expected":[null,null,null,null,null,true,true,true,true],"edge":true}
+]

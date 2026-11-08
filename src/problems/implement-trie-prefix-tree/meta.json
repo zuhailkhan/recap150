@@ -1,0 +1,70 @@
+{
+  "slug": "implement-trie-prefix-tree",
+  "title": "Implement Trie Prefix Tree",
+  "category": "Tries",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Build a Trie, a tree that stores words one letter per node. insert(word) adds a word. search(word) says whether exactly that word was inserted. startsWith(prefix) says whether any inserted word begins with the prefix. Words are lowercase letters.",
+  "example": {
+    "caption": "After inserting tea, ten and to, the letters t and e are stored once and shared. search(te) is false, startsWith(te) is true.",
+    "input": [{ "kind": "trie", "label": "trie after insert tea, ten, to", "words": ["tea", "ten", "to"] }],
+    "output": [{ "kind": "trie", "label": "startsWith(te) walks t, e and stops on a real node", "words": ["tea", "ten", "to"], "hot": "te", "hotTone": "hit" }]
+  },
+  "idea": {
+    "sentence": "Words that start the same share the same first nodes, so every lookup just walks one letter at a time down from the root.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "trie", "plain": "A tree where each edge is one letter. A path from the root spells a prefix. Said like \"try\", from retrieval." },
+      { "term": "prefix", "plain": "The first few letters of a word. \"app\" is a prefix of \"apple\"." },
+      { "term": "word end flag", "plain": "A boolean on a node that says a stored word finishes here. It tells \"app\" the word apart from \"app\" the prefix of apple." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then their arguments, e.g. [\"Trie\",\"insert\",\"search\"], [[],[\"tea\"],[\"tea\"]]",
+    "presets": [
+      { "label": "Shared prefix", "args": [["Trie", "insert", "insert", "search", "startsWith", "search"], [[], ["tea"], ["ten"], ["te"], ["te"], ["ten"]]] },
+      { "label": "Prefix is not a word", "args": [["Trie", "insert", "search", "startsWith", "search"], [[], ["apple"], ["app"], ["app"], ["apple"]]] },
+      { "label": "Path breaks", "args": [["Trie", "insert", "search", "startsWith"], [[], ["tea"], ["tan"], ["x"]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "L", "meaning": "length of the word or prefix being used" }, { "sym": "n", "meaning": "number of stored words" }],
+    "compare": { "brute": "n", "optimal": "1", "bruteLabel": "Keep a list of words and scan it", "optimalLabel": "Walk one node per letter", "unit": "steps per lookup, for a short word. The trie cost depends on L, not on n" },
+    "rows": [
+      { "name": "List of words", "time": "O(n * L)", "space": "O(n * L)", "note": "search compares against words one by one. startsWith must test every word." },
+      { "name": "Trie", "time": "O(L)", "space": "O(total letters)", "note": "Each operation touches at most one node per letter. The number of stored words does not matter." }
+    ],
+    "takeaway": "A trie trades some memory for lookups that cost only the length of the query, and it answers prefix questions that a hash set cannot."
+  },
+  "variants": [
+    { "id": "trie", "label": "Trie of nodes", "tsFn": "run", "goFn": "run", "stages": [
+      { "n": 1, "title": "Empty root", "note": "Make one empty root node. It stands for the empty prefix." },
+      { "n": 2, "title": "Insert: walk and build", "note": "For each letter, reuse the child if it exists, otherwise create it. Shared prefixes are stored once." },
+      { "n": 3, "title": "Mark the word end", "note": "After the last letter, set the end flag on that node." },
+      { "n": 4, "title": "Lookup: follow letters", "note": "Step to the child for each letter. If a child is missing, the walk fails right there." },
+      { "n": 5, "title": "Decide", "note": "search needs the end flag on the final node. startsWith only needs the path to exist." }
+    ] }
+  ],
+  "goArgs": ["[]string", "[][]string"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "edges": [
+    { "title": "Prefix, not a word", "input": "insert(hello), search(hell)", "output": "false", "why": "The path h-e-l-l exists, but no word ends there. Only the end flag makes it a word." },
+    { "title": "Empty trie", "input": "search(a) on a fresh trie", "output": "false", "why": "The root has no children, so the first step already fails. Nothing is created by a lookup." },
+    { "title": "Stored word is longer", "input": "insert(car), search(cars)", "output": "false", "why": "The walk reaches the end of car, then needs a child s that does not exist." },
+    { "title": "Inserting twice", "input": "insert(dog), insert(dog)", "output": "same trie", "why": "Every node already exists, so the second insert only sets the same flag again." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "search and startsWith walk the same path. The only difference is the last check: the end flag for search, nothing for startsWith. Forgetting the flag makes every prefix look like a word." },
+    { "lang": "TypeScript", "text": "A plain object as the children map breaks on keys such as \"constructor\" or \"__proto__\", because they exist on every object already. A Map (or Object.create(null)) has no such keys." },
+    { "lang": "Go", "text": "A map field is nil until you make it. Writing to a nil map panics, so create children when you create the node: children: map[rune]*node{}." },
+    { "lang": "Go", "text": "map[rune]*node handles any letters. For lowercase only, a [26]*node array is faster and needs no make, but you must compute ch - 'a' for the index." },
+    { "lang": "Go", "text": "Ranging over a string gives runes, not bytes, so multi-byte letters are handled as whole characters." }
+  ],
+  "recap": {
+    "pattern": "Trie (prefix tree)",
+    "key": "One node per letter, shared by every word with that prefix. A flag on a node marks a finished word.",
+    "complexity": "insert, search, startsWith O(L). Space O(total letters).",
+    "moves": ["Root node for the empty prefix", "insert: reuse or create a child per letter, flag the last node", "Lookup: follow letters, stop at the first missing child", "search needs the flag, startsWith does not"]
+  }
+}

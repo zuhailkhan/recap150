@@ -1,0 +1,12 @@
+[
+  {"name":"classic","input":[[["o","a","a","n"],["e","t","a","e"],["i","h","k","r"],["i","f","l","v"]],["oath","pea","eat","rain"]],"expected":["oath","eat"]},
+  {"name":"single cell hit","input":[[["a"]],["a"]],"expected":["a"]},
+  {"name":"single cell miss","input":[[["a"]],["b"]],"expected":[],"edge":true},
+  {"name":"no cell reuse","input":[[["a","b"]],["aba","ab"]],"expected":["ab"],"edge":true},
+  {"name":"shared prefixes","input":[[["o","a","t"],["e","t","h"]],["oat","oath","oa","tea"]],"expected":["oat","oath","oa"]},
+  {"name":"many paths, reported once","input":[[["a","a"],["a","a"]],["aa","aaa","aaaa","aaaaa"]],"expected":["aa","aaa","aaaa"],"edge":true},
+  {"name":"empty word list","input":[[["a","b"],["c","d"]],[]],"expected":[],"edge":true},
+  {"name":"snake path","input":[[["a","b","c"],["f","e","d"],["g","h","i"]],["abcdefghi","abe","adg","hid"]],"expected":["abcdefghi","abe","hid"]},
+  {"name":"letters not on the board","input":[[["a","b"],["c","d"]],["zzz","abz","dcba","ac"]],"expected":["ac"]},
+  {"name":"word is prefix of another","input":[[["a","b","c"]],["ab","abc","abcd"]],"expected":["ab","abc"]}
+]

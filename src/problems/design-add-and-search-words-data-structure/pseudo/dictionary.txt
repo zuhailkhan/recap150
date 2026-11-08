@@ -1,0 +1,23 @@
+class WordDictionary
+  root = new empty node                    # [1] stands for the empty prefix
+
+  addWord(word)
+    node = root
+    for each letter in word
+      if node has no child for letter
+        node.child[letter] = new node      # [2] shared prefixes reuse nodes
+      node = node.child[letter]
+    node.isEnd = true                      # [2] mark where the word finishes
+
+  search(pattern)
+    return dfs(root, 0)
+
+  dfs(node, i)
+    if i == length of pattern
+      return node.isEnd                    # [5] the whole pattern is used
+    if pattern[i] is "."
+      for each child of node               # [4] a wildcard tries every child
+        if dfs(child, i + 1): return true
+      return false
+    child = node.child[pattern[i]]         # [3] a plain letter has one way to go
+    return child exists and dfs(child, i + 1)
