@@ -1,0 +1,70 @@
+{
+  "slug": "3sum",
+  "title": "3Sum",
+  "category": "Two Pointers",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of integers. Find every set of three different positions whose values add up to zero. Return the value triples. The same triple of values must not appear twice, even if it can be built from different positions. Order does not matter.",
+  "example": {
+    "caption": "-1 + 0 + 1 and -1 + -1 + 2 both reach zero. The two -1 values give one triple, not two copies.",
+    "input": [{ "kind": "array", "label": "nums", "items": [-1, 0, 1, 2, -1, -4] }],
+    "output": [{ "kind": "buckets", "label": "triples", "keyLabel": "found", "buckets": [{ "key": "#1", "items": [-1, -1, 2], "tone": "hit" }, { "key": "#2", "items": [-1, 0, 1], "tone": "hit" }] }]
+  },
+  "idea": {
+    "sentence": "Sort the list. Fix the first number, then walk two pointers in from the ends to find the other two. After every hit, skip repeated values so no triple is recorded twice.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "triple", "plain": "A group of three values, such as [-1, 0, 1]." },
+      { "term": "fix one, search the rest", "plain": "Pick one number as given. Then the other two must sum to its negative. That is Two Sum II on the remaining list." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the list, e.g. [-1,0,1,2,-1,-4]",
+    "presets": [
+      { "label": "Duplicates", "args": [[-2, -2, 0, 0, 2, 2]] },
+      { "label": "Classic", "args": [[-1, 0, 1, 2, -1, -4]] },
+      { "label": "All zeros", "args": [[0, 0, 0, 0]] },
+      { "label": "No triple", "args": [[1, 2, 3]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of integers in the list" }],
+    "compare": { "brute": "n3", "optimal": "n2", "bruteLabel": "Try every three positions", "optimalLabel": "Sort, then fix one and two pointers", "unit": "sum checks (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n³)", "space": "O(1)", "note": "Three nested loops, plus a set to throw away repeated triples." },
+      { "name": "Sort + two pointers", "time": "O(n²)", "space": "O(1) extra", "note": "Sorting costs n log n. Each fixed number runs one linear two-pointer pass. Output space aside." }
+    ],
+    "takeaway": "Sorting buys two things: pointers that know which way to move, and duplicates that sit together so they are easy to skip."
+  },
+  "variants": [
+    { "id": "sorted", "label": "Sort + two pointers", "tsFn": "threeSum", "goFn": "threeSum", "stages": [
+      { "n": 1, "title": "Sort", "note": "Sort a copy. Equal values now sit next to each other." },
+      { "n": 2, "title": "Fix the first number", "note": "Take each value as the first of the triple. If it equals the previous one, skip it, because its triples were already found." },
+      { "n": 3, "title": "Two pointers", "note": "l starts just after i, r at the end. Too small, move l right. Too big, move r left." },
+      { "n": 4, "title": "Record", "note": "A sum of zero is a triple. Save it and move both pointers inward." },
+      { "n": 5, "title": "Skip repeats", "note": "Move l and r past values just used. Otherwise the next step would find the same triple again." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "[][]int",
+  "compare": "sortedGroups",
+  "edges": [
+    { "title": "All zeros", "input": "[0, 0, 0, 0]", "output": "[[0, 0, 0]]", "why": "Four zeros make many position choices but one value triple. Skipping repeats keeps it to one." },
+    { "title": "Fewer than three numbers", "input": "[0, 0]", "output": "[]", "why": "The loop bound a.length - 2 stops at once. No special case needed." },
+    { "title": "No triple at all", "input": "[1, 2, 3]", "output": "[]", "why": "All positive numbers can never sum to zero. Return an empty list, not a missing one." },
+    { "title": "Duplicates everywhere", "input": "[-2, -2, 0, 0, 2, 2]", "output": "[[-2, 0, 2]]", "why": "Eight position combinations reach zero. Skipping equal values on all three levels leaves one." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "nums.sort() with no comparator sorts as text, so 10 lands before 9 and -1 lands before -4. Always pass (a, b) => a - b. Also copy first, because sort changes the array you were given." },
+    { "lang": "Go", "text": "sort.Ints sorts in place and so changes the caller's slice. Copy it first if the caller still needs the old order." },
+    { "lang": "Go", "text": "Start the result as [][]int{}, not var out [][]int. A nil slice encodes to JSON as null, and callers often want []." },
+    { "lang": "General", "text": "Skip duplicates after recording a hit, not before checking one. Skipping early can jump over a valid triple like [-1, -1, 2]." },
+    { "lang": "General", "text": "The outer skip compares a[i] with a[i-1], the one before. Comparing with a[i+1] would skip the first -1 and lose [-1, -1, 2]." }
+  ],
+  "recap": {
+    "pattern": "Sort, fix one, two pointers",
+    "key": "Sort. For each first number, two pointers find pairs that cancel it. Skip equal values to avoid duplicates.",
+    "complexity": "Time O(n²). Space O(1) extra.",
+    "moves": ["Sort the numbers", "Fix i, skip it if equal to the one before", "l = i + 1, r = end: sum too small moves l, too big moves r", "On zero, record, move both, skip repeated values"]
+  }
+}

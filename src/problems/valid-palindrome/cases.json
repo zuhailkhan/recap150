@@ -1,0 +1,12 @@
+[
+  {"name":"sentence with punctuation","input":["A man, a plan, a canal: Panama"],"expected":true},
+  {"name":"not a palindrome","input":["race a car"],"expected":false},
+  {"name":"empty string","input":[""],"expected":true,"edge":true},
+  {"name":"only punctuation","input":[" .,!"],"expected":true,"edge":true},
+  {"name":"digit versus letter","input":["0P"],"expected":false,"edge":true},
+  {"name":"single character","input":["a"],"expected":true,"edge":true},
+  {"name":"mixed case","input":["Nurses run!"],"expected":true},
+  {"name":"digits","input":["12321"],"expected":true},
+  {"name":"almost a palindrome","input":["abca"],"expected":false},
+  {"name":"non-ASCII is ignored","input":["é a é"],"expected":true}
+]

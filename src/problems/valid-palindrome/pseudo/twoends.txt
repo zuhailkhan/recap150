@@ -1,0 +1,13 @@
+function isPalindrome(s)
+  l = 0, r = length(s) - 1               # [1] one pointer at each end
+  while l < r
+    while l < r and s[l] is not a letter or digit
+      l = l + 1                          # [2] skip it
+    while l < r and s[r] is not a letter or digit
+      r = r - 1                          # [2] same on the right
+    if l >= r then stop                  # nothing left to compare
+    if lowercase(s[l]) != lowercase(s[r])   # [3] compare, ignoring case
+      return false
+    l = l + 1                            # [4] move both pointers inward
+    r = r - 1
+  return true                            # [5] every pair matched

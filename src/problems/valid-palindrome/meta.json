@@ -1,0 +1,70 @@
+{
+  "slug": "valid-palindrome",
+  "title": "Valid Palindrome",
+  "category": "Two Pointers",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get a piece of text. Ignore every character that is not a letter or a digit, and ignore upper or lower case. Say whether what is left reads the same forwards and backwards. Empty text counts as a palindrome.",
+  "example": {
+    "caption": "Without the space, the exclamation mark and the capital, the text is nursesrun. It reads the same both ways.",
+    "input": [{ "kind": "array", "label": "s", "items": ["N", "u", "r", "s", "e", "s", " ", "r", "u", "n", "!"] }],
+    "output": [{ "kind": "array", "label": "true: every mirrored pair matches", "items": ["N", "u", "r", "s", "e", "s", " ", "r", "u", "n", "!"], "tones": ["hit", "hit", "hit", "hit", "focus", "hit", "dim", "hit", "hit", "hit", "dim"], "pointers": [{ "name": "l", "at": 4 }, { "name": "r", "at": 4 }] }]
+  },
+  "idea": {
+    "sentence": "Compare the two ends and walk inward. If the ends always match, the middle can only be fine, so no reversed copy is needed.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "palindrome", "plain": "Text that reads the same from left to right and from right to left." },
+      { "term": "alphanumeric", "plain": "A letter or a digit. Spaces and punctuation are not." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the text in quotes, e.g. \"Nurses run!\"",
+    "presets": [
+      { "label": "Palindrome", "args": ["Nurses run!"] },
+      { "label": "Not one", "args": ["race a car"] },
+      { "label": "Lots of junk", "args": ["A.b,B.a"] },
+      { "label": "Only punctuation", "args": [".,!"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of the text" }],
+    "compare": { "brute": "n", "optimal": "1", "bruteLabel": "Build a cleaned, reversed copy", "optimalLabel": "Two pointers, no copy", "unit": "extra characters stored" },
+    "rows": [
+      { "name": "Clean and reverse", "time": "O(n)", "space": "O(n)", "note": "Build a cleaned string, reverse it, compare. Simple, but it stores copies." },
+      { "name": "Two pointers", "time": "O(n)", "space": "O(1)", "note": "Each pointer moves at most n times in total. Only two integers are kept." }
+    ],
+    "takeaway": "Both are one pass. The pointers do the cleaning on the fly, so there is nothing extra to store."
+  },
+  "variants": [
+    { "id": "twoends", "label": "Two pointers", "tsFn": "isPalindrome", "goFn": "isPalindrome", "stages": [
+      { "n": 1, "title": "Ends", "note": "l starts at the first character and r at the last." },
+      { "n": 2, "title": "Skip junk", "note": "Move a pointer past spaces and punctuation until it sits on a letter or digit." },
+      { "n": 3, "title": "Compare", "note": "Lower-case both characters and compare. A difference means the answer is false." },
+      { "n": 4, "title": "Move inward", "note": "The pair matched, so step l right and r left." },
+      { "n": 5, "title": "All matched", "note": "The pointers met without a mismatch. Return true." }
+    ] }
+  ],
+  "goArgs": ["string"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty text", "input": "\"\"", "output": "true", "why": "r starts at -1, so the loop never runs. Nothing to compare means it passes." },
+    { "title": "Only punctuation", "input": "\" .,!\"", "output": "true", "why": "Both pointers skip until they meet. After cleaning the text is empty." },
+    { "title": "Digit against letter", "input": "\"0P\"", "output": "false", "why": "The trick of adding 32 to lower-case a code also turns the digit 0 into the letter P. Only lower-case real letters." },
+    { "title": "One character", "input": "\"a\"", "output": "true", "why": "l and r start on the same index. A single character mirrors itself." }
+  ],
+  "gotchas": [
+    { "lang": "Go", "text": "s[i] is a byte, not a character. Scanning bytes is safe here only because we count ASCII letters and digits. Every byte of a multi-byte character is above 127, so it is skipped. To keep accented letters you would convert to []rune first." },
+    { "lang": "Go", "text": "There is no built-in lower-case for a single byte. Write one (add 32 for A to Z), or use unicode.ToLower on a rune." },
+    { "lang": "TypeScript", "text": "s[i] and s.length count UTF-16 code units. Emoji and some scripts take two units, which is another reason this solution defines letters as ASCII only." },
+    { "lang": "TypeScript", "text": "Do not build the regex with a global flag (/x/g) and reuse it. A global regex keeps lastIndex between test() calls and gives wrong answers." },
+    { "lang": "General", "text": "Check l < r again inside each skip loop. Without it a run of punctuation can push a pointer off the end of the text." }
+  ],
+  "recap": {
+    "pattern": "Two pointers: meet in the middle",
+    "key": "Start at both ends, skip junk, compare, step inward. One mismatch decides the answer.",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": ["l at the start, r at the end", "Skip characters that are not letters or digits", "Compare lower-cased characters; a difference means false", "Move both inward until they meet"]
+  }
+}

@@ -1,0 +1,11 @@
+function maxArea(heights)
+  l = 0, r = length(heights) - 1       # [1] widest container first
+  best = 0
+  while l < r
+    area = (r - l) * min(heights[l], heights[r])   # [2] width times the shorter wall
+    best = max(best, area)             # [3] remember the largest area seen
+    if heights[l] <= heights[r]        # [4] the shorter wall limits every container it is in
+      l = l + 1                        # so drop it
+    else
+      r = r - 1
+  return best

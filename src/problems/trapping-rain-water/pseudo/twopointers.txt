@@ -1,0 +1,13 @@
+function trap(height)
+  l = 0, r = length(height) - 1          # [1] both ends
+  leftMax = 0, rightMax = 0, water = 0
+  while l < r
+    if height[l] < height[r]             # [2] work on the lower side
+      leftMax = max(leftMax, height[l])  # [3] tallest wall so far on the left
+      water = water + leftMax - height[l]    # [3] this bar fills up to that wall
+      l = l + 1
+    else
+      rightMax = max(rightMax, height[r])    # [3] tallest wall so far on the right
+      water = water + rightMax - height[r]   # [3] this bar fills up to that wall
+      r = r - 1
+  return water                           # [4] total

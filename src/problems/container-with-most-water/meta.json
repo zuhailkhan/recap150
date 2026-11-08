@@ -1,0 +1,68 @@
+{
+  "slug": "container-with-most-water",
+  "title": "Container With Most Water",
+  "category": "Two Pointers",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of wall heights standing in a row, one unit apart. Pick two walls. Together with the ground they form an open box. Water fills it only up to the shorter wall. Return the largest amount of water any pair can hold.",
+  "example": {
+    "caption": "Walls 8 (index 1) and 7 (index 8) are 7 apart. Water stops at height 7. 7 × 7 = 49.",
+    "input": [{ "kind": "array", "label": "heights", "items": [1, 8, 6, 2, 5, 4, 8, 3, 7] }],
+    "output": [{ "kind": "array", "label": "best pair, area 49", "items": [1, 8, 6, 2, 5, 4, 8, 3, 7], "tones": [null, "hit", null, null, null, null, null, null, "hit"], "pointers": [{ "name": "l", "at": 1, "tone": "hit" }, { "name": "r", "at": 8, "tone": "hit" }] }]
+  },
+  "idea": {
+    "sentence": "Start with the widest pair. The shorter wall caps every box it is part of, and all its other partners are closer, so move that wall inward. Never move the taller one.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "area", "plain": "Width (distance between the walls) times height of the shorter wall." },
+      { "term": "greedy", "plain": "Take the choice that is safe right now and never look back." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the heights, e.g. [1,8,6,2,5,4,8,3,7]",
+    "presets": [
+      { "label": "Classic", "args": [[1, 8, 6, 2, 5, 4, 8, 7]] },
+      { "label": "Tall at the ends", "args": [[9, 1, 1, 1, 9]] },
+      { "label": "Two walls", "args": [[1, 1]] },
+      { "label": "Ascending", "args": [[1, 2, 3, 4, 5]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of walls" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Try every pair of walls", "optimalLabel": "Two pointers", "unit": "areas computed (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n²)", "space": "O(1)", "note": "Compute the area of every pair." },
+      { "name": "Two pointers", "time": "O(n)", "space": "O(1)", "note": "Every step discards one wall for good, so there are n - 1 steps." }
+    ],
+    "takeaway": "Each step rules out a whole group of pairs at once. That is how n² pairs collapse into n steps."
+  },
+  "variants": [
+    { "id": "twopointers", "label": "Two pointers", "tsFn": "maxArea", "goFn": "maxArea", "stages": [
+      { "n": 1, "title": "Widest first", "note": "l at the first wall, r at the last. This is the largest width there will ever be." },
+      { "n": 2, "title": "Measure", "note": "Area is the distance between the walls times the shorter wall." },
+      { "n": 3, "title": "Keep the best", "note": "Compare with the best area seen so far and keep the larger." },
+      { "n": 4, "title": "Drop the shorter wall", "note": "Move the pointer on the shorter wall inward. The taller wall stays, because it may still pair with something taller." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Two walls", "input": "[1, 1]", "output": "1", "why": "Only one pair exists. Width 1 times height 1." },
+    { "title": "Zero heights", "input": "[0, 0, 0]", "output": "0", "why": "A wall of height zero holds nothing. The answer is 0, not an error." },
+    { "title": "Tall walls at the ends", "input": "[9, 1, 1, 1, 1, 9]", "output": "45", "why": "The widest pair is best here. Short walls in the middle never matter, because we only move the shorter side." },
+    { "title": "Equal walls", "input": "[4, 4, 4, 4]", "output": "12", "why": "On a tie either pointer may move. The other wall of the same height cannot do better on its own, so nothing is lost." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The area uses the shorter wall, not the average or the taller one. Water spills over the lower side." },
+    { "lang": "General", "text": "Move the shorter wall. On a tie either one is fine, because the other wall of equal height cannot do better alone." },
+    { "lang": "TypeScript", "text": "Math.min and Math.max are fine for two values. Do not spread a big array into them (Math.max(...areas)), which can overflow the call stack." },
+    { "lang": "Go", "text": "min and max are built in since Go 1.21. On an older toolchain you must write them yourself. Naming a local variable max or min hides the built-in, which is why this code calls the running total best." }
+  ],
+  "recap": {
+    "pattern": "Two pointers: greedy shrink",
+    "key": "Start widest. The shorter wall is the limit, so move it inward. Track the best area.",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": ["l = 0, r = last index", "area = (r - l) × min(height[l], height[r]), keep the best", "Move the pointer on the shorter wall", "Stop when the pointers meet"]
+  }
+}

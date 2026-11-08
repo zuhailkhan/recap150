@@ -1,0 +1,11 @@
+function twoSum(numbers, target)
+  l = 0, r = length(numbers) - 1        # [1] smallest on the left, largest on the right
+  while l < r
+    sum = numbers[l] + numbers[r]       # [2] add the two ends
+    if sum == target                    # [5] found it
+      return [l + 1, r + 1]             # answers count from 1
+    if sum < target
+      l = l + 1                         # [3] too small: numbers[l] fits nobody, drop it
+    else
+      r = r - 1                         # [4] too big: numbers[r] fits nobody, drop it
+  return empty list

@@ -1,0 +1,7 @@
+function trap(height)
+  left[i] = tallest bar in height[0..i], for every i        # [1] scan left to right
+  right[i] = tallest bar in height[i..end], for every i     # [2] scan right to left
+  water = 0
+  for each index i
+    water = water + min(left[i], right[i]) - height[i]      # [3] the lower wall sets the level
+  return water                                              # [4] total

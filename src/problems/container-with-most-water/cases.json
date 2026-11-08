@@ -1,0 +1,11 @@
+[
+  {"name":"classic","input":[[1,8,6,2,5,4,8,3,7]],"expected":49},
+  {"name":"two walls","input":[[1,1]],"expected":1,"edge":true},
+  {"name":"flat zero","input":[[0,0,0]],"expected":0,"edge":true},
+  {"name":"tall walls inside","input":[[2,3,10,5,7,8,9]],"expected":36},
+  {"name":"ascending","input":[[1,2,3,4,5]],"expected":6},
+  {"name":"descending","input":[[5,4,3,2,1]],"expected":6},
+  {"name":"tall walls at the ends","input":[[9,1,1,1,1,9]],"expected":45,"edge":true},
+  {"name":"huge heights","input":[[100000,1,1,100000]],"expected":300000,"edge":true},
+  {"name":"equal walls","input":[[4,4,4,4]],"expected":12}
+]

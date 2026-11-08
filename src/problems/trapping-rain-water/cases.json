@@ -1,0 +1,12 @@
+[
+  {"name":"classic","input":[[0,1,0,2,1,0,1,3,2,1,2,1]],"expected":6},
+  {"name":"deep valley","input":[[4,2,0,3,2,5]],"expected":9},
+  {"name":"empty","input":[[]],"expected":0,"edge":true},
+  {"name":"one bar","input":[[5]],"expected":0,"edge":true},
+  {"name":"flat","input":[[3,3,3,3]],"expected":0,"edge":true},
+  {"name":"ascending, no pit","input":[[1,2,3,4,5]],"expected":0,"edge":true},
+  {"name":"single pit","input":[[3,0,3]],"expected":3},
+  {"name":"uneven walls","input":[[3,0,2,0,4]],"expected":7},
+  {"name":"tall then low","input":[[5,4,1,2]],"expected":1},
+  {"name":"big heights","input":[[100000,0,100000]],"expected":100000}
+]

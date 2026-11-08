@@ -1,0 +1,11 @@
+[
+  {"name":"classic","input":[[2,7,11,15],9],"expected":[1,2]},
+  {"name":"answer in the middle","input":[[1,3,4,6,8,11],10],"expected":[3,4]},
+  {"name":"two elements","input":[[1,2],3],"expected":[1,2],"edge":true},
+  {"name":"duplicates","input":[[0,0,3,4],0],"expected":[1,2],"edge":true},
+  {"name":"negatives","input":[[-9,-4,-1,2,5,8],-2],"expected":[2,4],"edge":true},
+  {"name":"mixed signs","input":[[-3,-1,0,2,4],3],"expected":[2,5]},
+  {"name":"pair at the far ends","input":[[1,5,9,13,20],21],"expected":[1,5]},
+  {"name":"same value as the pair","input":[[1,2,2,4],4],"expected":[2,3],"edge":true},
+  {"name":"large values","input":[[-1000,-5,1000],0],"expected":[1,3]}
+]
