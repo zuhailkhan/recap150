@@ -1,0 +1,67 @@
+{
+  "slug": "number-of-1-bits",
+  "title": "Number of 1 Bits",
+  "category": "Bit Manipulation",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get an unsigned 32-bit integer. Write it in binary and count how many of its digits are 1. This count is also called the Hamming weight or popcount.",
+  "example": {
+    "caption": "11 is 1011 in binary. Three of its digits are 1.",
+    "input": [{ "kind": "bits", "label": "n", "width": 6, "rows": [{ "label": "n", "value": 11 }] }],
+    "output": [{ "kind": "bits", "label": "ones", "width": 6, "rows": [{ "label": "n", "value": 11, "tones": ["dim", "dim", "hit", "dim", "hit", "hit"] }] }]
+  },
+  "idea": {
+    "sentence": "x AND (x - 1) wipes out the lowest 1 bit, so loop until x is 0 and count the loop turns.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "Hamming weight", "plain": "The number of 1 digits in the binary form of a number. Also called popcount." },
+      { "term": "lowest set bit", "plain": "The right-most 1 digit. Subtracting 1 turns it into 0 and turns every 0 to its right into 1." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a number from 0 to 4294967295. Keep it under 64 to see a 6-digit row.",
+    "presets": [
+      { "label": "Eleven", "args": [11] },
+      { "label": "One bit only", "args": [32] },
+      { "label": "All six ones", "args": [63] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "b", "meaning": "number of bits in the integer (32 here)" }, { "sym": "k", "meaning": "number of 1 bits, at most b" }],
+    "compare": { "brute": "n", "optimal": "logn", "bruteLabel": "Test every bit position", "optimalLabel": "Clear one 1 at a time", "unit": "loop turns (rough: the second one only turns k times, often fewer than b)" },
+    "rows": [
+      { "name": "Test each bit", "time": "O(b)", "space": "O(1)", "note": "Check n & 1, shift right, repeat for all 32 positions." },
+      { "name": "Clear the lowest 1", "time": "O(k)", "space": "O(1)", "note": "One turn per 1 bit. A number with two 1 bits takes two turns." },
+      { "name": "Lookup table", "time": "O(b / 8)", "space": "O(256)", "note": "Precompute counts for each byte and add up four lookups. Fast but needs the table." }
+    ],
+    "takeaway": "Brian Kernighan's trick does work only for the bits that are set. For 32 bits both are constant time, so it is the habit that matters."
+  },
+  "variants": [
+    { "id": "clear", "label": "Clear lowest 1", "tsFn": "hammingWeight", "goFn": "hammingWeight", "stages": [
+      { "n": 1, "title": "Unsigned copy", "note": "Read n as an unsigned 32-bit value and start the count at 0." },
+      { "n": 2, "title": "Clear the lowest 1", "note": "x = x & (x - 1). The lowest 1 becomes 0 and nothing else changes." },
+      { "n": 3, "title": "Count it", "note": "One 1 bit was removed, so add one. When x reaches 0, return the count." }
+    ] }
+  ],
+  "goArgs": ["uint32"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Zero", "input": "0", "output": "0", "why": "The loop never runs. No 1 bits." },
+    { "title": "All 32 bits set", "input": "4294967295", "output": "32", "why": "The longest run: 32 turns. In JS this is 2^32 − 1, which must be read as unsigned." },
+    { "title": "Only the top bit", "input": "2147483648", "output": "1", "why": "Bit 31 set. A signed reading is negative, so a loop that tests x > 0 would stop at once and answer 0." },
+    { "title": "One bit missing", "input": "4294967293", "output": "31", "why": "Everything but bit 1 is set. Each turn removes the lowest 1, so 31 turns." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "JS bitwise operators work on signed 32-bit integers. For n >= 2^31 the value turns negative (4294967295 | 0 is -1). Use x >>> 0 to get the unsigned value back." },
+    { "lang": "TypeScript", "text": "Test x !== 0, not x > 0. A number with bit 31 set looks negative after a bitwise operation, so x > 0 stops early and gives a count that is too small." },
+    { "lang": "TypeScript", "text": "n >> 1 is an arithmetic shift: it keeps the sign bit, so a negative number never reaches 0 and the shift-and-test loop runs forever. Use >>> for a logical shift." },
+    { "lang": "Go", "text": "Take uint32, not int. int is 64-bit and signed, and a negative int shifted right keeps its sign. math/bits.OnesCount32 does this in one call, but writing it by hand is the lesson." }
+  ],
+  "recap": {
+    "pattern": "x & (x − 1) clears the lowest 1",
+    "key": "Subtracting 1 flips the lowest 1 and the zeros under it, so AND with x removes exactly that 1. Count turns until x is 0.",
+    "complexity": "Time O(k) for k set bits (at most 32). Space O(1).",
+    "moves": ["Read n as unsigned", "x = x & (x − 1) removes the lowest 1", "Count each removal", "Stop when x is 0"]
+  }
+}

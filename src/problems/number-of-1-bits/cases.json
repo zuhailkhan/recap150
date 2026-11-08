@@ -1,0 +1,12 @@
+[
+  {"name":"eleven","input":[11],"expected":3},
+  {"name":"single high bit","input":[128],"expected":1},
+  {"name":"zero","input":[0],"expected":0,"edge":true},
+  {"name":"all eight low bits","input":[255],"expected":8},
+  {"name":"all 32 bits","input":[4294967295],"expected":32,"edge":true},
+  {"name":"only bit 31","input":[2147483648],"expected":1,"edge":true},
+  {"name":"bit 31 off, rest on","input":[2147483647],"expected":31},
+  {"name":"bit 1 off, rest on","input":[4294967293],"expected":31,"edge":true},
+  {"name":"one","input":[1],"expected":1},
+  {"name":"alternating","input":[2863311530],"expected":16}
+]

@@ -1,0 +1,13 @@
+[
+  {"name":"classic 32-bit","input":[43261596,32],"expected":964176192},
+  {"name":"mostly ones","input":[4294967293,32],"expected":3221225471},
+  {"name":"one becomes top bit","input":[1,32],"expected":2147483648,"edge":true},
+  {"name":"zero","input":[0,32],"expected":0},
+  {"name":"all ones","input":[4294967295,32],"expected":4294967295,"edge":true},
+  {"name":"top bit becomes one","input":[2147483648,32],"expected":1,"edge":true},
+  {"name":"eight bits","input":[11,8],"expected":208},
+  {"name":"eight bits, single","input":[128,8],"expected":1},
+  {"name":"eight bits, alternating","input":[170,8],"expected":85},
+  {"name":"eight bits, low pair","input":[3,8],"expected":192},
+  {"name":"six bits","input":[11,6],"expected":52}
+]

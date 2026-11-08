@@ -1,0 +1,7 @@
+function reverseBits(n, width)
+  result = 0                            # [1] built one bit at a time
+  repeat width times
+    bit = n AND 1                       # [2] lowest bit of n
+    result = (result shifted left 1) OR bit    # [3] push it on the right of result
+    n = n shifted right 1               # [3] next bit becomes the lowest
+  return result                         # [4] read as unsigned

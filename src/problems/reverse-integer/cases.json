@@ -1,0 +1,14 @@
+[
+  {"name":"classic","input":[123],"expected":321},
+  {"name":"negative","input":[-123],"expected":-321},
+  {"name":"trailing zero","input":[120],"expected":21},
+  {"name":"zero","input":[0],"expected":0,"edge":true},
+  {"name":"overflows","input":[1534236469],"expected":0,"edge":true},
+  {"name":"min int32 overflows","input":[-2147483648],"expected":0,"edge":true},
+  {"name":"max int32 overflows","input":[2147483647],"expected":0,"edge":true},
+  {"name":"fits just under the limit","input":[1463847412],"expected":2147483641,"edge":true},
+  {"name":"negative, fits","input":[-1463847412],"expected":-2147483641},
+  {"name":"many zeros","input":[900000],"expected":9},
+  {"name":"single digit","input":[-8],"expected":-8},
+  {"name":"just over the limit","input":[1563847412],"expected":0}
+]

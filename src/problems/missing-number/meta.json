@@ -1,0 +1,69 @@
+{
+  "slug": "missing-number",
+  "title": "Missing Number",
+  "category": "Bit Manipulation",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "A list holds n different numbers, all taken from 0 to n. That range has n + 1 values, so exactly one is absent. Find the absent number. Aim for one pass and constant extra memory.",
+  "example": {
+    "caption": "The range is 0 to 3. The list has 3, 0, 1, so 2 is missing.",
+    "input": [{ "kind": "array", "label": "nums", "items": [3, 0, 1] }],
+    "output": [{ "kind": "array", "label": "range 0..3", "items": [0, 1, 2, 3], "tones": ["dim", "dim", "hit", "dim"] }]
+  },
+  "idea": {
+    "sentence": "XOR every index 0..n with every value in the list. Each present number cancels with itself, and the missing one is left over.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "XOR (^)", "plain": "Compares two numbers bit by bit. The result bit is 1 only where the two bits differ. x ^ x is 0." },
+      { "term": "index", "plain": "A position in the list, counted from 0. Together with the values it covers each number in 0..n once as an index and once as a value." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the list, e.g. [3,0,1]",
+    "presets": [
+      { "label": "Classic", "args": [[3, 0, 1]] },
+      { "label": "Nine numbers", "args": [[9, 6, 4, 2, 3, 5, 7, 0, 1]] },
+      { "label": "n itself is missing", "args": [[0, 1]] },
+      { "label": "Zero is missing", "args": [[1]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of the list (the range is 0..n)" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "For each value 0..n, scan the list", "optimalLabel": "One XOR pass", "unit": "checks (rough)" },
+    "rows": [
+      { "name": "Search each value", "time": "O(n²)", "space": "O(1)", "note": "For every value in 0..n, scan the list to see if it is there." },
+      { "name": "Hash set", "time": "O(n)", "space": "O(n)", "note": "Put the numbers in a set, then probe 0..n." },
+      { "name": "XOR indexes and values", "time": "O(n)", "space": "O(1)", "note": "One pass, one integer. Pairs cancel and the gap stays." },
+      { "name": "Sum formula", "time": "O(n)", "space": "O(1)", "note": "n(n+1)/2 minus the sum of the list. Same cost. Risks overflow in fixed-width ints for huge n." }
+    ],
+    "takeaway": "XOR and the sum formula both cost one pass and no memory. XOR never overflows, because the result stays inside the bits of the inputs."
+  },
+  "variants": [
+    { "id": "xor", "label": "XOR with indexes", "tsFn": "missingNumber", "goFn": "missingNumber", "stages": [
+      { "n": 1, "title": "Start at n", "note": "x starts as the list length. n is an index that never appears as a position (positions stop at n - 1)." },
+      { "n": 2, "title": "XOR index and value", "note": "x ^= i ^ nums[i]. Each present number cancels itself, once as index and once as value." },
+      { "n": 3, "title": "Return x", "note": "Only the missing number was never cancelled." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "n is missing", "input": "[0, 1]", "output": "2", "why": "Every index 0 and 1 cancels a value. Only the start value x = n = 2 survives, which is why x does not start at 0." },
+    { "title": "Zero is missing", "input": "[1]", "output": "0", "why": "Range 0..1. x = 1, then 1 ^ 0 ^ 1 = 0. A 0 answer is real, not a no-answer signal." },
+    { "title": "Only zero present", "input": "[0]", "output": "1", "why": "The one-number list is missing n itself." },
+    { "title": "Shuffled order", "input": "[9, 6, 4, 2, 3, 5, 7, 0, 1]", "output": "8", "why": "XOR does not care about order, so the list does not need sorting." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Start x at n, not at 0. The loop covers indexes 0 to n - 1, so without the start value the number n can never cancel, and a list that misses n returns the wrong answer." },
+    { "lang": "TypeScript", "text": "Bitwise operators convert to signed 32-bit integers. List values are far below 2^31, so XOR is safe. A value of 2^31 or more would wrap silently." },
+    { "lang": "TypeScript", "text": "The sum formula is exact in JS up to 2^53, so it also works. Go's int is 64-bit and holds n(n+1)/2 easily, but a 32-bit int (int32) can overflow for n above about 65,000." },
+    { "lang": "Go", "text": "i ^ v is XOR here because it sits between two values. ^x with one operand is bitwise NOT. Mixing them up is a quiet bug." }
+  ],
+  "recap": {
+    "pattern": "XOR indexes and values",
+    "key": "Fold in every index and every value. All numbers present appear twice and cancel. The missing one appears only as an index.",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": ["x = n", "For each i, x ^= i ^ nums[i]", "Matching pairs cancel to 0", "Return x"]
+  }
+}

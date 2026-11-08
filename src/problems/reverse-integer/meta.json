@@ -1,0 +1,70 @@
+{
+  "slug": "reverse-integer",
+  "title": "Reverse Integer",
+  "category": "Bit Manipulation",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Reverse the decimal digits of a signed 32-bit integer and keep its sign. If the reversed number does not fit in the signed 32-bit range, return 0. Do not rely on a wider integer type to hold the answer.",
+  "example": {
+    "caption": "-123 reversed is -321. The sign stays where it is.",
+    "input": [{ "kind": "array", "label": "x", "items": ["-", 1, 2, 3] }],
+    "output": [{ "kind": "array", "label": "result", "items": ["-", 3, 2, 1], "tones": ["hit", "hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Peel the last digit off x with % 10, push it onto result with result * 10 + digit, and check against the 32-bit limit before the multiply.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "int32 range", "plain": "-2147483648 to 2147483647. A reversed number outside it counts as overflow, and the answer is 0." },
+      { "term": "truncate toward zero", "plain": "Drop the fraction. -12.3 becomes -12, not -13. Go and C do this for integer division." },
+      { "term": "check before multiply", "plain": "Test result against the limit divided by 10 first. After the multiply it is too late if the type wrapped." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: an integer, e.g. 123 or -120",
+    "presets": [
+      { "label": "123", "args": [123] },
+      { "label": "Negative, trailing zero", "args": [-120] },
+      { "label": "Overflows", "args": [1534236469] },
+      { "label": "Just fits", "args": [1463847412] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "d", "meaning": "number of decimal digits (at most 10 here)" }],
+    "compare": { "brute": "n", "optimal": "n", "bruteLabel": "Reverse a string, then parse", "optimalLabel": "Peel digits with % 10", "unit": "digit steps (same growth, different memory)" },
+    "rows": [
+      { "name": "String reverse", "time": "O(d)", "space": "O(d)", "note": "Convert to text, reverse it, parse it back, then range-check the parsed value." },
+      { "name": "Peel and push", "time": "O(d)", "space": "O(1)", "note": "One turn per digit and a single integer. The limit check happens inside the loop." }
+    ],
+    "takeaway": "Both are O(d), but the digit loop needs no text and no big integer. The detail that matters is where you put the overflow check."
+  },
+  "variants": [
+    { "id": "digits", "label": "Peel and push", "tsFn": "reverse", "goFn": "reverse", "stages": [
+      { "n": 1, "title": "Set the limit", "note": "result starts at 0. The limit is 214748364, one tenth of the largest int32." },
+      { "n": 2, "title": "Peel a digit", "note": "x % 10 is the last digit with the sign of x. Dividing by 10 toward zero drops it." },
+      { "n": 3, "title": "Check, then push", "note": "If result * 10 + digit would leave the int32 range, return 0. Otherwise push the digit." },
+      { "n": 4, "title": "Return", "note": "x is 0, so every digit has moved. result holds the reversed number." }
+    ] }
+  ],
+  "goArgs": ["int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Trailing zeros vanish", "input": "120", "output": "21", "why": "The 0 is peeled first and becomes a leading zero of the result, which is no digit at all." },
+    { "title": "Overflow gives 0", "input": "1534236469", "output": "0", "why": "The reverse is 9646324351, bigger than 2147483647. The check fires when result is 964632435." },
+    { "title": "Negative minimum", "input": "-2147483648", "output": "0", "why": "Its reverse, -8463847412, is below the smallest int32. Note x itself is valid input." },
+    { "title": "Zero", "input": "0", "output": "0", "why": "The loop never runs. The answer is 0." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Numbers are doubles, so result * 10 + digit never wraps. You must still check the 32-bit range yourself, or 1534236469 returns 9646324351 instead of 0." },
+    { "lang": "TypeScript", "text": "x / 10 is a float division. Use Math.trunc(x / 10). Math.floor is wrong for negatives: floor(-12.3) is -13. And x % 10 keeps the sign, so -123 % 10 is -3." },
+    { "lang": "TypeScript", "text": "Do not 'fix' overflow with result | 0. It wraps silently into a wrong negative number instead of returning 0." },
+    { "lang": "Go", "text": "Go's / truncates toward zero and % takes the sign of the dividend, like JS. Python differs: -123 // 10 is -13. Go's int is 64-bit, so it will not overflow for 32-bit input but the range check is still required." },
+    { "lang": "General", "text": "The two limits differ by one: the largest int32 ends in 7 and the smallest in -8. The check on the last digit has to use 7 for positives and -8 for negatives." }
+  ],
+  "recap": {
+    "pattern": "Peel digits, check before multiply",
+    "key": "digit = x % 10, x = trunc(x / 10), result = result * 10 + digit, and return 0 if result is already past one tenth of the limit.",
+    "complexity": "Time O(d) for d digits, at most 10. Space O(1).",
+    "moves": ["Peel digit = x % 10 and drop it from x", "If result > 214748364 (or equal and digit > 7), return 0", "Same for the negative side with -8", "result = result * 10 + digit"]
+  }
+}

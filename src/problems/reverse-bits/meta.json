@@ -1,0 +1,70 @@
+{
+  "slug": "reverse-bits",
+  "title": "Reverse Bits",
+  "category": "Bit Manipulation",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get an unsigned integer and a bit width. Write the number in that many binary digits, flip the order of the digits, and return the new number. The real problem always uses width 32. Here the width is an argument, so a short row fits on a phone.",
+  "example": {
+    "caption": "With 6 bits, 001011 (11) read backwards is 110100 (52).",
+    "input": [{ "kind": "bits", "label": "n", "width": 6, "rows": [{ "label": "n", "value": 11 }] }],
+    "output": [{ "kind": "bits", "label": "out", "width": 6, "rows": [{ "label": "out", "value": 52, "tones": ["hit", "hit", "dim", "hit", "dim", "dim"] }] }]
+  },
+  "idea": {
+    "sentence": "Peel the lowest bit off n and push it onto the right end of the result, once per bit. The first bit out ends up last.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "shift left (<<)", "plain": "Slide all bits one place to the left. The right end gets a fresh 0." },
+      { "term": "logical shift (>>>)", "plain": "Slide bits right and fill the left end with 0, ignoring any sign." },
+      { "term": "unsigned", "plain": "All 32 bits count as value, with no sign bit. The top bit is worth 2^31." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: n and the width, e.g. 11, 6. For the real problem the width is 32.",
+    "presets": [
+      { "label": "11 in 6 bits", "args": [11, 6] },
+      { "label": "Lowest bit only", "args": [1, 6] },
+      { "label": "Pattern 101010", "args": [42, 6] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "b", "meaning": "number of bits (32 in the real problem)" }],
+    "compare": { "brute": "n", "optimal": "logn", "bruteLabel": "Loop over every bit", "optimalLabel": "Swap halves in a few rounds", "unit": "operations (rough: 5 rounds for 32 bits)" },
+    "rows": [
+      { "name": "Peel and push", "time": "O(b)", "space": "O(1)", "note": "One turn per bit. For b = 32 this is a fixed 32 turns." },
+      { "name": "String reverse", "time": "O(b)", "space": "O(b)", "note": "Convert to a binary string, reverse it, parse it back. Easy but allocates." },
+      { "name": "Swap halves", "time": "O(log b)", "space": "O(1)", "note": "Swap the 16-bit halves, then bytes, nibbles, pairs and single bits. Five rounds with masks." }
+    ],
+    "takeaway": "The loop is the clear version. It is 32 steps whatever the input, which is why it counts as constant time."
+  },
+  "variants": [
+    { "id": "loop", "label": "Peel and push", "tsFn": "reverseBits", "goFn": "reverseBits", "stages": [
+      { "n": 1, "title": "Empty result", "note": "The result starts at 0 and will grow one bit per turn." },
+      { "n": 2, "title": "Read lowest bit", "note": "n & 1 gives the right-most bit of n. The first bit read is the one that ends up last." },
+      { "n": 3, "title": "Push and shift", "note": "Shift the result left, OR the bit in at the right, then shift n right." },
+      { "n": 4, "title": "Return unsigned", "note": "After width turns the bits are reversed. In JS, >>> 0 makes the value unsigned." }
+    ] }
+  ],
+  "goArgs": ["uint32", "int"],
+  "goRet": "uint32",
+  "compare": "exact",
+  "edges": [
+    { "title": "Zero", "input": "0, 32", "output": "0", "why": "No 1 bits to move. The loop still runs 32 times." },
+    { "title": "Lowest bit becomes the top", "input": "1, 32", "output": "2147483648", "why": "The answer has bit 31 set. In JS a bitwise result with bit 31 set is negative (-2147483648) unless you apply >>> 0." },
+    { "title": "Top bit becomes the lowest", "input": "2147483648, 32", "output": "1", "why": "The input already needs the unsigned reading. In JS n & 1 and n >>> 1 are safe, but n >> 1 would smear the sign bit." },
+    { "title": "All ones", "input": "4294967295, 32", "output": "4294967295", "why": "Reversing a row of ones changes nothing. A good check that the unsigned conversion works." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Bitwise operators return signed 32-bit values, so a result with bit 31 set is negative: reverseBits(1, 32) without >>> 0 gives -2147483648, not 2147483648. Finish with result >>> 0." },
+    { "lang": "TypeScript", "text": "Use >>> to shift n, not >>. The arithmetic shift copies the sign bit into the top, which is wrong for inputs at 2^31 or above." },
+    { "lang": "TypeScript", "text": "JS masks the shift count to 5 bits: 1 << 32 is 1, not 0. A loop that shifts by 32 or more quietly does nothing instead of failing." },
+    { "lang": "Go", "text": "Use uint32. It is unsigned, so >> is a logical shift and the value is never negative. A shift by a negative count panics at run time, so be careful with 31 - i style code." },
+    { "lang": "General", "text": "A fixed width matters. Reversing 6 bits of 11 gives 52, but reversing 32 bits of 11 gives 3489660928. Leading zeros count." }
+  ],
+  "recap": {
+    "pattern": "Peel the low bit, push it on the result",
+    "key": "Each turn moves the lowest bit of n onto the right end of the result. After the whole width, the order is flipped.",
+    "complexity": "Time O(b), a fixed 32 for this problem. Space O(1).",
+    "moves": ["result = 0", "bit = n & 1", "result = (result << 1) | bit, then n >>>= 1", "Repeat width times, return result as unsigned"]
+  }
+}

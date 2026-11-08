@@ -1,0 +1,6 @@
+function getSum(a, b)                   # [1] a = sum so far, b = carries left
+  while b is not 0                      # [1] a carry is left to add
+    carry = (a AND b) shifted left 1    # [2] both bits 1 carries to the left
+    a = a XOR b                         # [3] sum of each column, carry ignored
+    b = carry                           # [4] add the carry next turn
+  return a                              # [1] no carry left

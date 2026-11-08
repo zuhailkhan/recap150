@@ -1,0 +1,68 @@
+{
+  "slug": "counting-bits",
+  "title": "Counting Bits",
+  "category": "Bit Manipulation",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "Given a number n, build a list of length n + 1 where entry i is the number of 1 bits in the binary form of i. Do it in one pass over 0..n, not by counting each number from scratch.",
+  "example": {
+    "caption": "For n = 5 the list is 0, 1, 1, 2, 1, 2. For example 5 is 101, which has two 1 bits.",
+    "input": [{ "kind": "array", "label": "n", "items": [5] }],
+    "output": [{ "kind": "array", "label": "ans", "items": [0, 1, 1, 2, 1, 2], "tones": [null, null, null, null, null, "hit"] }]
+  },
+  "idea": {
+    "sentence": "i has the same 1 bits as i >> 1 (itself without the last bit), plus one more if that last bit was 1, so each answer is built from an earlier one.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "i >> 1", "plain": "Shift every bit one place right and drop the last one. It is the same as dividing by 2 and rounding down." },
+      { "term": "i & 1", "plain": "The last bit of i: 1 if i is odd, 0 if even." },
+      { "term": "dp", "plain": "Dynamic programming: answer a problem by reusing answers to smaller ones you already stored." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: n, e.g. 5. Presets keep n small so every row fits.",
+    "presets": [
+      { "label": "n = 5", "args": [5] },
+      { "label": "n = 8, a power of two", "args": [8] },
+      { "label": "n = 2", "args": [2] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "the largest number to count (the list has n + 1 entries)" }, { "sym": "b", "meaning": "bits per number, about log n" }],
+    "compare": { "brute": "nlogn", "optimal": "n", "bruteLabel": "Count each number's bits separately", "optimalLabel": "Reuse ans[i >> 1]", "unit": "bit operations (rough)" },
+    "rows": [
+      { "name": "Count each number", "time": "O(n log n)", "space": "O(1) extra", "note": "Every number takes up to log n steps to count its bits." },
+      { "name": "ans[i >> 1] + (i & 1)", "time": "O(n)", "space": "O(1) extra", "note": "One lookup and one add per number. The output list itself is n + 1 cells." },
+      { "name": "ans[i & (i − 1)] + 1", "time": "O(n)", "space": "O(1) extra", "note": "Same idea from the other trick: removing the lowest 1 leaves a smaller number with one bit fewer." }
+    ],
+    "takeaway": "Every answer is one step away from an earlier answer, so the whole table costs one operation per entry."
+  },
+  "variants": [
+    { "id": "shift", "label": "Shift and add", "tsFn": "countBits", "goFn": "countBits", "stages": [
+      { "n": 1, "title": "Make the table", "note": "A list of n + 1 zeros. ans[0] stays 0 because zero has no 1 bits." },
+      { "n": 2, "title": "Look at the half", "note": "i >> 1 is i without its last bit. It is smaller than i, so its answer is already in the table." },
+      { "n": 3, "title": "Add the last bit", "note": "ans[i] = ans[i >> 1] + (i & 1). The dropped bit adds 1 only if it was a 1." }
+    ] }
+  ],
+  "goArgs": ["int"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "n = 0", "input": "0", "output": "[0]", "why": "The list still has n + 1 = 1 entry. The loop does not run." },
+    { "title": "n = 1", "input": "1", "output": "[0, 1]", "why": "i = 1 uses ans[0]. The base entry must already be 0." },
+    { "title": "Power of two", "input": "16", "output": "[0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 1]", "why": "A power of two has exactly one 1 bit. Each one restarts the count at 1." },
+    { "title": "Odd versus even", "input": "5", "output": "[0, 1, 1, 2, 1, 2]", "why": "Even numbers share the count of their half. Odd numbers add one more." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "In JS, + binds tighter than &. ans[i >> 1] + i & 1 means (ans[i >> 1] + i) & 1, which is silently wrong. Write ans[i >> 1] + (i & 1) with the parentheses." },
+    { "lang": "TypeScript", "text": "new Array(n + 1) holds empty slots, not zeros. fill(0) is needed, or ans[i >> 1] is undefined and the sum becomes NaN." },
+    { "lang": "Go", "text": "Go orders & above +, so half + i&1 is fine, but keep the parentheses for the reader. make([]int, n+1) already holds zeros." },
+    { "lang": "General", "text": "Do not call a popcount helper for each i. That works but throws away the point: the answer for i is one lookup away from an answer you already have." }
+  ],
+  "recap": {
+    "pattern": "DP on bits: reuse the half",
+    "key": "ans[i] = ans[i >> 1] + (i & 1). The count for i is the count for i without its last bit, plus that bit.",
+    "complexity": "Time O(n). Space O(n) for the answer.",
+    "moves": ["ans[0] = 0", "For each i, read ans[i >> 1]", "Add i & 1", "Store it and move to i + 1"]
+  }
+}

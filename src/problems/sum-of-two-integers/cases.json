@@ -1,0 +1,12 @@
+[
+  {"name":"no carry","input":[1,2],"expected":3},
+  {"name":"carry chain","input":[5,3],"expected":8},
+  {"name":"negative plus positive","input":[-1,1],"expected":0,"edge":true},
+  {"name":"zeros","input":[0,0],"expected":0},
+  {"name":"two negatives","input":[-2,-3],"expected":-5,"edge":true},
+  {"name":"cancel out","input":[1000,-1000],"expected":0},
+  {"name":"negative result","input":[-1000,999],"expected":-1},
+  {"name":"wraps past int32 max","input":[2147483647,1],"expected":-2147483648,"edge":true},
+  {"name":"wraps below int32 min","input":[-2147483648,-1],"expected":2147483647,"edge":true},
+  {"name":"same number","input":[6,6],"expected":12}
+]

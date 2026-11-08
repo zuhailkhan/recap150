@@ -1,0 +1,67 @@
+{
+  "slug": "single-number",
+  "title": "Single Number",
+  "category": "Bit Manipulation",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "Every number in the list appears exactly twice, except one that appears once. Find that one. Use one pass and no extra memory, so no hash set and no counting table.",
+  "example": {
+    "caption": "4 has no twin. 1 and 2 each appear twice and cancel out.",
+    "input": [{ "kind": "array", "label": "nums", "items": [4, 1, 2, 1, 2] }],
+    "output": [{ "kind": "array", "label": "nums", "items": [4, 1, 2, 1, 2], "tones": ["hit", "dim", "dim", "dim", "dim"] }]
+  },
+  "idea": {
+    "sentence": "XOR every number together: equal pairs cancel to 0, so only the number without a twin is left.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "XOR (^)", "plain": "Compares two numbers bit by bit. The result bit is 1 only where the two bits differ." },
+      { "term": "cancel", "plain": "x ^ x is 0 and x ^ 0 is x. Order does not matter, so every pair vanishes wherever it sits." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the list, e.g. [4,1,2,1,2]",
+    "presets": [
+      { "label": "Classic", "args": [[4, 1, 2, 1, 2]] },
+      { "label": "Twin far apart", "args": [[7, 3, 5, 3, 5, 7, 9]] },
+      { "label": "Zero in the list", "args": [[0, 6, 0]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of the list" }],
+    "compare": { "brute": "n", "optimal": "1", "bruteLabel": "Hash set or count table", "optimalLabel": "One running XOR", "unit": "extra memory cells (rough)" },
+    "rows": [
+      { "name": "Count with a map", "time": "O(n)", "space": "O(n)", "note": "Count every value, then find the one with count 1." },
+      { "name": "Sort, then compare neighbours", "time": "O(n log n)", "space": "O(1)", "note": "Equal numbers end up side by side. Needs the sort (or a copy of the list)." },
+      { "name": "XOR everything", "time": "O(n)", "space": "O(1)", "note": "One pass and a single integer." }
+    ],
+    "takeaway": "XOR keeps one number of memory instead of a whole table, because pairs erase themselves."
+  },
+  "variants": [
+    { "id": "xor", "label": "XOR fold", "tsFn": "singleNumber", "goFn": "singleNumber", "stages": [
+      { "n": 1, "title": "Start at 0", "note": "x begins as 0. XOR with 0 changes nothing, so it does not disturb the first number." },
+      { "n": 2, "title": "Fold each number in", "note": "x = x XOR n. A value seen a second time flips the same bits back." },
+      { "n": 3, "title": "Return what is left", "note": "All pairs are gone. x holds the number that appeared once." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One number", "input": "[1]", "output": "1", "why": "Nothing to cancel. 0 XOR 1 is 1." },
+    { "title": "Negative numbers", "input": "[-1, -1, -2]", "output": "-2", "why": "XOR works on the bit pattern, so a negative value cancels with its twin like any other." },
+    { "title": "Zero is the answer", "input": "[3, 0, 3]", "output": "0", "why": "x ends at 0 because the single number is 0. Never use 0 as a sign of no answer." },
+    { "title": "Twins far apart", "input": "[7, 3, 5, 3, 5, 7, 9]", "output": "9", "why": "Distance does not matter. XOR is order-free, so each pair cancels wherever it sits." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "JS bitwise operators first convert each number to a signed 32-bit integer. Values beyond about 2.1 billion are silently wrapped, so ^ gives wrong answers there. Use BigInt for bigger values." },
+    { "lang": "TypeScript", "text": "A XOR result can be negative if bit 31 ends up set. Use >>> 0 if you need the unsigned reading." },
+    { "lang": "Go", "text": "^ is XOR when it sits between two operands and bitwise NOT when it is in front of one (^x). Writing x = ^n does the wrong thing." },
+    { "lang": "General", "text": "This only works because every other number appears an even count (exactly two). If a value could appear three times, three copies leave one copy behind." }
+  ],
+  "recap": {
+    "pattern": "XOR cancels pairs",
+    "key": "x ^ x = 0 and x ^ 0 = x. XOR the whole list and the only number left is the one without a twin.",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": ["Start with x = 0", "XOR each number into x", "Pairs cancel to 0 whatever the order", "Return x"]
+  }
+}

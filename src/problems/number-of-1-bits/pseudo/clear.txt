@@ -1,0 +1,7 @@
+function hammingWeight(n)
+  x = n as an unsigned 32-bit number    # [1]
+  count = 0
+  while x is not 0
+    x = x AND (x - 1)                   # [2] clears the lowest 1 bit
+    count = count + 1                   # [3] one 1 bit removed
+  return count                          # [3] x is 0, all counted

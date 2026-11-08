@@ -1,0 +1,6 @@
+function countBits(n)
+  ans = list of n + 1 zeros             # [1] entry 0 stays 0
+  for i from 1 to n
+    half = ans[i shifted right by 1]    # [2] i without its last bit, already solved
+    ans[i] = half + (i AND 1)           # [3] add 1 if the dropped bit was 1
+  return ans

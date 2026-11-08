@@ -1,0 +1,12 @@
+[
+  {"name":"classic","input":[[2,2,1]],"expected":1},
+  {"name":"five numbers","input":[[4,1,2,1,2]],"expected":4},
+  {"name":"one number","input":[[1]],"expected":1,"edge":true},
+  {"name":"negatives","input":[[-1,-1,-2]],"expected":-2,"edge":true},
+  {"name":"zero among pairs","input":[[0,1,0]],"expected":1},
+  {"name":"zero is the answer","input":[[3,0,3]],"expected":0,"edge":true},
+  {"name":"single at the end","input":[[7,3,5,3,5,7,9]],"expected":9},
+  {"name":"mixed signs","input":[[30000,-30000,30000]],"expected":-30000},
+  {"name":"largest int32","input":[[2147483647,5,5]],"expected":2147483647,"edge":true},
+  {"name":"smallest int32","input":[[-2147483648,9,9]],"expected":-2147483648,"edge":true}
+]

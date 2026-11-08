@@ -1,0 +1,69 @@
+{
+  "slug": "sum-of-two-integers",
+  "title": "Sum of Two Integers",
+  "category": "Bit Manipulation",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Add two integers, which may be negative, without using the + or - operators. Use only bit operations. The result is read as a signed 32-bit integer.",
+  "example": {
+    "caption": "5 + 3 = 8. In binary 101 + 011 = 1000.",
+    "input": [{ "kind": "bits", "label": "inputs", "width": 6, "rows": [{ "label": "a", "value": 5 }, { "label": "b", "value": 3 }] }],
+    "output": [{ "kind": "bits", "label": "sum", "width": 6, "rows": [{ "label": "sum", "value": 8, "tones": ["dim", "dim", "hit", "dim", "dim", "dim"] }] }]
+  },
+  "idea": {
+    "sentence": "XOR adds each column and ignores carries, AND shifted left is the carries. Repeat with (sum, carries) until no carry is left.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "carry", "plain": "In column addition, when 1 + 1 gives 0 and moves a 1 to the next column on the left. In bits it is a AND b, shifted left by one." },
+      { "term": "two's complement", "plain": "How computers store negative integers. -1 is all ones. Adding works the same for negative and positive, which is why this trick handles negatives too." },
+      { "term": "int32", "plain": "A signed integer that is exactly 32 bits wide. Past its largest value it wraps around to the most negative one." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: a and b, e.g. 5, 3. Keep them small and positive (under 32) so the rows stay short.",
+    "presets": [
+      { "label": "5 + 3, carries ripple", "args": [5, 3] },
+      { "label": "No carry at all", "args": [1, 2] },
+      { "label": "Same number twice", "args": [6, 6] },
+      { "label": "7 + 1, long chain", "args": [7, 1] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "w", "meaning": "word width in bits (32 here)" }, { "sym": "b", "meaning": "the size of the second number" }],
+    "compare": { "brute": "n", "optimal": "logn", "bruteLabel": "Count up by 1, b times", "optimalLabel": "Carry loop, at most w turns", "unit": "operations (rough)" },
+    "rows": [
+      { "name": "Increment b times", "time": "O(b)", "space": "O(1)", "note": "Needs an increment, which is itself an addition. Not allowed, and slow for big b." },
+      { "name": "XOR and carry loop", "time": "O(w)", "space": "O(1)", "note": "Every turn pushes the carries one column left, so after at most w turns they fall off the end." }
+    ],
+    "takeaway": "A carry can only travel left, one column per turn, so the loop stops within one word width. That is 32 turns at the worst, regardless of the values."
+  },
+  "variants": [
+    { "id": "carry", "label": "XOR and carry", "tsFn": "getSum", "goFn": "getSum", "stages": [
+      { "n": 1, "title": "Loop while carry", "note": "a is the sum so far, b the carries still to add. Stop when b is 0." },
+      { "n": 2, "title": "Find the carries", "note": "(a & b) << 1: columns with two 1s carry a 1 into the next column." },
+      { "n": 3, "title": "Add without carry", "note": "a ^ b is the column sum with the carries left out." },
+      { "n": 4, "title": "Carry becomes b", "note": "The carries are the next number to add. b = carry." }
+    ] }
+  ],
+  "goArgs": ["int", "int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "No carries", "input": "1, 2", "output": "3", "why": "No column has two 1s, so the first turn gives carry 0 and a ^ b is already the answer." },
+    { "title": "Opposite signs", "input": "-1, 1", "output": "0", "why": "-1 is all ones. The carry ripples through every column and falls off the top after 32 turns, leaving 0." },
+    { "title": "Two negatives", "input": "-2, -3", "output": "-5", "why": "Two's complement adds the same way for negatives. Nothing special for the sign." },
+    { "title": "Wraps past the top", "input": "2147483647, 1", "output": "-2147483648", "why": "The sum does not fit in 32 bits, so it wraps like a real int32. That is the defined behaviour here." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "JS bitwise operators convert to signed 32-bit and return signed 32-bit, so negatives and wrap-around come for free. You do not need the & 0xFFFFFFFF masks that Python needs. Inputs of 2^31 or more are wrapped before the loop even starts." },
+    { "lang": "TypeScript", "text": "<< binds tighter than &, so a & b << 1 means a & (b << 1). Write (a & b) << 1 with the parentheses." },
+    { "lang": "Go", "text": "Go's int is 64 bits. The loop still ends, but 2147483647 + 1 gives 2147483648, not -2147483648. Convert to int32 first so the sum wraps at 32 bits, then convert back." },
+    { "lang": "Go", "text": "& and << have the same precedence in Go and group left to right, so x & y << 1 means (x & y) << 1, the opposite of JS. Keep the parentheses anyway. A negative shift count panics, but a constant 1 is fine." }
+  ],
+  "recap": {
+    "pattern": "XOR sums, AND-shift carries",
+    "key": "a ^ b is the sum with no carries. (a & b) << 1 is the carries. Add them the same way until the carries are 0.",
+    "complexity": "Time O(w) for a w-bit word (32 turns at most). Space O(1).",
+    "moves": ["carry = (a & b) << 1", "a = a ^ b", "b = carry", "Stop when b is 0 and return a"]
+  }
+}

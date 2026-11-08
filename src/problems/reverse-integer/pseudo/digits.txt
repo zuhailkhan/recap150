@@ -1,0 +1,10 @@
+function reverse(x)
+  limit = 214748364                     # [1] 2147483647 / 10, rounded toward zero
+  result = 0
+  while x is not 0
+    digit = x remainder 10              # [2] last digit, keeps the sign of x
+    x = x divided by 10, toward zero    # [2] drop it
+    if result * 10 + digit would leave -2147483648 .. 2147483647   # [3] test with the limit, before multiplying
+      return 0                          # [3] overflow
+    result = result * 10 + digit        # [3] push the digit on the right
+  return result                         # [4]

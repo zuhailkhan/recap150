@@ -1,0 +1,5 @@
+function singleNumber(nums)
+  x = 0                       # [1] XOR with 0 changes nothing
+  for each n in nums
+    x = x XOR n               # [2] a number seen twice cancels to 0
+  return x                    # [3] only the unpaired number is left

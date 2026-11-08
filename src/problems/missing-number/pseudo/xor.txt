@@ -1,0 +1,5 @@
+function missingNumber(nums)
+  x = length(nums)                      # [1] n, the index with no slot
+  for i from 0 to length(nums) - 1
+    x = x XOR i XOR nums[i]             # [2] index and value cancel if equal
+  return x                              # [3] the value that never cancelled
