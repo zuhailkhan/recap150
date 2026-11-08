@@ -5,6 +5,8 @@ import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   base: './',
+  // The main chunk holds the text of all 150 problems (sidebar and recap read it synchronously). Code, solvers and demos load lazily per problem.
+  build: { chunkSizeWarningLimit: 1200 },
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   plugins: [
     vue(),
