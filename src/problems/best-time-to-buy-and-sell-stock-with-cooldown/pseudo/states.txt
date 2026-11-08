@@ -1,0 +1,9 @@
+function maxProfit(prices)
+  if prices is empty, return 0
+  hold, sold, rest = three arrays of length n, all 0       # [1] one table row per state
+  hold[0] = -prices[0]                                     # [1] day 0: buy now
+  for i from 1 to n - 1
+    hold[i] = max(hold[i-1], rest[i-1] - prices[i])        # [2] keep holding, or buy after a rest
+    sold[i] = hold[i-1] + prices[i]                        # [3] sell what I held yesterday
+    rest[i] = max(rest[i-1], sold[i-1])                    # [4] stay resting, or cooldown ends
+  return max(sold[n-1], rest[n-1])                         # [5] end owning nothing

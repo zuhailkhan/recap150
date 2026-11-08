@@ -1,0 +1,12 @@
+[
+  {"name":"classic","input":["abcde","ace"],"expected":3},
+  {"name":"identical strings","input":["abc","abc"],"expected":3},
+  {"name":"nothing in common","input":["abc","def"],"expected":0,"edge":true},
+  {"name":"single letter match","input":["a","a"],"expected":1,"edge":true},
+  {"name":"repeated letters","input":["aaaa","aa"],"expected":2,"edge":true},
+  {"name":"one empty string","input":["","abc"],"expected":0,"edge":true},
+  {"name":"gaps in both","input":["abcd","acbd"],"expected":3},
+  {"name":"palindromic mix","input":["abcba","abcbcba"],"expected":5},
+  {"name":"scattered","input":["ezupkr","ubmrapg"],"expected":2},
+  {"name":"short against long","input":["bl","yby"],"expected":1}
+]

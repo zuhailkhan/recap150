@@ -1,0 +1,78 @@
+{
+  "slug": "edit-distance",
+  "title": "Edit Distance",
+  "category": "2-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get two words. In one step you may insert a letter, delete a letter, or replace a letter. Return the smallest number of steps that turns the first word into the second. Either word may be empty.",
+  "example": {
+    "caption": "abc becomes yabd with two edits: put a y in front, and change the c into a d.",
+    "input": [
+      { "kind": "array", "label": "word1", "items": ["a", "b", "c"] },
+      { "kind": "array", "label": "word2", "items": ["y", "a", "b", "d"] }
+    ],
+    "output": [
+      { "kind": "array", "label": "one best plan", "items": ["insert y", "keep a", "keep b", "c to d"], "tones": ["focus", "dim", "dim", "focus"] },
+      { "kind": "array", "label": "answer", "items": [2], "tones": ["hit"] }
+    ]
+  },
+  "idea": {
+    "sentence": "Let dp[i][j] be the fewest edits for the first i letters of word1 and the first j letters of word2; a match copies the diagonal, a mismatch costs 1 plus the cheapest of the three neighbours.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "prefix", "plain": "The first i letters of a word. The empty prefix has i = 0." },
+      { "term": "dp table", "plain": "A grid where each cell stores the answer to a smaller version of the problem, so a bigger answer is built from cells already filled." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two words (strings). Keep them short, each cell is one step and the trace stops at 60 steps.",
+    "presets": [
+      { "label": "abc to yabd", "args": ["abc", "yabd"] },
+      { "label": "One replace", "args": ["cat", "cut"] },
+      { "label": "Swap two letters", "args": ["ab", "ba"] },
+      { "label": "Equal words", "args": ["abc", "abc"] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "length of word1" },
+      { "sym": "m", "meaning": "length of word2" }
+    ],
+    "compare": { "brute": "2n", "optimal": "nm", "bruteLabel": "Try every choice for each letter", "optimalLabel": "Fill an (n+1) by (m+1) table", "unit": "steps (brute force really grows as 3 to the power n, drawn as the closest shape)" },
+    "rows": [
+      { "name": "Plain recursion", "time": "O(3^(n+m))", "space": "O(n+m)", "note": "Every mismatch branches three ways and the same pair of prefixes is solved again and again." },
+      { "name": "DP table", "time": "O(n*m)", "space": "O(n*m)", "note": "Each of the (n+1)(m+1) cells is solved once from three cells already filled." }
+    ],
+    "takeaway": "The table has one cell per pair of prefixes. Each cell looks at only three neighbours, so the work is the table size. Keeping just two rows would cut the space to O(m)."
+  },
+  "variants": [
+    { "id": "table", "label": "Bottom-up table", "tsFn": "minDistance", "goFn": "minDistance", "stages": [
+      { "n": 1, "title": "Base row and column", "note": "Row 0 and column 0 hold the cost against an empty word: i deletes or j inserts." },
+      { "n": 2, "title": "Letters match", "note": "No edit is needed, so the cell copies the diagonal cell dp[i-1][j-1]." },
+      { "n": 3, "title": "Letters differ", "note": "One edit plus the cheapest of up (delete), left (insert) and diagonal (replace)." },
+      { "n": 4, "title": "Read the corner", "note": "The last cell, dp[m][n], covers both whole words. That is the answer." }
+    ] }
+  ],
+  "goArgs": ["string", "string"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One word is empty", "input": "\"\" and \"abc\"", "output": "3", "why": "Only the base row or column is used. Three inserts, or three deletes the other way round." },
+    { "title": "Both empty", "input": "\"\" and \"\"", "output": "0", "why": "The table is 1 by 1 and holds dp[0][0] = 0. No loop runs, and that is correct." },
+    { "title": "Swapped letters", "input": "ab and ba", "output": "2", "why": "Two replaces. A swap is not one move here, so a solution that counts it as 1 is wrong." },
+    { "title": "Equal words", "input": "abc and abc", "output": "0", "why": "Every cell on the diagonal copies the cell before it, so the zeros slide down to the corner." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The table is (m+1) by (n+1), not m by n. Cell i, j talks about prefixes, so the letters to compare are word1[i-1] and word2[j-1]. Mixing i and i-1 is the classic off-by-one." },
+    { "lang": "General", "text": "Forget the base row and column and every cell on the edge reads garbage. Row 0 is 0..n and column 0 is 0..m." },
+    { "lang": "TypeScript", "text": "new Array(m + 1).fill(new Array(n + 1).fill(0)) shares one row between all rows. Writing one cell would change every row. Use Array.from with a fresh array per row." },
+    { "lang": "Go", "text": "make([][]int, m+1) only makes the outer slice, every inner slice is nil. Allocate each row with make([]int, n+1) in a loop. The built-in min of three values needs Go 1.21 or newer." },
+    { "lang": "Go", "text": "word1[i-1] is a byte. That is right for ASCII letters, but a word with accents or emoji needs []rune(word1) first." }
+  ],
+  "recap": {
+    "pattern": "2-D DP over two prefixes",
+    "key": "dp[i][j] is the cost for the first i and first j letters. Equal letters copy the diagonal, else 1 + min(up, left, diagonal).",
+    "complexity": "Time O(n*m). Space O(n*m), or O(m) with two rows.",
+    "moves": ["Make an (m+1) by (n+1) table", "Fill row 0 with j and column 0 with i", "Equal letters: copy dp[i-1][j-1]", "Else 1 + min(up, left, diagonal), then read dp[m][n]"]
+  }
+}

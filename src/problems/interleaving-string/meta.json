@@ -1,0 +1,76 @@
+{
+  "slug": "interleaving-string",
+  "title": "Interleaving String",
+  "category": "2-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get three strings, s1, s2 and s3. Decide whether s3 can be made by weaving s1 and s2 together. Every letter of both strings is used exactly once, and the letters of each string keep their own order.",
+  "example": {
+    "caption": "\"ab\" and \"cd\" weave into \"acbd\": take a from s1, c from s2, b from s1, d from s2.",
+    "input": [
+      { "kind": "array", "label": "s1", "items": ["a", "b"], "tones": ["keep", "keep"] },
+      { "kind": "array", "label": "s2", "items": ["c", "d"], "tones": ["focus", "focus"] },
+      { "kind": "array", "label": "s3", "items": ["a", "c", "b", "d"] }
+    ],
+    "output": [
+      { "kind": "dp", "label": "dp[i][j] = can i letters of s1 and j of s2 weave into the first i+j letters of s3?", "cells": [["T", "F", "F"], ["T", "T", "F"], ["F", "T", "T"]], "rowLabels": ["", "a", "b"], "colLabels": ["", "c", "d"], "tones": [[null, null, null], [null, null, null], [null, null, "hit"]] }
+    ]
+  },
+  "idea": {
+    "sentence": "dp[i][j] says whether i letters of s1 and j letters of s2 can weave into the first i+j letters of s3. It is true if the newest letter of s3 matches the next letter of s1 with dp[i-1][j] true, or of s2 with dp[i][j-1] true.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "interleave", "plain": "Merge two strings into one, picking letters from either, but never reordering letters inside a string." },
+      { "term": "prefix", "plain": "The first k letters of a string." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Three strings, e.g. \"ab\", \"cd\", \"acbd\" (keep them short)",
+    "presets": [
+      { "label": "Alternating", "args": ["ab", "cd", "acbd"] },
+      { "label": "Repeated letters", "args": ["aa", "ab", "aaba"] },
+      { "label": "Order broken", "args": ["abc", "bd", "abdcb"] },
+      { "label": "Same string twice", "args": ["ab", "ab", "baab"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "m", "meaning": "length of s1" }, { "sym": "n", "meaning": "length of s2" }],
+    "compare": { "brute": "2n", "optimal": "nm", "bruteLabel": "Try every weave", "optimalLabel": "Fill the table", "unit": "steps (rough; brute force explores up to 2^(m+n) weaves)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(2^(m+n))", "space": "O(m+n)", "note": "At each letter of s3, try taking it from s1, then from s2." },
+      { "name": "2-D table", "time": "O(m·n)", "space": "O(m·n)", "note": "One true/false per (letters of s1 used, letters of s2 used). Position in s3 is i + j, so it needs no third axis." },
+      { "name": "One rolling row", "time": "O(m·n)", "space": "O(n)", "note": "Row i reads row i-1 and its own left cell. Keep one boolean array of length n+1 and update it left to right." }
+    ],
+    "takeaway": "The position in s3 is always i + j, so two numbers describe the whole situation. The table answers every (i, j) once instead of retrying weaves."
+  },
+  "variants": [
+    { "id": "table", "label": "2-D table", "tsFn": "isInterleave", "goFn": "isInterleave", "stages": [
+      { "n": 1, "title": "Check lengths, make table", "note": "If the lengths do not add up, answer false. Otherwise make an (m+1) by (n+1) table of false." },
+      { "n": 2, "title": "Empty start", "note": "dp[0][0] is true: no letters from either string build the empty start of s3." },
+      { "n": 3, "title": "Letter from s1", "note": "Newest letter of s3 equals s1's next letter, and the cell above is true." },
+      { "n": 4, "title": "Letter from s2", "note": "Or it equals s2's next letter and the cell to the left is true. Either route makes the cell true." },
+      { "n": 5, "title": "Read the corner", "note": "dp[m][n] is the answer: everything used, all of s3 built." }
+    ] }
+  ],
+  "goArgs": ["string", "string", "string"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "All empty", "input": "\"\", \"\", \"\"", "output": "true", "why": "Nothing to place and nothing to build. dp[0][0] is already the answer." },
+    { "title": "Lengths differ", "input": "\"ab\", \"cd\", \"abc\"", "output": "false", "why": "Every letter must be used once, so the lengths must add up. This also keeps s3[i+j-1] inside s3." },
+    { "title": "One string empty", "input": "\"\", \"b\", \"b\"", "output": "true", "why": "Only the first row is used. The answer is just whether s2 equals s3." },
+    { "title": "Same letters, wrong order", "input": "\"abc\", \"bd\", \"abdc\"", "output": "false", "why": "The letters are all there, but taking c before d would break the order inside s1 or s2. A greedy letter count says true." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Without the length check, s3[i+j-1] can read past the end. Check m + n == len(s3) first." },
+    { "lang": "General", "text": "Never decide greedily when both strings offer the same letter. Both routes can be right, and only the table tracks both." },
+    { "lang": "Go", "text": "make([][]bool, m+1) gives nil rows. Allocate each row. The zero value of bool is false, which is exactly the starting value you want." },
+    { "lang": "TypeScript", "text": "Array(m + 1).fill(Array(n + 1).fill(false)) shares one row between all rows. Use Array.from so each row is its own array." }
+  ],
+  "recap": {
+    "pattern": "2-D DP: two strings weave into a third",
+    "key": "dp[i][j] = (dp[i-1][j] and s1[i-1] == s3[i+j-1]) or (dp[i][j-1] and s2[j-1] == s3[i+j-1]).",
+    "complexity": "Time O(m·n). Space O(m·n), or O(n) with one rolling row.",
+    "moves": ["If m + n differs from the length of s3, return false", "dp[0][0] = true", "Fill row by row: letter from s1 via above, or from s2 via left", "Return dp[m][n]"]
+  }
+}

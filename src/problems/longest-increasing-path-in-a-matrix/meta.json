@@ -1,0 +1,76 @@
+{
+  "slug": "longest-increasing-path-in-a-matrix",
+  "title": "Longest Increasing Path In a Matrix",
+  "category": "2-D Dynamic Programming",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "You get a grid of numbers. A path moves up, down, left or right, and every step must land on a strictly bigger number. You may start anywhere and cannot move diagonally. Return how many cells the longest such path visits.",
+  "example": {
+    "caption": "Starting at the 1 you can climb 1, 2, 6, 9. That is 4 cells, and no path is longer.",
+    "input": [{ "kind": "grid", "label": "matrix", "cells": [[9, 9, 4], [6, 6, 8], [2, 1, 1]] }],
+    "output": [
+      { "kind": "grid", "label": "longest climb", "cells": [[9, 9, 4], [6, 6, 8], [2, 1, 1]], "tones": [["hit", null, null], ["hit", null, null], ["hit", "hit", null]] },
+      { "kind": "array", "label": "answer (cells)", "items": [4], "tones": ["hit"] }
+    ]
+  },
+  "idea": {
+    "sentence": "The longest path starting at a cell is 1 plus the best of its bigger neighbours, so store that answer in a memo table the first time and the recursion never repeats work.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "memoisation", "plain": "Remember each answer the first time you compute it. A later call for the same cell reads the table instead of recursing again." },
+      { "term": "strictly bigger", "plain": "Greater than, not equal. Equal neighbours are never part of a path, so the path cannot loop." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a matrix (list of equal-length rows). Keep it to 2 by 3 or 2 by 2, each cell takes two steps.",
+    "presets": [
+      { "label": "2 by 3 climb", "args": [[[2, 3, 1], [6, 5, 4]]] },
+      { "label": "Small 2 by 2", "args": [[[3, 4], [2, 1]]] },
+      { "label": "All equal", "args": [[[1, 1], [1, 1]]] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "r", "meaning": "number of rows" },
+      { "sym": "c", "meaning": "number of columns" },
+      { "sym": "n", "meaning": "number of cells, r times c" }
+    ],
+    "compare": { "brute": "2n", "optimal": "n", "bruteLabel": "Walk every path from every cell", "optimalLabel": "Solve each cell once", "unit": "cell visits (brute force really grows as 3 to the power of the path length, drawn as the closest shape)" },
+    "rows": [
+      { "name": "Plain DFS", "time": "O(3^n)", "space": "O(n)", "note": "Every cell starts its own search and the same cells are walked again and again by different paths." },
+      { "name": "DFS with memo", "time": "O(n)", "space": "O(n)", "note": "Each cell is solved once and looks at 4 neighbours. The memo and the recursion stack are both at most n deep." }
+    ],
+    "takeaway": "The memo is the DP table: one cell per grid cell. Strictly increasing steps mean there is no cycle, so the recursion always ends and the fill order is decided by the recursion itself."
+  },
+  "variants": [
+    { "id": "memo", "label": "DFS with memo", "tsFn": "longestIncreasingPath", "goFn": "longestIncreasingPath", "stages": [
+      { "n": 1, "title": "Memo table", "note": "Make a table the size of the grid. memo[r][c] is the longest path starting at that cell. 0 means not computed." },
+      { "n": 2, "title": "Memo hit", "note": "If the cell already holds a number, return it. No walking, no recursion." },
+      { "n": 3, "title": "Go uphill", "note": "A new cell asks each strictly bigger neighbour for its longest path." },
+      { "n": 4, "title": "Fill on return", "note": "When all neighbours have answered, store 1 plus the best answer in the memo." },
+      { "n": 5, "title": "Try every start", "note": "Call the search from every cell, keep the largest answer. Repeats are memo hits." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "All numbers equal", "input": "[[1,1],[1,1]]", "output": "1", "why": "No neighbour is strictly bigger, so every cell is a path of length 1. Using at-least-equal would loop forever." },
+    { "title": "Empty matrix", "input": "[]", "output": "0", "why": "There is no start cell. Check rows before reading the first row for the column count." },
+    { "title": "One long row", "input": "[[0,1,2,3,4,5,6,7,8,9]]", "output": "10", "why": "A single chain. The recursion goes ten deep from the first cell, and every later start is a memo hit." },
+    { "title": "Negative numbers", "input": "[[-3,-2],[-5,-1]]", "output": "4", "why": "Only the order of values matters. The memo holds path lengths, never cell values, so 0 still safely means not computed." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "0 in the memo means not computed, which is safe because a real answer is at least 1. If you used a memo that can hold a real 0, use -1 or a separate seen table." },
+    { "lang": "General", "text": "The step must be strictly bigger. With equal allowed, two neighbours could call each other forever. Strictness is also why no visited set is needed." },
+    { "lang": "TypeScript", "text": "Array.from({ length: rows }, () => new Array(cols).fill(0)) gives each row its own array. new Array(rows).fill([]) would share one row." },
+    { "lang": "Go", "text": "make([][]int, rows) has nil rows. Allocate each row. A recursive closure must be declared first with var dfs func(r, c int) int, then assigned, so it can call itself." },
+    { "lang": "General", "text": "Recursion depth can reach the number of cells for a snake-shaped matrix. That is fine for small grids. For huge ones, sort cells by value and fill in that order, or use a topological order." }
+  ],
+  "recap": {
+    "pattern": "DFS with memo on a grid",
+    "key": "memo[r][c] = 1 + max(memo of strictly bigger neighbours). Fill it by recursion and return the stored value on a repeat.",
+    "complexity": "Time O(r*c). Space O(r*c).",
+    "moves": ["Make a memo table of 0s the size of the grid", "dfs(r,c): if memo is set, return it", "Otherwise 1 + best of the strictly bigger neighbours, store it", "Run dfs from every cell and keep the max"]
+  }
+}

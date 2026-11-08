@@ -1,0 +1,14 @@
+[
+  {"name":"two ways, two b's","input":["bbag","bag"],"expected":2},
+  {"name":"rabbbit","input":["rabbbit","rabbit"],"expected":3},
+  {"name":"babgbag","input":["babgbag","bag"],"expected":5},
+  {"name":"single equal letter","input":["a","a"],"expected":1},
+  {"name":"no match","input":["a","b"],"expected":0},
+  {"name":"empty target","input":["abc",""],"expected":1,"edge":true},
+  {"name":"empty source","input":["","a"],"expected":0,"edge":true},
+  {"name":"both empty","input":["",""],"expected":1,"edge":true},
+  {"name":"target longer than source","input":["ab","abc"],"expected":0,"edge":true},
+  {"name":"repeated letters","input":["aaaa","aa"],"expected":6},
+  {"name":"order matters","input":["xyz","zyx"],"expected":0},
+  {"name":"count passes signed 32 bits","input":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","aaaaaaaaaaaaaaaaa"],"expected":2333606220,"edge":true}
+]

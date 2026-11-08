@@ -1,0 +1,78 @@
+{
+  "slug": "regular-expression-matching",
+  "title": "Regular Expression Matching",
+  "category": "2-D Dynamic Programming",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "You get a text and a pattern. In the pattern, a dot matches any one letter, and a star means zero or more copies of the symbol right before it. Decide whether the pattern matches the whole text, not just a part of it. The pattern never starts with a star.",
+  "example": {
+    "caption": "In c*a*b the c* is used zero times, a* eats the two a letters, and b matches b.",
+    "input": [
+      { "kind": "array", "label": "text", "items": ["a", "a", "b"] },
+      { "kind": "array", "label": "pattern", "items": ["c", "*", "a", "*", "b"] }
+    ],
+    "output": [
+      { "kind": "array", "label": "what each piece does", "items": ["c* : 0 copies", "a* : aa", "b : b"], "tones": ["dim", "hit", "hit"] },
+      { "kind": "array", "label": "matches the whole text?", "items": ["true"], "tones": ["hit"] }
+    ]
+  },
+  "idea": {
+    "sentence": "Let dp[i][j] say whether the first i letters match the first j pattern symbols; a star cell is true if its letter is used zero times or one more copy eats the last text letter.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "x*", "plain": "A symbol followed by a star is one unit. It stands for zero, one or many copies of that symbol." },
+      { "term": "prefix", "plain": "The first i letters of the text, or the first j symbols of the pattern. The empty prefix has length 0." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two strings: text, then pattern. Letters, dots and stars only, and a star must follow a letter or a dot. Keep them short.",
+    "presets": [
+      { "label": "aab vs c*a*b", "args": ["aab", "c*a*b"] },
+      { "label": "Star eats letters", "args": ["aab", "a*b"] },
+      { "label": "Dot star", "args": ["ab", ".*"] },
+      { "label": "No match", "args": ["aa", "a"] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "length of the text" },
+      { "sym": "m", "meaning": "length of the pattern" }
+    ],
+    "compare": { "brute": "2n", "optimal": "nm", "bruteLabel": "Backtrack over every star choice", "optimalLabel": "Fill an (n+1) by (m+1) table", "unit": "steps (backtracking can really grow as 2 to the power of the number of stars)" },
+    "rows": [
+      { "name": "Plain recursion", "time": "O(2^(n+m))", "space": "O(n+m)", "note": "A star splits into two branches at every text position, and the same pair of positions is solved many times." },
+      { "name": "DP table", "time": "O(n*m)", "space": "O(n*m)", "note": "Each cell is solved once. A star cell reads two other cells, a plain cell reads one." }
+    ],
+    "takeaway": "A star is the only place the table branches, and it branches into exactly two cells already filled. That keeps the work at table size."
+  },
+  "variants": [
+    { "id": "table", "label": "Bottom-up table", "tsFn": "isMatch", "goFn": "isMatch", "stages": [
+      { "n": 1, "title": "Base row and column", "note": "The empty text matches the empty pattern. A pattern like x*y* can also match the empty text, so row 0 copies the cell two columns left at every star." },
+      { "n": 2, "title": "Star: two choices", "note": "Zero copies reads the cell two columns left. One more copy needs the letter to fit and reads the cell above." },
+      { "n": 3, "title": "Plain symbol", "note": "A letter or dot must fit the text letter, and the diagonal cell must be true." },
+      { "n": 4, "title": "Read the corner", "note": "dp[m][n] covers the whole text and the whole pattern. That is the answer." }
+    ] }
+  ],
+  "goArgs": ["string", "string"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty text, star pattern", "input": "\"\" and a*", "output": "true", "why": "A star can use zero copies, so the pattern can vanish. This comes only from the base row." },
+    { "title": "Empty pattern", "input": "a and \"\"", "output": "false", "why": "Column 0 is false below the corner. A non-empty text cannot match nothing." },
+    { "title": "Star that must give back", "input": "aaa and a*a", "output": "true", "why": "a* must stop one letter early so the plain a can match the last one. The zero-copies and eat-one choices cover it." },
+    { "title": "Dot star", "input": "ab and .*", "output": "true", "why": "A dot with a star matches any run of letters. Each cell can eat one more letter, so the T flows down the star column to the corner." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "A star never stands alone. It repeats the symbol before it, so the star cell looks at p[j-2], and zero copies jumps two columns left, not one." },
+    { "lang": "General", "text": "Eating one more copy reads the cell above in the same column, dp[i-1][j], not the diagonal. The star stays in play after it eats a letter." },
+    { "lang": "General", "text": "Fill row 0 for patterns like a*b*. Without it, an empty text with a star pattern wrongly says false, and so does any match that skips a starred prefix." },
+    { "lang": "TypeScript", "text": "Allocate the booleans with Array.from and a fresh array per row. A bad pattern starting with a star makes dp[i][-1] undefined, so validate the pattern if the input is not trusted." },
+    { "lang": "Go", "text": "make([][]bool, m+1) leaves nil rows. Allocate each row. Indexing p[j-2] when j is 1 would panic, which is why a pattern may never start with a star." }
+  ],
+  "recap": {
+    "pattern": "2-D DP over text and pattern prefixes",
+    "key": "A star cell is true if zero copies work (dp[i][j-2]) or a fitting letter is eaten and dp[i-1][j] is true.",
+    "complexity": "Time O(n*m). Space O(n*m).",
+    "moves": ["Make an (n+1) by (m+1) table, dp[0][0] = true", "Row 0: a star copies the cell two columns left", "Star: zero copies, or fit and read the cell above", "Plain symbol: fits and the diagonal is true. Read dp[n][m]"]
+  }
+}

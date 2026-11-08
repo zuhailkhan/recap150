@@ -1,0 +1,11 @@
+function change(amount, coins)
+  k = length(coins)
+  dp = table of (k + 1) rows and (amount + 1) columns, all 0   # [1] row i: first i coin kinds allowed
+  for every row i: dp[i][0] = 1                                # [1] amount 0: one way, take nothing
+  for i from 1 to k                                            # coins in the OUTER loop
+    c = coins[i-1]
+    for a from 1 to amount
+      dp[i][a] = dp[i-1][a]                                    # [2] without coin c
+      if a >= c
+        dp[i][a] = dp[i][a] + dp[i][a-c]                       # [3] with coin c: same row, a - c back
+  return dp[k][amount]                                         # [4] all coins, full amount

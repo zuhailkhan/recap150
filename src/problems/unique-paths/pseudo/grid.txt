@@ -1,0 +1,6 @@
+function uniquePaths(m, n)
+  dp = table of m rows and n columns, all 1      # [1] first row and column: one way each
+  for i from 1 to m - 1
+    for j from 1 to n - 1
+      dp[i][j] = dp[i-1][j] + dp[i][j-1]         # [2] from above plus from the left
+  return dp[m-1][n-1]                            # [3] bottom-right square

@@ -1,0 +1,13 @@
+[
+  {"name":"classic","input":[5,[1,2,5]],"expected":4},
+  {"name":"order must not count twice","input":[3,[1,2]],"expected":2,"edge":true},
+  {"name":"amount zero","input":[0,[1,2]],"expected":1,"edge":true},
+  {"name":"impossible","input":[3,[2]],"expected":0,"edge":true},
+  {"name":"exact single coin","input":[10,[10]],"expected":1},
+  {"name":"three coins","input":[4,[1,2,3]],"expected":4},
+  {"name":"only even coins, odd amount","input":[7,[2,4]],"expected":0},
+  {"name":"two coins","input":[4,[1,2]],"expected":3},
+  {"name":"coin never divides amount","input":[5,[3]],"expected":0},
+  {"name":"coin bigger than the amount","input":[3,[5,1]],"expected":1,"edge":true},
+  {"name":"change for 60","input":[60,[1,5,10,25,50]],"expected":77,"edge":true}
+]

@@ -1,0 +1,14 @@
+function isInterleave(s1, s2, s3)
+  m = length(s1), n = length(s2)
+  if m + n != length(s3), return false                     # [1] lengths must add up
+  dp = table of (m + 1) rows and (n + 1) columns, all false   # [1] rows: letters from s1, columns: from s2
+  for i from 0 to m
+    for j from 0 to n
+      if i == 0 and j == 0
+        dp[0][0] = true                                    # [2] empty + empty = empty
+        continue
+      c = s3[i + j - 1]                                    # [3] newest letter of s3
+      viaS1 = i > 0 and dp[i-1][j] and s1[i-1] == c        # [3] from s1: above must work
+      viaS2 = j > 0 and dp[i][j-1] and s2[j-1] == c        # [4] from s2: left must work
+      dp[i][j] = viaS1 or viaS2                            # [4] either route is enough
+  return dp[m][n]                                          # [5] everything used

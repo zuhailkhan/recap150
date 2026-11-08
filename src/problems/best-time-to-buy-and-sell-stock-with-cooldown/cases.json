@@ -1,0 +1,11 @@
+[
+  {"name":"classic","input":[[1,2,3,0,2]],"expected":3},
+  {"name":"single day","input":[[1]],"expected":0,"edge":true},
+  {"name":"only falling prices","input":[[5,4,3,2,1]],"expected":0,"edge":true},
+  {"name":"steady rise: hold all the way","input":[[1,2,3,4,5]],"expected":4,"edge":true},
+  {"name":"dip then rise","input":[[1,4,2,7]],"expected":6},
+  {"name":"two days, falling","input":[[2,1]],"expected":0,"edge":true},
+  {"name":"three days","input":[[1,2,4]],"expected":3},
+  {"name":"longer mix","input":[[6,1,6,4,3,0,2]],"expected":7},
+  {"name":"many swings","input":[[2,1,4,5,2,9,7]],"expected":10}
+]

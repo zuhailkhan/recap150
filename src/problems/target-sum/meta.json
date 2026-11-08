@@ -1,0 +1,289 @@
+{
+  "slug": "target-sum",
+  "title": "Target Sum",
+  "category": "2-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of non-negative integers and a target. Put a plus or a minus sign in front of every number, then add them all up. Count how many different sign choices give exactly the target.",
+  "example": {
+    "caption": "With 1 and 1 and target 0, the choices +1-1 and -1+1 both total 0. Answer: 2.",
+    "input": [
+      {
+        "kind": "array",
+        "label": "nums",
+        "items": [
+          1,
+          1
+        ]
+      },
+      {
+        "kind": "array",
+        "label": "target",
+        "items": [
+          0
+        ]
+      }
+    ],
+    "output": [
+      {
+        "kind": "dp",
+        "label": "dp[i][s] = sign choices for the first i numbers with total s",
+        "cells": [
+          [
+            "",
+            "",
+            1,
+            "",
+            ""
+          ],
+          [
+            "",
+            1,
+            "",
+            1,
+            ""
+          ],
+          [
+            1,
+            "",
+            2,
+            "",
+            1
+          ]
+        ],
+        "rowLabels": [
+          "none",
+          "±1",
+          "±1"
+        ],
+        "colLabels": [
+          -2,
+          -1,
+          0,
+          1,
+          2
+        ],
+        "tones": [
+          [
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            null,
+            null,
+            "hit",
+            null,
+            null
+          ]
+        ]
+      }
+    ]
+  },
+  "idea": {
+    "sentence": "Many sign choices end on the same running sum, so count them instead of listing them. dp[i][s] is how many ways the first i numbers total s. Each number sends every sum to s+x and to s-x.",
+    "demo": "custom",
+    "jargon": [
+      {
+        "term": "running sum",
+        "plain": "The total of the signed numbers chosen so far."
+      },
+      {
+        "term": "offset",
+        "plain": "Sums can be negative, but array indexes cannot. Add a constant (here the total of all numbers) to every sum so that -total lands on column 0."
+      }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the numbers, then the target, e.g. [1,1], 0",
+    "presets": [
+      {
+        "label": "Two ones",
+        "args": [
+          [
+            1,
+            1
+          ],
+          0
+        ]
+      },
+      {
+        "label": "Three ones",
+        "args": [
+          [
+            1,
+            1,
+            1
+          ],
+          1
+        ]
+      },
+      {
+        "label": "A zero doubles it",
+        "args": [
+          [
+            0,
+            1
+          ],
+          1
+        ]
+      },
+      {
+        "label": "Out of range",
+        "args": [
+          [
+            1,
+            2
+          ],
+          5
+        ]
+      }
+    ]
+  },
+  "fast": {
+    "vars": [
+      {
+        "sym": "n",
+        "meaning": "how many numbers"
+      },
+      {
+        "sym": "S",
+        "meaning": "the sum of all numbers"
+      }
+    ],
+    "compare": {
+      "brute": "2n",
+      "optimal": "nm",
+      "bruteLabel": "Try every sign choice",
+      "optimalLabel": "Count per running sum",
+      "unit": "steps (rough; n·S for the table, 2^n for brute force)"
+    },
+    "rows": [
+      {
+        "name": "Brute force",
+        "time": "O(2^n)",
+        "space": "O(n)",
+        "note": "Recurse: plus or minus for each number."
+      },
+      {
+        "name": "Table over sums (shown)",
+        "time": "O(n·S)",
+        "space": "O(n·S)",
+        "note": "(n+1) rows by (2S+1) columns. Each cell is touched a constant number of times."
+      },
+      {
+        "name": "Map or one row",
+        "time": "O(n·S)",
+        "space": "O(S)",
+        "note": "Row i reads only row i-1. Keep a map from running sum to count and build a new map per number. Only reachable sums are stored."
+      },
+      {
+        "name": "Subset-sum trick",
+        "time": "O(n·S)",
+        "space": "O(S)",
+        "note": "Choosing plus for a subset P gives sum(P) - (S - sum(P)). So count subsets that sum to (S + target) / 2."
+      }
+    ],
+    "takeaway": "Do not list sign choices. Many land on the same running sum, so keep one count per sum and add counts when two paths meet."
+  },
+  "variants": [
+    {
+      "id": "table",
+      "label": "Table over sums",
+      "tsFn": "findTargetSumWays",
+      "goFn": "findTargetSumWays",
+      "stages": [
+        {
+          "n": 1,
+          "title": "Offset table",
+          "note": "Columns are sums from -total to total, shifted so they are valid indexes. Row 0: sum 0 in one way."
+        },
+        {
+          "n": 2,
+          "title": "Choose plus",
+          "note": "For each reachable sum s in the row above, add its count to s + x in this row."
+        },
+        {
+          "n": 3,
+          "title": "Choose minus",
+          "note": "Add the same counts to s - x. When two paths land on one sum, the counts add."
+        },
+        {
+          "n": 4,
+          "title": "Read the target",
+          "note": "Read the last row at the target. A target outside -total..total has no ways, so return 0."
+        }
+      ]
+    }
+  ],
+  "goArgs": [
+    "[]int",
+    "int"
+  ],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    {
+      "title": "Zeros double the count",
+      "input": "[0, 0, 0, 0, 0, 0, 0, 0, 1], 1",
+      "output": "256",
+      "why": "A zero can take either sign and the total does not move, so each zero multiplies the count by 2. Eight zeros give 2^8."
+    },
+    {
+      "title": "Target out of range",
+      "input": "[1], 2",
+      "output": "0",
+      "why": "No choice can exceed the total of all numbers. Check the range before indexing, or the index goes past the end."
+    },
+    {
+      "title": "Negative target",
+      "input": "[2, 3], -1",
+      "output": "1",
+      "why": "Only +2-3 gives -1. This is why sums need an offset: -1 would be an invalid index."
+    },
+    {
+      "title": "One number",
+      "input": "[1], 1",
+      "output": "1",
+      "why": "The single number must carry a plus sign. A minus gives -1."
+    }
+  ],
+  "gotchas": [
+    {
+      "lang": "General",
+      "text": "Sums can be negative. Shift every sum by the total of all numbers so that column 0 is -total. Forgetting the offset is the usual crash."
+    },
+    {
+      "lang": "General",
+      "text": "Check |target| <= total before reading dp. A huge target would otherwise index far past the table."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "Out-of-range array reads give undefined, and undefined + 1 is NaN. A bad offset does not throw. It quietly poisons the counts."
+    },
+    {
+      "lang": "Go",
+      "text": "Out-of-range slice access panics. Allocate every row (make([]int, 2*total+1)). The counts can be large, so int (64-bit on most machines) is the safe type."
+    }
+  ],
+  "recap": {
+    "pattern": "DP over running sums",
+    "key": "dp[i][s] counts sign choices of the first i numbers that total s. Each number x sends s to s+x and s-x.",
+    "complexity": "Time O(n·S). Space O(n·S), or O(S) with a map or one row.",
+    "moves": [
+      "Offset columns so -total is index 0",
+      "Row 0: sum 0 has 1 way",
+      "For each number x: add every count to s+x and to s-x",
+      "Return dp[n][target], or 0 if out of range"
+    ]
+  }
+}

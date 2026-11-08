@@ -1,0 +1,11 @@
+function maxCoins(nums)
+  a = [1] + nums + [1]                      # [1] pad both ends: a missing neighbour counts as 1
+  n = length of a
+  dp = n x n table of 0s                    # dp[l][r]: best coins for balloons strictly between l and r
+  for gap from 2 to n-1                     # [2] short ranges first
+    for l from 0 while l + gap < n
+      r = l + gap
+      for k from l+1 to r-1                 # [3] try balloon k as the LAST one burst in (l, r)
+        coins = dp[l][k] + a[l]*a[k]*a[r] + dp[k][r]
+        dp[l][r] = max(dp[l][r], coins)     # [4] keep the best choice of last balloon
+  return dp[0][n-1]                         # [5] the range that holds every real balloon

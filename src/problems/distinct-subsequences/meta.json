@@ -1,0 +1,79 @@
+{
+  "slug": "distinct-subsequences",
+  "title": "Distinct Subsequences",
+  "category": "2-D Dynamic Programming",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "You get a source string and a target string. Count in how many different ways you can delete letters from the source, keeping the order, so that exactly the target is left. Two ways differ when they keep different positions, even if the letters look the same.",
+  "example": {
+    "caption": "The target bag hides in bbag twice. Either b can be the one we keep, and both ways use the same a and g.",
+    "input": [
+      { "kind": "array", "label": "source", "items": ["b", "b", "a", "g"] },
+      { "kind": "array", "label": "target", "items": ["b", "a", "g"] }
+    ],
+    "output": [
+      { "kind": "array", "label": "way 1: keep positions 0, 2, 3", "items": ["b", "b", "a", "g"], "tones": ["hit", "dim", "hit", "hit"] },
+      { "kind": "array", "label": "way 2: keep positions 1, 2, 3", "items": ["b", "b", "a", "g"], "tones": ["dim", "hit", "hit", "hit"] },
+      { "kind": "array", "label": "answer", "items": [2], "tones": ["hit"] }
+    ]
+  },
+  "idea": {
+    "sentence": "Let dp[i][j] count the ways the first i source letters spell the first j target letters: skipping the last letter always counts, and using it adds dp[i-1][j-1] when it equals the target letter.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "subsequence", "plain": "What is left after deleting some letters (maybe none) without moving the rest. The kept letters stay in their original order." },
+      { "term": "prefix", "plain": "The first i letters of a string. The empty prefix has i = 0." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two strings: source, then target. Keep them short, each cell is one step and the trace stops at 60 steps.",
+    "presets": [
+      { "label": "bag in bbag", "args": ["bbag", "bag"] },
+      { "label": "Repeated letters", "args": ["aaa", "aa"] },
+      { "label": "ab inside abab", "args": ["abab", "ab"] },
+      { "label": "Target too long", "args": ["ab", "abc"] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "length of the source" },
+      { "sym": "m", "meaning": "length of the target" }
+    ],
+    "compare": { "brute": "2n", "optimal": "nm", "bruteLabel": "Try every subset of source letters", "optimalLabel": "Fill an (n+1) by (m+1) table", "unit": "steps" },
+    "rows": [
+      { "name": "Try every subset", "time": "O(2^n * n)", "space": "O(n)", "note": "Build each of the 2^n subsets of positions and compare it with the target." },
+      { "name": "DP table", "time": "O(n*m)", "space": "O(n*m)", "note": "Each of the (n+1)(m+1) cells is one addition of two cells already filled." }
+    ],
+    "takeaway": "Instead of listing the ways, the table only counts them. One cell is a sum of two earlier cells, so a count that is huge costs only n times m additions."
+  },
+  "variants": [
+    { "id": "table", "label": "Bottom-up table", "tsFn": "numDistinct", "goFn": "numDistinct", "stages": [
+      { "n": 1, "title": "Base row and column", "note": "Spelling the empty target has 1 way, so column 0 is 1. Spelling letters from the empty source has 0 ways, so row 0 is 0 apart from the corner." },
+      { "n": 2, "title": "Skip the letter", "note": "Not using s[i-1] is always allowed. The cell starts as the cell above it, dp[i-1][j]." },
+      { "n": 3, "title": "Or use the letter", "note": "If s[i-1] equals target[j-1], also add dp[i-1][j-1]: the ways to spell one letter fewer from one letter fewer." },
+      { "n": 4, "title": "Read the corner", "note": "dp[m][n] looks at the whole source and the whole target. That is the answer." }
+    ] }
+  ],
+  "goArgs": ["string", "string"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty target", "input": "abc and \"\"", "output": "1", "why": "There is one way to keep nothing. Column 0 is all 1, so the answer comes straight from the base." },
+    { "title": "Empty source", "input": "\"\" and a", "output": "0", "why": "Row 0 is 0 for every real target letter. You cannot make a letter out of nothing." },
+    { "title": "Target longer than source", "input": "ab and abc", "output": "0", "why": "The table fills with zeros on the right. No special check is needed." },
+    { "title": "Count passes 32 bits", "input": "34 a letters and 17 a letters", "output": "2333606220", "why": "This is C(34, 17), about 2.3 billion. A signed 32-bit counter overflows. Go int and a JavaScript number both hold it exactly." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Count positions, not strings. In bbag the two b's give two ways even though both ways spell the same thing." },
+    { "lang": "General", "text": "Column 0 must be 1, not 0. If you leave it at 0 the whole table stays 0, because every count is built from the base." },
+    { "lang": "TypeScript", "text": "A number is exact up to 2^53, about 9e15. The counts here stay below that for the test sizes. Much longer inputs would need BigInt." },
+    { "lang": "TypeScript", "text": "Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0)) makes a fresh row each time. new Array(m + 1).fill(row) would share one row." },
+    { "lang": "Go", "text": "make([][]int, m+1) gives nil inner slices. Allocate each row. Use int, which is 64-bit on current platforms, and do not use int32 for the counts." }
+  ],
+  "recap": {
+    "pattern": "2-D DP counting ways",
+    "key": "dp[i][j] = dp[i-1][j] (skip the letter) plus dp[i-1][j-1] when s[i-1] equals target[j-1] (use it).",
+    "complexity": "Time O(n*m). Space O(n*m), or O(m) with one row updated right to left.",
+    "moves": ["Make an (n+1) by (m+1) table", "Set column 0 to 1, row 0 to 0", "dp[i][j] starts as the cell above (skip)", "Add the diagonal when the letters match, read dp[n][m]"]
+  }
+}

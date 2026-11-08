@@ -1,0 +1,15 @@
+function findTargetSumWays(nums, target)
+  total = sum of nums
+  off = total                                              # [1] column s + off holds running sum s
+  dp = table of (n + 1) rows and (2 * total + 1) columns, all 0
+  dp[0][off] = 1                                           # [1] no numbers yet: sum 0 in one way
+  reach = 0
+  for i from 1 to n
+    x = nums[i-1]
+    for s from -reach to reach
+      dp[i][s + x + off] += dp[i-1][s + off]               # [2] choose +x
+    for s from -reach to reach
+      dp[i][s - x + off] += dp[i-1][s + off]               # [3] choose -x
+    reach = reach + x
+  if target is below -total or above total, return 0       # [4] unreachable
+  return dp[n][target + off]                               # [4] ways to hit the target

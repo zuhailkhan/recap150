@@ -1,0 +1,15 @@
+function isMatch(s, p)
+  m = length of s, n = length of p
+  dp = (m+1) x (n+1) table of false         # dp[i][j]: first i letters of s match first j symbols of p
+  dp[0][0] = true                           # [1] empty text matches empty pattern
+  for j from 2 to n
+    if p[j-1] == "*": dp[0][j] = dp[0][j-2] # [1] a star can drop its letter: zero copies
+  for i from 1 to m
+    for j from 1 to n
+      if p[j-1] == "*"
+        zero = dp[i][j-2]                   # [2] zero copies of p[j-2]
+        eat  = (p[j-2] is "." or equals s[i-1]) and dp[i-1][j]   # [2] one more copy eats s[i-1]
+        dp[i][j] = zero or eat
+      else
+        dp[i][j] = (p[j-1] is "." or equals s[i-1]) and dp[i-1][j-1]   # [3] symbol fits, diagonal true
+  return dp[m][n]                           # [4] whole text against whole pattern

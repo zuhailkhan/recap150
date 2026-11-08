@@ -1,0 +1,12 @@
+[
+  {"name":"kitten to sitting","input":["kitten","sitting"],"expected":3},
+  {"name":"insert and replace","input":["abc","yabd"],"expected":2},
+  {"name":"empty to word","input":["","abc"],"expected":3,"edge":true},
+  {"name":"word to empty","input":["abc",""],"expected":3,"edge":true},
+  {"name":"both empty","input":["",""],"expected":0,"edge":true},
+  {"name":"already equal","input":["same","same"],"expected":0},
+  {"name":"swap two letters","input":["ab","ba"],"expected":2},
+  {"name":"one replace","input":["cat","cut"],"expected":1},
+  {"name":"intention to execution","input":["intention","execution"],"expected":5},
+  {"name":"sunday to saturday","input":["sunday","saturday"],"expected":3}
+]

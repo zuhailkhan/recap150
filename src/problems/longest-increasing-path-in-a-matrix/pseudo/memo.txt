@@ -1,0 +1,15 @@
+function longestIncreasingPath(matrix)
+  memo = table of 0s, same size as matrix   # [1] memo[r][c]: longest path starting here, 0 = not computed
+
+  function dfs(r, c)
+    if memo[r][c] != 0 then return memo[r][c]   # [2] solved before: reuse it
+    best = 1                                    # a path of just this cell
+    for each neighbour (nr, nc) in the grid with matrix[nr][nc] > matrix[r][c]
+      best = max(best, 1 + dfs(nr, nc))         # [3] step uphill, ask the neighbour
+    memo[r][c] = best                           # [4] recursion returned: store the answer
+    return best
+
+  longest = 0
+  for every cell (r, c)
+    longest = max(longest, dfs(r, c))           # [5] try every start, repeats are free
+  return longest                                # [5] 0 for an empty matrix

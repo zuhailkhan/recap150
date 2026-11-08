@@ -1,0 +1,13 @@
+[
+  {"name":"four balloons","input":[[3,1,5,8]],"expected":167},
+  {"name":"three balloons","input":[[3,1,5]],"expected":35},
+  {"name":"two balloons","input":[[1,5]],"expected":10},
+  {"name":"single balloon","input":[[5]],"expected":5,"edge":true},
+  {"name":"no balloons","input":[[]],"expected":0,"edge":true},
+  {"name":"all zeros","input":[[0,0]],"expected":0,"edge":true},
+  {"name":"zero in the middle","input":[[3,0,5]],"expected":20},
+  {"name":"big values","input":[[9,76,64,21]],"expected":116718},
+  {"name":"all ones","input":[[1,1,1,1]],"expected":4},
+  {"name":"twelve balloons","input":[[3,1,5,8,2,9,4,7,6,10,2,3]],"expected":2893},
+  {"name":"equal values","input":[[2,2,2,2,2]],"expected":30}
+]

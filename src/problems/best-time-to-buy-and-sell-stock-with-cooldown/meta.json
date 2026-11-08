@@ -1,0 +1,74 @@
+{
+  "slug": "best-time-to-buy-and-sell-stock-with-cooldown",
+  "title": "Best Time to Buy And Sell Stock With Cooldown",
+  "category": "2-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get the price of a stock on each day. You may buy and sell as often as you like, but you can hold only one share at a time, and the day after a sale you may not buy. Return the largest total profit.",
+  "example": {
+    "caption": "Buy at 1, sell at 2, rest, buy at 0, sell at 2. Profit 1 + 2 = 3.",
+    "input": [
+      { "kind": "array", "label": "prices", "items": [1, 2, 3, 0, 2], "tones": ["keep", "hit", null, "keep", "hit"] }
+    ],
+    "output": [
+      { "kind": "dp", "label": "best profit at the end of each day, per state", "cells": [[-1, -1, -1, 1, 1], [0, 1, 2, -1, 3], [0, 0, 1, 2, 2]], "rowLabels": ["hold", "sold", "rest"], "colLabels": ["d0: 1", "d1: 2", "d2: 3", "d3: 0", "d4: 2"], "tones": [[null, null, null, null, null], [null, null, null, null, "hit"], [null, null, null, null, null]] }
+    ]
+  },
+  "idea": {
+    "sentence": "Each day you are in one of three states: holding a share, just sold, or resting with nothing. Keep the best profit for each state, and say which yesterday-state each one can come from.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "state machine", "plain": "A small set of situations you can be in, plus rules for which situation can follow which." },
+      { "term": "cooldown", "plain": "The day right after a sale. You must do nothing that day, so you cannot buy." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One list of prices, e.g. [1,2,3,0,2]",
+    "presets": [
+      { "label": "Classic", "args": [[1, 2, 3, 0, 2]] },
+      { "label": "Dip, then a jump", "args": [[1, 4, 2, 7]] },
+      { "label": "Prices only fall", "args": [[4, 3, 2, 1]] },
+      { "label": "Steady rise", "args": [[1, 2, 3, 4]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of days" }],
+    "compare": { "brute": "2n", "optimal": "n", "bruteLabel": "Try every buy/sell plan", "optimalLabel": "Three states per day", "unit": "plans or steps (rough; plans grow exponentially, drawn as 2n)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(2^n)", "space": "O(n)", "note": "Each day: buy, sell or wait. Recurse over every choice." },
+      { "name": "Three arrays (shown)", "time": "O(n)", "space": "O(n)", "note": "One table cell per state per day. Easy to read and to trace." },
+      { "name": "Three variables", "time": "O(n)", "space": "O(1)", "note": "Each day reads only yesterday. Keep three numbers. Compute the new hold, sold and rest from the old ones, using a temporary copy." }
+    ],
+    "takeaway": "Cooldown is not extra bookkeeping. It is a rule about which state can follow which: from sold you can only go to rest, never straight to hold."
+  },
+  "variants": [
+    { "id": "states", "label": "Three states", "tsFn": "maxProfit", "goFn": "maxProfit", "stages": [
+      { "n": 1, "title": "Day 0", "note": "Three state arrays. On day 0 holding means buying: hold is minus the price. Sold and rest are 0." },
+      { "n": 2, "title": "Hold", "note": "Keep holding, or buy today. Buying needs yesterday to be a rest day, not a sale." },
+      { "n": 3, "title": "Sold", "note": "Sell the share held yesterday, at today's price." },
+      { "n": 4, "title": "Rest", "note": "Do nothing. Either I was already resting, or yesterday's sale cooldown just ended." },
+      { "n": 5, "title": "Best ending", "note": "End the last day owning nothing: either I sold that day, or I was resting." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One day", "input": "[1]", "output": "0", "why": "You can buy but never sell. Best profit is 0, so the loop never runs and sold and rest stay 0." },
+    { "title": "Prices only fall", "input": "[5, 4, 3, 2, 1]", "output": "0", "why": "Any trade loses money. Rest on every day." },
+    { "title": "Steady rise", "input": "[1, 2, 3, 4, 5]", "output": "4", "why": "Buying at 1 and selling at 5 beats selling every day, because each sale forces a cooldown." },
+    { "title": "Cooldown changes the answer", "input": "[1, 2, 3, 0, 2]", "output": "3", "why": "Without the cooldown rule you could sell at 3 and buy at 0 the next day, for 4. The rule costs 1." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Buy from the rest state, not from the sold state. Reading sold[i-1] when buying removes the cooldown and gives answers that are too high." },
+    { "lang": "General", "text": "Return max(sold, rest) on the last day, not hold. Ending with a share you never sold is worth nothing." },
+    { "lang": "TypeScript", "text": "Do not start hold at 0. Owning a share has already cost money, so hold begins at -prices[0]. Starting at 0 means free shares." },
+    { "lang": "Go", "text": "With three rolling variables you must read yesterday's values before overwriting them. Assigning hold, sold and rest in sequence uses a new hold where an old one is needed. Copy to temporaries first." }
+  ],
+  "recap": {
+    "pattern": "State-machine DP",
+    "key": "Track hold, sold and rest. hold = max(hold, rest - price). sold = hold + price. rest = max(rest, sold).",
+    "complexity": "Time O(n). Space O(n), or O(1) with three variables.",
+    "moves": ["Make three rows: hold, sold, rest", "Day 0: hold = -price, the others 0", "Each day: fill hold, sold, rest from yesterday", "Answer is max(sold, rest) on the last day"]
+  }
+}

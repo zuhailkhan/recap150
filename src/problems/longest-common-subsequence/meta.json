@@ -1,0 +1,74 @@
+{
+  "slug": "longest-common-subsequence",
+  "title": "Longest Common Subsequence",
+  "category": "2-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get two strings. A subsequence keeps some letters in their original order and may skip any letters between them. Return the length of the longest subsequence that both strings contain. Return 0 if they share none.",
+  "example": {
+    "caption": "\"ace\" can be read out of \"abcde\" by skipping b and d, so the answer is 3.",
+    "input": [
+      { "kind": "array", "label": "text1", "items": ["a", "b", "c", "d", "e"], "tones": ["hit", null, "hit", null, "hit"] },
+      { "kind": "array", "label": "text2", "items": ["a", "c", "e"], "tones": ["hit", "hit", "hit"] }
+    ],
+    "output": [
+      { "kind": "dp", "label": "dp[i][j] = LCS of the first i letters of text1 and the first j letters of text2", "cells": [[0, 0, 0, 0], [0, 1, 1, 1], [0, 1, 1, 1], [0, 1, 2, 2], [0, 1, 2, 2], [0, 1, 2, 3]], "rowLabels": ["", "a", "b", "c", "d", "e"], "colLabels": ["", "a", "c", "e"], "tones": [[null, null, null, null], [null, null, null, null], [null, null, null, null], [null, null, null, null], [null, null, null, null], [null, null, null, "hit"]] }
+    ]
+  },
+  "idea": {
+    "sentence": "dp[i][j] is the LCS length of the first i letters of one string and the first j of the other. Equal last letters pair up (diagonal + 1). Otherwise drop one letter: max(above, left).",
+    "demo": "custom",
+    "jargon": [
+      { "term": "subsequence", "plain": "Letters picked in order, skipping any you like. Unlike a substring, the picked letters need not sit next to each other." },
+      { "term": "prefix", "plain": "The first k letters of a string. The empty prefix has k = 0." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two strings, e.g. \"abcd\", \"acbd\" (keep them short)",
+    "presets": [
+      { "label": "Gaps in both", "args": ["abcd", "acbd"] },
+      { "label": "Nothing in common", "args": ["abc", "def"] },
+      { "label": "Repeated letters", "args": ["aaa", "aa"] },
+      { "label": "Prefix of the other", "args": ["abc", "ab"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "m", "meaning": "length of text1" }, { "sym": "n", "meaning": "length of text2" }],
+    "compare": { "brute": "2n", "optimal": "nm", "bruteLabel": "Try every subsequence", "optimalLabel": "Fill the table", "unit": "steps (rough; brute force checks 2^m subsequences, drawn as 2n)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(2^m · n)", "space": "O(m)", "note": "List every subsequence of the shorter string and test it against the other." },
+      { "name": "2-D table", "time": "O(m·n)", "space": "O(m·n)", "note": "Each of the (m+1)(n+1) cells is computed once from three neighbours." },
+      { "name": "Two rolling rows", "time": "O(m·n)", "space": "O(n)", "note": "A cell reads only the row above and the cell to its left, so keep the previous row and the current row." }
+    ],
+    "takeaway": "Look at the last letters of the two prefixes. If they match, they can end the common subsequence together. If not, one of them is useless, and you try both options."
+  },
+  "variants": [
+    { "id": "table", "label": "2-D table", "tsFn": "longestCommonSubsequence", "goFn": "longestCommonSubsequence", "stages": [
+      { "n": 1, "title": "Zero row and column", "note": "Make an (m+1) by (n+1) table of zeros. An empty prefix has nothing in common with anything." },
+      { "n": 2, "title": "Letters match", "note": "Both prefixes end in the same letter. Pair them: the answer is the diagonal cell plus 1." },
+      { "n": 3, "title": "Letters differ", "note": "The two last letters cannot both be used. Take the better of dropping one: the larger of above and left." },
+      { "n": 4, "title": "Read the corner", "note": "The bottom-right cell is the answer for the two whole strings." }
+    ] }
+  ],
+  "goArgs": ["string", "string"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "No shared letter", "input": "\"abc\", \"def\"", "output": "0", "why": "Every cell takes the max of zeros, so the whole table stays 0." },
+    { "title": "One string is a prefix", "input": "\"abc\", \"ab\"", "output": "2", "why": "Every letter of the shorter string matches along the diagonal." },
+    { "title": "Repeated letters", "input": "\"aaaa\", \"aa\"", "output": "2", "why": "A letter is used once per subsequence. The count is limited by the shorter string, not by how many a's exist." },
+    { "title": "Empty string", "input": "\"\", \"abc\"", "output": "0", "why": "Only the zero row and column exist, and they are 0. The loops never run." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The table is (m+1) by (n+1). Row 0 and column 0 stand for the empty prefix. The letter for row i is text1[i-1], not text1[i]. Mixing these up is the usual off-by-one." },
+    { "lang": "Go", "text": "make([][]int, m+1) gives nil rows. Allocate each row with make([]int, n+1). The built-in max needs Go 1.21 or newer." },
+    { "lang": "Go", "text": "text1[i] is a byte, not a character. That is fine for ASCII lowercase letters. For Unicode, convert both strings to []rune first." },
+    { "lang": "TypeScript", "text": "Array(m + 1).fill(Array(n + 1).fill(0)) shares one row between all rows. Build each row with Array.from." }
+  ],
+  "recap": {
+    "pattern": "2-D DP on two strings",
+    "key": "dp[i][j] = LCS of two prefixes. Match: diagonal + 1. No match: max(above, left).",
+    "complexity": "Time O(m·n). Space O(m·n), or O(n) with two rows.",
+    "moves": ["Make an (m+1) by (n+1) table of zeros", "Letters equal: dp[i][j] = dp[i-1][j-1] + 1", "Letters differ: dp[i][j] = max(dp[i-1][j], dp[i][j-1])", "Return dp[m][n]"]
+  }
+}

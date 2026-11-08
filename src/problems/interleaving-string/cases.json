@@ -1,0 +1,14 @@
+[
+  {"name":"classic true","input":["aabcc","dbbca","aadbbcbcac"],"expected":true},
+  {"name":"classic false","input":["aabcc","dbbca","aadbbbaccc"],"expected":false},
+  {"name":"all empty","input":["","",""],"expected":true,"edge":true},
+  {"name":"s1 empty","input":["","b","b"],"expected":true,"edge":true},
+  {"name":"s2 empty, wrong letter","input":["a","","c"],"expected":false,"edge":true},
+  {"name":"lengths do not add up","input":["ab","cd","abc"],"expected":false,"edge":true},
+  {"name":"repeated letters, true","input":["aa","ab","aaba"],"expected":true},
+  {"name":"order inside a string matters","input":["abc","bd","abdcb"],"expected":false},
+  {"name":"alternating","input":["ab","cd","acbd"],"expected":true},
+  {"name":"same string twice, grouped","input":["ab","ab","aabb"],"expected":true},
+  {"name":"same string twice, reversed pair","input":["ab","ab","baab"],"expected":false},
+  {"name":"ties: both letters match","input":["ab","ac","abac"],"expected":true}
+]

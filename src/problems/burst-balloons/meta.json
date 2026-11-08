@@ -1,0 +1,72 @@
+{
+  "slug": "burst-balloons",
+  "title": "Burst Balloons",
+  "category": "2-D Dynamic Programming",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "You get a row of balloons, each with a number. Bursting a balloon scores its number times the numbers of its two current neighbours. A missing neighbour counts as 1. Burst all balloons in the best order and return the largest total score.",
+  "example": {
+    "caption": "For 3, 1, 5 the best plan is to burst the 1 first, then the 3, then the 5. Each score is a product of the balloon and its neighbours at that moment.",
+    "input": [{ "kind": "array", "label": "balloons", "items": [3, 1, 5] }],
+    "output": [
+      { "kind": "array", "label": "burst order: 1, then 3, then 5", "items": ["3*1*5 = 15", "1*3*5 = 15", "1*5*1 = 5"], "tones": ["focus", "focus", "focus"] },
+      { "kind": "array", "label": "total", "items": [35], "tones": ["hit"] }
+    ]
+  },
+  "idea": {
+    "sentence": "Instead of asking which balloon to burst first, ask which one is burst last in a range: then its two sides are independent, and dp[l][r] = best of dp[l][k] + a[l]*a[k]*a[r] + dp[k][r].",
+    "demo": "custom",
+    "jargon": [
+      { "term": "interval DP", "plain": "A table over ranges of the input. A long range is solved from the shorter ranges inside it, so we fill short ranges first." },
+      { "term": "last to burst", "plain": "If k is burst last in a range, its neighbours at that moment are the fixed edges l and r, because everything between has already gone." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of balloon numbers. Keep it to 3 or 4 balloons, because every choice of last balloon is a step.",
+    "presets": [
+      { "label": "Three balloons", "args": [[3, 1, 5]] },
+      { "label": "Two balloons", "args": [[1, 5]] },
+      { "label": "Zero in the middle", "args": [[3, 0, 5]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of balloons" }],
+    "compare": { "brute": "2n", "optimal": "n3", "bruteLabel": "Try every burst order", "optimalLabel": "Fill a table of ranges", "unit": "steps (brute force really grows as n factorial, drawn as the closest shape)" },
+    "rows": [
+      { "name": "Try every burst order", "time": "O(n!)", "space": "O(n)", "note": "Every order of the n balloons is a different plan. The neighbours change as balloons vanish, so plans cannot be combined." },
+      { "name": "Interval DP, last balloon", "time": "O(n^3)", "space": "O(n^2)", "note": "About n^2/2 ranges, and each tries up to n choices of last balloon." }
+    ],
+    "takeaway": "Choosing the last balloon makes the two sides independent. That turns a tangle of orders into n squared ranges with n choices each."
+  },
+  "variants": [
+    { "id": "interval", "label": "Interval table", "tsFn": "maxCoins", "goFn": "maxCoins", "stages": [
+      { "n": 1, "title": "Pad with ones", "note": "Add a 1 at each end so the first and last balloon have neighbours. The table is n by n over the padded row." },
+      { "n": 2, "title": "Short ranges first", "note": "Loop over the gap r - l from 2 upward, so every smaller range inside is already filled." },
+      { "n": 3, "title": "Try each last balloon", "note": "For every k between l and r, k is burst last: its score is a[l]*a[k]*a[r] plus the two sides dp[l][k] and dp[k][r]." },
+      { "n": 4, "title": "Keep the best", "note": "dp[l][r] is the largest total over all choices of k." },
+      { "n": 5, "title": "Read the corner", "note": "Range (0, n-1) holds every real balloon. dp[0][n-1] is the answer." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "No balloons", "input": "[]", "output": "0", "why": "The padded row is [1, 1] and no range has anything inside. The loops never run and dp[0][1] is 0." },
+    { "title": "One balloon", "input": "[5]", "output": "5", "why": "Its neighbours are the two padded ones, so the score is 1 * 5 * 1." },
+    { "title": "A zero balloon", "input": "[3, 0, 5]", "output": "20", "why": "Burst the 0 first: it scores 0 and leaves 3 and 5 side by side. Then 3 scores 1*3*5 = 15 and 5 scores 5. A 0 is a free way to join its neighbours." },
+    { "title": "All zeros", "input": "[0, 0]", "output": "0", "why": "Every product has a zero in it. All table cells stay 0, so a max starting from 0 is fine." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Do not model it as the first balloon to burst. Then the neighbours of the two sides depend on each other and the ranges are not independent. The last-burst view keeps the edges l and r fixed." },
+    { "lang": "General", "text": "The range (l, r) is open: l and r themselves are not burst. The loop for k runs from l+1 to r-1 and the answer is dp[0][n-1] on the padded row." },
+    { "lang": "TypeScript", "text": "Array.from({ length: n }, () => new Array(n).fill(0)) gives each row its own array. new Array(n).fill(new Array(n).fill(0)) would make every row the same array." },
+    { "lang": "Go", "text": "make([][]int, n) has nil rows. Allocate each row. Build the padded slice with a fresh make and append, so you never write into the caller's nums by accident." },
+    { "lang": "General", "text": "Each burst scores a product of three numbers, so totals grow fast. With values up to 100 and a few hundred balloons the sum is in the hundreds of millions. Go int and JavaScript numbers hold it, a narrower integer type may not." }
+  ],
+  "recap": {
+    "pattern": "Interval DP, pick the last element",
+    "key": "dp[l][r] is the max over k in (l, r) of dp[l][k] + a[l]*a[k]*a[r] + dp[k][r], with k burst last.",
+    "complexity": "Time O(n^3). Space O(n^2).",
+    "moves": ["Pad the array with 1 on both ends", "Loop gap from 2 up so short ranges come first", "For each k try k as the last balloon burst", "Keep the max in dp[l][r], answer dp[0][n-1]"]
+  }
+}

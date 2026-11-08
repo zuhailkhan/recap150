@@ -1,0 +1,23 @@
+[
+  {"name":"aab vs a*b","input":["aab","a*b"],"expected":true},
+  {"name":"aab vs c*a*b","input":["aab","c*a*b"],"expected":true},
+  {"name":"aa vs a","input":["aa","a"],"expected":false},
+  {"name":"aa vs a*","input":["aa","a*"],"expected":true},
+  {"name":"ab vs .*","input":["ab",".*"],"expected":true},
+  {"name":"mississippi vs mis*is*p*.","input":["mississippi","mis*is*p*."],"expected":false},
+  {"name":"mississippi vs mis*is*ip*.","input":["mississippi","mis*is*ip*."],"expected":true},
+  {"name":"both empty","input":["",""],"expected":true,"edge":true},
+  {"name":"empty text vs a*","input":["","a*"],"expected":true,"edge":true},
+  {"name":"empty text vs a","input":["","a"],"expected":false},
+  {"name":"a vs empty pattern","input":["a",""],"expected":false,"edge":true},
+  {"name":"ab vs .*c","input":["ab",".*c"],"expected":false},
+  {"name":"aaa vs ab*a*c*a","input":["aaa","ab*a*c*a"],"expected":true},
+  {"name":"a vs ab*","input":["a","ab*"],"expected":true},
+  {"name":"abcd vs d*","input":["abcd","d*"],"expected":false},
+  {"name":"a vs .*..a*","input":["a",".*..a*"],"expected":false},
+  {"name":"abc vs a.c","input":["abc","a.c"],"expected":true},
+  {"name":"empty text vs x*y*","input":["","x*y*"],"expected":true,"edge":true},
+  {"name":"bbbba vs .*a*a","input":["bbbba",".*a*a"],"expected":true},
+  {"name":"aaa vs a*a","input":["aaa","a*a"],"expected":true},
+  {"name":"ab vs a*b*c*","input":["ab","a*b*c*"],"expected":true}
+]

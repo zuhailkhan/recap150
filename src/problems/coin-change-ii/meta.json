@@ -1,0 +1,74 @@
+{
+  "slug": "coin-change-ii",
+  "title": "Coin Change II",
+  "category": "2-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You have unlimited coins of several values and a target amount. Count how many different combinations of coins add up to the amount. Two combinations are the same if they use the same coins, whatever order you list them in.",
+  "example": {
+    "caption": "Amount 5 with coins 1, 2 and 5 has 4 combinations: 5, 2+2+1, 2+1+1+1 and 1+1+1+1+1.",
+    "input": [
+      { "kind": "array", "label": "amount", "items": [5] },
+      { "kind": "array", "label": "coins", "items": [1, 2, 5] }
+    ],
+    "output": [
+      { "kind": "dp", "label": "dp[i][a] = combinations for amount a using the first i coin kinds", "cells": [[1, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 1], [1, 1, 2, 2, 3, 3], [1, 1, 2, 2, 3, 4]], "rowLabels": ["none", "{1}", "{1,2}", "{1,2,5}"], "colLabels": ["a=0", "a=1", "a=2", "a=3", "a=4", "a=5"], "tones": [[null, null, null, null, null, null], [null, null, null, null, null, null], [null, null, null, null, null, null], [null, null, null, null, null, "hit"]] }
+    ]
+  },
+  "idea": {
+    "sentence": "dp[i][a] counts the combinations for amount a using the first i coin kinds. It is the count without coin i, plus the count with at least one coin i: dp[i-1][a] + dp[i][a-coin].",
+    "demo": "custom",
+    "jargon": [
+      { "term": "combination", "plain": "A bag of coins where order does not matter. 1+2 and 2+1 are the same combination." },
+      { "term": "permutation", "plain": "A sequence where order matters. 1+2 and 2+1 are two different permutations." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the amount, then the coin list, e.g. 5, [1,2,5]",
+    "presets": [
+      { "label": "Classic", "args": [5, [1, 2, 5]] },
+      { "label": "Order must not count", "args": [3, [1, 2]] },
+      { "label": "Impossible", "args": [3, [2]] },
+      { "label": "Three small coins", "args": [4, [1, 2, 3]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "k", "meaning": "number of coin kinds" }, { "sym": "A", "meaning": "the target amount" }],
+    "compare": { "brute": "2n", "optimal": "nm", "bruteLabel": "List every combination", "optimalLabel": "Fill the table", "unit": "steps (rough; combinations can grow exponentially, drawn as 2n)" },
+    "rows": [
+      { "name": "Brute force", "time": "exponential", "space": "O(A)", "note": "Recurse on (coin index, amount left). Many calls repeat." },
+      { "name": "2-D table", "time": "O(k·A)", "space": "O(k·A)", "note": "One cell per (coins allowed, amount). Easy to see, and to trace." },
+      { "name": "One rolling row", "time": "O(k·A)", "space": "O(A)", "note": "Row i reads row i-1 (the same cell) and itself (a - coin). So one array works: for each coin, for a from coin up, dp[a] += dp[a - coin]." }
+    ],
+    "takeaway": "Put the coins in the outer loop. Each combination is then built in one fixed coin order, so it is counted once. Put the amounts outside and you count orders instead."
+  },
+  "variants": [
+    { "id": "table", "label": "2-D table", "tsFn": "change", "goFn": "change", "stages": [
+      { "n": 1, "title": "Base row and column", "note": "Row 0 means no coins, so only amount 0 works (1 way). Column 0 is 1 in every row." },
+      { "n": 2, "title": "Without this coin", "note": "Copy the cell above: the ways that never use coin i. It is the only choice when the coin is bigger than the amount." },
+      { "n": 3, "title": "With this coin", "note": "Add the cell a - coin steps to the left in the same row: take one coin i, then make the rest with the same coins." },
+      { "n": 4, "title": "Read the corner", "note": "The bottom-right cell allows every coin and the full amount." }
+    ] }
+  ],
+  "goArgs": ["int", "[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Amount 0", "input": "0, [1, 2]", "output": "1", "why": "There is exactly one way to make nothing: take no coins. That is why column 0 is 1, not 0." },
+    { "title": "Order must not count", "input": "3, [1, 2]", "output": "2", "why": "1+1+1 and 1+2 are the only combinations. 2+1 is the same bag as 1+2. Amount in the outer loop would say 3." },
+    { "title": "No way", "input": "3, [2]", "output": "0", "why": "Only even amounts can be made. The cell for amount 3 stays 0." },
+    { "title": "A coin larger than the amount", "input": "3, [5, 1]", "output": "1", "why": "Coin 5 can never be used, so its row just copies the row above. The a >= coin check stops a negative index." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Loop order is the whole trap. Coins outside, amounts inside counts combinations. Amounts outside, coins inside counts permutations (1+2 and 2+1 both). The Demo shows the two side by side." },
+    { "lang": "General", "text": "Check a >= coin before reading dp[i][a - coin]. Otherwise the index goes negative." },
+    { "lang": "TypeScript", "text": "A negative array index returns undefined, not an error, and undefined + number is NaN. A missing a >= coin check will quietly poison the table." },
+    { "lang": "Go", "text": "A negative index panics. The counts can pass 2^31 for large inputs, so keep them in int (64-bit on most machines) or use int64." }
+  ],
+  "recap": {
+    "pattern": "2-D DP: take or skip the coin",
+    "key": "dp[i][a] = dp[i-1][a] + dp[i][a - coin_i]. Coins in the outer loop, so combinations are counted once.",
+    "complexity": "Time O(k·A). Space O(k·A), or O(A) with one row.",
+    "moves": ["Table of (k+1) rows by (amount+1) columns; column 0 is 1", "For each coin (outer loop), for each amount a", "dp[i][a] = dp[i-1][a], plus dp[i][a-coin] if a >= coin", "Return dp[k][amount]"]
+  }
+}

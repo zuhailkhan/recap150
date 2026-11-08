@@ -1,0 +1,10 @@
+function numDistinct(s, target)
+  m = length of s, n = length of target
+  dp = (m+1) x (n+1) table of 0s            # dp[i][j] = ways: first i letters of s spell first j of target
+  for i from 0 to m: dp[i][0] = 1           # [1] empty target: one way, pick nothing (row 0 stays 0 for j > 0)
+  for i from 1 to m
+    for j from 1 to n
+      dp[i][j] = dp[i-1][j]                 # [2] skip s[i-1]
+      if s[i-1] == target[j-1]
+        dp[i][j] = dp[i][j] + dp[i-1][j-1]  # [3] or use s[i-1] for target[j-1]
+  return dp[m][n]                           # [4] all of s, all of target
