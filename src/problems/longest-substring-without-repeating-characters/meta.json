@@ -1,0 +1,68 @@
+{
+  "slug": "longest-substring-without-repeating-characters",
+  "title": "Longest Substring Without Repeating Characters",
+  "category": "Sliding Window",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Given a string, find the length of the longest stretch of neighbouring characters in which no character appears twice. The stretch must be contiguous. Skipping characters is not allowed.",
+  "example": {
+    "caption": "The stretch \"abc\" has no repeats and has length 3. Any longer stretch here repeats a letter.",
+    "input": [{ "kind": "array", "label": "s", "items": ["a", "b", "c", "a", "b", "c", "b", "b"] }],
+    "output": [{ "kind": "array", "label": "longest without repeats", "items": ["a", "b", "c", "a", "b", "c", "b", "b"], "tones": ["hit", "hit", "hit", null, null, null, null, null], "window": [0, 2] }]
+  },
+  "idea": {
+    "sentence": "Keep a window with no repeated letter. Grow it on the right, and when the new letter is a repeat, shrink from the left until the repeat is gone.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "window", "plain": "The stretch of the string between a left and a right marker." },
+      { "term": "invariant", "plain": "A rule that is true after every step. Here: the window never holds a repeated letter." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a string, e.g. \"pwwkew\"",
+    "presets": [
+      { "label": "Repeat mid-way", "args": ["pwwkew"] },
+      { "label": "Old letter returns", "args": ["abba"] },
+      { "label": "All the same", "args": ["bbbb"] },
+      { "label": "All different", "args": ["abcd"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of the string" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Check every start and grow until a repeat", "optimalLabel": "One sliding window", "unit": "letter checks (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n²)", "space": "O(k)", "note": "From every start, extend until a letter repeats. k is the size of the alphabet." },
+      { "name": "Sliding window", "time": "O(n)", "space": "O(k)", "note": "Each letter enters the window once and leaves at most once. The set holds at most k letters." }
+    ],
+    "takeaway": "The left marker never moves backwards. That is why the work is linear even though there is a loop inside a loop."
+  },
+  "variants": [
+    { "id": "window", "label": "Window and set", "tsFn": "lengthOfLongestSubstring", "goFn": "lengthOfLongestSubstring", "stages": [
+      { "n": 1, "title": "Empty window", "note": "A left marker, a best length, and a set of the letters currently inside the window." },
+      { "n": 2, "title": "Shrink on a repeat", "note": "While the new letter is already in the set, remove the left letter and move left forward." },
+      { "n": 3, "title": "Grow", "note": "The repeat is gone, so add the new letter. The window is valid again." },
+      { "n": 4, "title": "Record", "note": "Compare the window length with the best so far and keep the larger." }
+    ] }
+  ],
+  "goArgs": ["string"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty string", "input": "\"\"", "output": "0", "why": "The loop never runs, so best stays 0." },
+    { "title": "One letter", "input": "\"a\"", "output": "1", "why": "A window of one letter cannot repeat anything." },
+    { "title": "Old letter returns", "input": "\"abba\"", "output": "2", "why": "The final a matches an a that left the window earlier. It is no longer in the set, so it counts as new." },
+    { "title": "Repeat skips ahead", "input": "\"dvdf\"", "output": "3", "why": "At the second d the window drops d and v, then grows to \"vdf\". Restarting from scratch would miss it." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The letters must be neighbours. You shrink the window to remove a repeat, you never skip letters." },
+    { "lang": "TypeScript", "text": "Indexing a string gives UTF-16 code units. Emoji are two units. Spread with [...s] to walk real characters, as the traced version does." },
+    { "lang": "Go", "text": "s[i] is a byte, so this works for ASCII. For general Unicode, convert to []rune first and use map[rune]bool." },
+    { "lang": "Go", "text": "Reading a missing key from a map[byte]bool gives false. That is the answer you want here, so no two-value form is needed." }
+  ],
+  "recap": {
+    "pattern": "Sliding window: no repeats",
+    "key": "Grow the right end. While the new letter repeats, drop letters from the left. Track the largest window length.",
+    "complexity": "Time O(n). Space O(k) for the alphabet.",
+    "moves": ["Keep a set of the letters in the window", "While the new letter is in the set, remove the left letter and move left", "Add the new letter to the set", "Update best with right minus left plus one"]
+  }
+}

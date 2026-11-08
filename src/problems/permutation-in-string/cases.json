@@ -1,0 +1,12 @@
+[
+  {"name":"permutation inside","input":["ab","eidbaooo"],"expected":true},
+  {"name":"letters never adjacent","input":["ab","eidboaoo"],"expected":false},
+  {"name":"whole string","input":["abc","cba"],"expected":true,"edge":true},
+  {"name":"s1 longer than s2","input":["abc","ab"],"expected":false,"edge":true},
+  {"name":"same single letter","input":["a","a"],"expected":true,"edge":true},
+  {"name":"duplicate counts matter","input":["aab","abbaa"],"expected":true},
+  {"name":"right letters wrong counts","input":["aab","abbbb"],"expected":false,"edge":true},
+  {"name":"match at the very end","input":["xyz","aaaaxzy"],"expected":true},
+  {"name":"empty s2","input":["a",""],"expected":false},
+  {"name":"repeated letter missing","input":["hello","ooolleoooleh"],"expected":false}
+]

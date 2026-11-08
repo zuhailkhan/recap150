@@ -1,0 +1,11 @@
+[
+  {"name":"classic","input":["abcabcbb"],"expected":3},
+  {"name":"all the same","input":["bbbbb"],"expected":1},
+  {"name":"repeat in the middle","input":["pwwkew"],"expected":3},
+  {"name":"empty string","input":[""],"expected":0,"edge":true},
+  {"name":"single letter","input":["a"],"expected":1,"edge":true},
+  {"name":"repeat of an old letter","input":["abba"],"expected":2,"edge":true},
+  {"name":"all different","input":["abcdef"],"expected":6},
+  {"name":"spaces and digits","input":["a b1 b"],"expected":4},
+  {"name":"repeat skips ahead","input":["dvdf"],"expected":3,"edge":true}
+]

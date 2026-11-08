@@ -1,0 +1,17 @@
+function minWindow(s, target)
+  need = count of each letter in target      # [1] need > 0: still missing. 0 or less: covered
+  missing = length of target                 # [1] letters not covered yet
+  left = 0
+  best = none
+  for right from 0 to last index of s
+    if need[s[right]] > 0
+      missing = missing - 1                  # [2] a useful letter entered
+    need[s[right]] = need[s[right]] - 1
+    while missing == 0                       # [3] window covers target: shrink
+      if best is none or window is shorter
+        best = s[left .. right]              # [4] keep the shortest
+      need[s[left]] = need[s[left]] + 1
+      if need[s[left]] > 0
+        missing = missing + 1                # [3] a needed letter left: stop shrinking
+      left = left + 1
+  return best, or "" if none                 # [5] empty string when nothing covered

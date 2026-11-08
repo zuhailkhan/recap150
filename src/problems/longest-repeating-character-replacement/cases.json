@@ -1,0 +1,12 @@
+[
+  {"name":"classic","input":["ABAB",2],"expected":4},
+  {"name":"one replacement","input":["AABABBA",1],"expected":4},
+  {"name":"no replacements allowed","input":["ABAB",0],"expected":1,"edge":true},
+  {"name":"k covers everything","input":["ABC",5],"expected":3,"edge":true},
+  {"name":"single letter","input":["A",0],"expected":1,"edge":true},
+  {"name":"already one letter","input":["AAAA",2],"expected":4},
+  {"name":"majority at the end","input":["ABBB",1],"expected":4},
+  {"name":"all different, one swap","input":["ABCDE",1],"expected":2},
+  {"name":"majority in the middle","input":["BAAAB",2],"expected":5},
+  {"name":"stale maxFreq case","input":["AABBBCCAA",2],"expected":5,"edge":true}
+]

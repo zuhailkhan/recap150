@@ -1,0 +1,11 @@
+function lengthOfLongestSubstring(s)
+  seen = empty set                       # [1] letters inside the window
+  left = 0
+  best = 0
+  for right from 0 to last index of s
+    while s[right] is in seen
+      remove s[left] from seen           # [2] duplicate: shrink from the left
+      left = left + 1
+    add s[right] to seen                 # [3] take the new letter in
+    best = max(best, right - left + 1)   # [4] window is valid: remember its length
+  return best

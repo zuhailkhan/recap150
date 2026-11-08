@@ -1,0 +1,68 @@
+{
+  "slug": "best-time-to-buy-and-sell-stock",
+  "title": "Best Time to Buy And Sell Stock",
+  "category": "Sliding Window",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get the price of one stock for each day. Pick one day to buy and a later day to sell. Return the largest profit you can make. If every possible trade loses money, return 0.",
+  "example": {
+    "caption": "Buy on day 1 at 1, sell on day 4 at 6. Profit is 5. Buying at 7 first would never pay off.",
+    "input": [{ "kind": "array", "label": "prices", "items": [7, 1, 5, 3, 6, 4] }],
+    "output": [{ "kind": "array", "label": "best trade", "items": [7, 1, 5, 3, 6, 4], "tones": ["dim", "keep", null, null, "focus", null], "pointers": [{ "name": "buy", "at": 1, "tone": "keep" }, { "name": "sell", "at": 4, "tone": "focus" }], "window": [1, 4] }]
+  },
+  "idea": {
+    "sentence": "Treat buy and sell as the two ends of a window. Walk the sell end forward, and whenever a cheaper day appears, jump the buy end to it.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "sliding window", "plain": "A stretch of the array between two markers. Both markers only ever move forward." },
+      { "term": "running minimum", "plain": "The lowest value seen so far while walking left to right." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the list of daily prices, e.g. [7,1,5,3,6,4]",
+    "presets": [
+      { "label": "Classic", "args": [[7, 1, 5, 3, 6, 4]] },
+      { "label": "Only falls", "args": [[7, 6, 4, 3, 1]] },
+      { "label": "Low after the high", "args": [[2, 4, 1]] },
+      { "label": "Equal prices", "args": [[4, 4, 4, 4]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of days" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Try every buy and sell pair", "optimalLabel": "One pass, remember the cheapest day", "unit": "pairs or days checked (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n²)", "space": "O(1)", "note": "For each buy day, look at every later sell day." },
+      { "name": "One pass", "time": "O(n)", "space": "O(1)", "note": "Each day is visited once. Only the buy index and the best profit are stored." }
+    ],
+    "takeaway": "The best buy day for any sell day is just the lowest price before it. Remember that one number instead of rechecking all earlier days."
+  },
+  "variants": [
+    { "id": "scan", "label": "One pass", "tsFn": "maxProfit", "goFn": "maxProfit", "stages": [
+      { "n": 1, "title": "Start the window", "note": "Buy day 0. The best profit so far is 0, which also covers the no-trade case." },
+      { "n": 2, "title": "Cheaper day: move buy", "note": "If today is cheaper than the buy day, it is a better buy day for everything after it." },
+      { "n": 3, "title": "Otherwise try selling", "note": "Profit is today's price minus the buy price. Keep the larger profit." },
+      { "n": 4, "title": "Return the best", "note": "After the last day, the best profit is the answer. It stays 0 if prices only fall." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Prices only fall", "input": "[7, 6, 4, 3, 1]", "output": "0", "why": "Every trade loses money, so the best move is not to trade. The best starts at 0 and never grows." },
+    { "title": "Single day", "input": "[5]", "output": "0", "why": "You cannot sell on a later day. The loop never runs and 0 is returned." },
+    { "title": "Low comes after the high", "input": "[2, 4, 1]", "output": "2", "why": "The cheapest price is 1, but it is last. Buying there allows no sale. Selling must come after buying." },
+    { "title": "Equal prices", "input": "[4, 4, 4, 4]", "output": "0", "why": "Same price on every day gives profit 0. Equal is not cheaper, so the buy day stays." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Do not take max(prices) minus min(prices). The minimum may come after the maximum, and you cannot sell before you buy." },
+    { "lang": "General", "text": "Start best at 0, not at a negative number or the first price. A losing-only list must return 0." },
+    { "lang": "TypeScript", "text": "Math.min(...prices) spreads the whole array into arguments. It can crash with a stack error on very large arrays. A plain loop is safe." },
+    { "lang": "Go", "text": "The built-in max needs Go 1.21 or newer. On older versions write the comparison with an if." }
+  ],
+  "recap": {
+    "pattern": "Sliding window: running minimum",
+    "key": "Walk the sell day forward. Keep the cheapest day so far as the buy day, and track the best price difference.",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": ["Start with buy at day 0 and best at 0", "If today is cheaper than the buy day, move buy here", "Otherwise profit is today minus buy. Keep the larger", "Return best, which is 0 if no trade pays"]
+  }
+}

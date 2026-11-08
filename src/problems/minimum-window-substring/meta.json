@@ -1,0 +1,70 @@
+{
+  "slug": "minimum-window-substring",
+  "title": "Minimum Window Substring",
+  "category": "Sliding Window",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "You get a string s and a string target. Find the shortest stretch of neighbouring characters in s that contains every character of target, counting repeats. If no such stretch exists, return an empty string.",
+  "example": {
+    "caption": "BANC is the shortest stretch of s that holds an A, a B and a C.",
+    "input": [{ "kind": "array", "label": "s", "items": ["A", "D", "O", "B", "E", "C", "O", "D", "E", "B", "A", "N", "C"] }, { "kind": "array", "label": "target", "items": ["A", "B", "C"] }],
+    "output": [{ "kind": "array", "label": "s", "items": ["A", "D", "O", "B", "E", "C", "O", "D", "E", "B", "A", "N", "C"], "tones": [null, null, null, null, null, null, null, null, null, "hit", "hit", "hit", "hit"], "window": [9, 12] }]
+  },
+  "idea": {
+    "sentence": "Grow the window on the right until it covers the target. Then shrink it from the left for as long as it still covers, and remember the shortest one.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "covers", "plain": "The window holds at least as many of each target letter as the target does. Extra letters are fine." },
+      { "term": "missing", "plain": "How many target letters, counting repeats, the window still lacks. When it hits 0 the window covers." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: s then target, e.g. \"XABYCAB\", \"ABC\"",
+    "presets": [
+      { "label": "Shrink to the best", "args": ["XABYCAB", "ABC"] },
+      { "label": "Repeated letters", "args": ["bbaac", "aba"] },
+      { "label": "Not possible", "args": ["abc", "ad"] },
+      { "label": "Exact string", "args": ["ab", "ab"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of s" }, { "sym": "m", "meaning": "length of target" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Check every substring", "optimalLabel": "One window, two markers", "unit": "letter checks (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n²·m)", "space": "O(m)", "note": "Try every start and end, and count letters in each stretch." },
+      { "name": "Sliding window", "time": "O(n + m)", "space": "O(m)", "note": "Each letter of s enters once and leaves at most once. The table holds the distinct letters of target." }
+    ],
+    "takeaway": "Two markers only move forward. The right one finds a window that works, the left one squeezes it down to the smallest one."
+  },
+  "variants": [
+    { "id": "window", "label": "Need and missing", "tsFn": "minWindow", "goFn": "minWindow", "stages": [
+      { "n": 1, "title": "Count what is needed", "note": "A table of target letter counts, and a single number for how many letters are still missing." },
+      { "n": 2, "title": "Grow on the right", "note": "The new letter is counted. If the window was still short of it, one fewer letter is missing." },
+      { "n": 3, "title": "Shrink while covered", "note": "While nothing is missing, drop the left letter. Stop when a needed letter leaves." },
+      { "n": 4, "title": "Keep the shortest", "note": "Each covering window is compared with the best so far. Only a strictly shorter one replaces it." },
+      { "n": 5, "title": "Return the best", "note": "Return the best stretch, or an empty string if no window ever covered the target." }
+    ] }
+  ],
+  "goArgs": ["string", "string"],
+  "goRet": "string",
+  "compare": "exact",
+  "edges": [
+    { "title": "Target is the whole string", "input": "\"ab\", \"ab\"", "output": "\"ab\"", "why": "The window covers only at the very end, and shrinking one letter breaks it." },
+    { "title": "Repeats in target", "input": "\"a\", \"aa\"", "output": "\"\"", "why": "Target needs two a letters but s has one. Missing never reaches 0, so no window is found." },
+    { "title": "Letter absent", "input": "\"abc\", \"d\"", "output": "\"\"", "why": "A letter that is not in s can never be covered. Return the empty string, not null." },
+    { "title": "Shrinks past a tie", "input": "\"XABYCAB\", \"ABC\"", "output": "\"CAB\"", "why": "Windows of length 5, 4, 4 and then 3 cover the target. The 3 is found only because the left marker keeps squeezing." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Count repeats. target \"aab\" needs two a letters. A set of letters would accept a window with one a." },
+    { "lang": "General", "text": "Shrink with a while loop, not an if. After one drop the window may still cover, and a shorter answer may follow." },
+    { "lang": "TypeScript", "text": "Use Infinity as the initial best length, not 0. And Map.get returns undefined for letters outside target, so read it with ?? 0." },
+    { "lang": "Go", "text": "need[s[i]] on a missing key returns 0, and the -- then stores -1. That is the intended 'surplus' value, but it does mean the map also grows with letters that are not in target." },
+    { "lang": "Go", "text": "Slicing s[a:b] shares the original string's memory. Strings are immutable, so this is safe and cheap." }
+  ],
+  "recap": {
+    "pattern": "Sliding window: grow, then shrink",
+    "key": "Track how many target letters are missing. Grow right until none are missing, then shrink left while still none are, saving the shortest.",
+    "complexity": "Time O(n + m). Space O(m).",
+    "moves": ["Count target letters in need and set missing to its length", "Move right. A letter still needed lowers missing", "While missing is 0, record the window, then drop the left letter", "Return the shortest window, or an empty string"]
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "slug": "permutation-in-string",
+  "title": "Permutation In String",
+  "category": "Sliding Window",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get two strings, s1 and s2. Decide whether s2 contains a stretch of neighbouring letters that uses exactly the letters of s1, in any order. Each letter must appear the same number of times.",
+  "example": {
+    "caption": "The stretch \"ba\" inside s2 uses one a and one b, the same letters as \"ab\". The answer is true.",
+    "input": [{ "kind": "array", "label": "s1", "items": ["a", "b"] }, { "kind": "array", "label": "s2", "items": ["e", "i", "d", "b", "a", "o", "o", "o"] }],
+    "output": [{ "kind": "array", "label": "s2", "items": ["e", "i", "d", "b", "a", "o", "o", "o"], "tones": [null, null, null, "hit", "hit", null, null, null], "window": [3, 4] }]
+  },
+  "idea": {
+    "sentence": "A permutation has the same letter counts as s1. Slide a window of exactly that width over s2 and update the counts as one letter leaves and one enters.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "permutation", "plain": "The same letters in any order, with the same counts." },
+      { "term": "fixed-size window", "plain": "A window that always has the same width. It moves by dropping one letter on the left and adding one on the right." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: s1 then s2, e.g. \"ab\", \"eidbaooo\"",
+    "presets": [
+      { "label": "Found", "args": ["ab", "eidbaooo"] },
+      { "label": "Letters apart", "args": ["ab", "eidboao"] },
+      { "label": "Counts matter", "args": ["aab", "abbbb"] },
+      { "label": "Too short", "args": ["abc", "ab"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of s1" }, { "sym": "m", "meaning": "length of s2" }],
+    "compare": { "brute": "nm", "optimal": "n", "bruteLabel": "Compare every window with s1 from scratch", "optimalLabel": "Update counts as the window slides", "unit": "letter checks (rough)" },
+    "rows": [
+      { "name": "Compare each window", "time": "O(n·m)", "space": "O(1)", "note": "Count the letters of each window of width n again, then compare with s1." },
+      { "name": "Slide and update", "time": "O(n + m)", "space": "O(1)", "note": "Counting s1 costs n. Each slide changes two counts. The table holds at most 26 lowercase letters." }
+    ],
+    "takeaway": "Sliding by one changes only two counts. Track how many letters are unbalanced and you can test every window in one step."
+  },
+  "variants": [
+    { "id": "window", "label": "Slide and balance", "tsFn": "checkInclusion", "goFn": "checkInclusion", "stages": [
+      { "n": 1, "title": "Owe the letters of s1", "note": "Each letter of s1 is owed to the window. Count how many letters are unbalanced." },
+      { "n": 2, "title": "Left letter leaves", "note": "Once the window is full, the oldest letter drops out and is owed again." },
+      { "n": 3, "title": "Right letter enters", "note": "The new letter pays one off. A count of exactly 0 means that letter is balanced." },
+      { "n": 4, "title": "All balanced? Found", "note": "When no letter is unbalanced, the window has the same counts as s1." }
+    ] }
+  ],
+  "goArgs": ["string", "string"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "s1 longer than s2", "input": "\"abc\", \"ab\"", "output": "false", "why": "The window can never be full. Letters are owed that cannot be paid, so off never reaches 0." },
+    { "title": "Whole string", "input": "\"abc\", \"cba\"", "output": "true", "why": "The window is the entire s2. It balances on the last letter." },
+    { "title": "Counts matter", "input": "\"aab\", \"abbbb\"", "output": "false", "why": "Both letters appear, but a needs two. Presence is not enough. The counts must match." },
+    { "title": "Single letter", "input": "\"a\", \"a\"", "output": "true", "why": "A window of width 1. The first letter pays off the only debt." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "A count going below zero is meaningful: the window has too many of that letter. It counts as unbalanced until a slide removes it." },
+    { "lang": "General", "text": "Remove the left letter before adding the right one, or the window is briefly n + 1 wide and a false match can appear." },
+    { "lang": "TypeScript", "text": "Map.get gives undefined for a missing letter. Read it with ?? 0 so a letter that is not in s1 can still go to -1." },
+    { "lang": "Go", "text": "Reading a missing key from a map gives 0, which is the balanced value. That is convenient here, but it also means a letter outside s1 starts balanced and shows up as unbalanced only once it enters." }
+  ],
+  "recap": {
+    "pattern": "Fixed window with a balance counter",
+    "key": "Owe each letter of s1. Slide a window of the same width over s2, paying off entering letters and re-owing leaving ones. Zero unbalanced letters means a permutation.",
+    "complexity": "Time O(n + m). Space O(1).",
+    "moves": ["Count the letters of s1 as owed and track how many are unbalanced", "Once the window is full, the left letter leaves and is owed again", "The right letter enters and pays one off", "If nothing is unbalanced, return true"]
+  }
+}

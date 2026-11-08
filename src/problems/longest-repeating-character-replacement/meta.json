@@ -1,0 +1,68 @@
+{
+  "slug": "longest-repeating-character-replacement",
+  "title": "Longest Repeating Character Replacement",
+  "category": "Sliding Window",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a string of capital letters and a number k. You may change at most k letters to any other letter. After the changes, find the length of the longest stretch made of one repeated letter.",
+  "example": {
+    "caption": "With k = 2, swap the two A letters in ABAB for B. The whole string becomes BBBB, length 4.",
+    "input": [{ "kind": "array", "label": "s", "items": ["A", "B", "A", "B"] }, { "kind": "array", "label": "k", "items": [2] }],
+    "output": [{ "kind": "array", "label": "window of one letter", "items": ["A", "B", "A", "B"], "tones": ["miss", "hit", "miss", "hit"], "window": [0, 3] }]
+  },
+  "idea": {
+    "sentence": "A window can be fixed if its size minus its most common letter count is at most k. Slide the window and never let it shrink.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "window", "plain": "The stretch of the string between a left and a right marker." },
+      { "term": "maxFreq", "plain": "The highest count one letter has reached inside any window so far." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the string, then k, e.g. \"AABABBA\", 1",
+    "presets": [
+      { "label": "One replacement", "args": ["AABABBA", 1] },
+      { "label": "Whole string", "args": ["ABAB", 2] },
+      { "label": "No replacements", "args": ["ABAB", 0] },
+      { "label": "Stale maxFreq", "args": ["AABBBCC", 1] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of the string" }, { "sym": "k", "meaning": "number of allowed replacements" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Check every substring", "optimalLabel": "One sliding window", "unit": "letter checks (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n²)", "space": "O(1)", "note": "Count letters in every substring and test the rule." },
+      { "name": "Sliding window", "time": "O(n)", "space": "O(1)", "note": "Each step adds one letter and removes at most one. The count table holds at most 26 capital letters." }
+    ],
+    "takeaway": "Only the window size matters for the answer. A window that cannot grow just slides along, so you never need to recompute the top count."
+  },
+  "variants": [
+    { "id": "window", "label": "Never-shrinking window", "tsFn": "characterReplacement", "goFn": "characterReplacement", "stages": [
+      { "n": 1, "title": "Counts and maxFreq", "note": "A table of letter counts for the window, and the highest count seen so far." },
+      { "n": 2, "title": "Grow on the right", "note": "Count the new letter and raise maxFreq if this letter has a new top count." },
+      { "n": 3, "title": "Too many replacements: slide", "note": "If size minus maxFreq is more than k, drop the left letter. The window keeps its size." },
+      { "n": 4, "title": "Size is the answer", "note": "The window only grows when it finds a better one, so its final size is the best length." }
+    ] }
+  ],
+  "goArgs": ["string", "int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "No replacements", "input": "\"ABAB\", 0", "output": "1", "why": "With k = 0 the window can only hold one letter type at a time. The longest run is length 1." },
+    { "title": "k is huge", "input": "\"ABC\", 5", "output": "3", "why": "You can turn everything into one letter, so the whole string counts. The window never slides." },
+    { "title": "Stale maxFreq", "input": "\"AABBBCCAA\", 2", "output": "5", "why": "After the best window passes, maxFreq stays at its high mark. The window only grows if a letter beats that mark, which is exactly when a longer answer exists." },
+    { "title": "Single letter", "input": "\"A\", 0", "output": "1", "why": "One letter is already a run of length 1." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Do not lower maxFreq when the left letter leaves. It looks wrong, but a stale high value can only make the window slide, never grow, so the answer stays correct." },
+    { "lang": "General", "text": "The window is not always valid after a slide. Only its size matters. Return the final size, which is the length minus left." },
+    { "lang": "TypeScript", "text": "Map.get returns undefined for a missing key. Default with ?? 0 before adding or subtracting, or the count becomes NaN." },
+    { "lang": "Go", "text": "count[s[right]]++ works on a missing key because the zero value of int is 0. Keys are bytes, so print them with string(rune(b))." }
+  ],
+  "recap": {
+    "pattern": "Sliding window: size minus top count",
+    "key": "A window needs (size minus its most common letter count) replacements. If that exceeds k, slide it right. Never shrink it.",
+    "complexity": "Time O(n). Space O(1) for 26 letters.",
+    "moves": ["Count each letter that enters the window", "Raise maxFreq if this letter's count is a new high", "If size minus maxFreq is more than k, drop the left letter and move left", "Return length minus left, which is the final window size"]
+  }
+}

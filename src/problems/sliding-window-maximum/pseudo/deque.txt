@@ -1,0 +1,12 @@
+function maxSlidingWindow(nums, k)
+  out = empty list
+  dq = empty deque of indexes                 # [1] values fall from front to back
+  for right from 0 to last index of nums
+    while dq is not empty and nums[back of dq] <= nums[right]
+      pop the back of dq                      # [2] it can never be the max again
+    push right onto the back of dq            # [3] new candidate
+    if front of dq <= right - k
+      pop the front of dq                     # [4] it slid out of the window
+    if right >= k - 1
+      append nums[front of dq] to out         # [5] front is the window's max
+  return out

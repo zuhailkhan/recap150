@@ -1,0 +1,9 @@
+function maxProfit(prices)
+  buy = 0                              # [1] index of the cheapest day so far
+  best = 0                             # [1] best profit so far
+  for sell from 1 to last day
+    if prices[sell] < prices[buy]
+      buy = sell                       # [2] a cheaper day: buy here instead
+      continue
+    best = max(best, prices[sell] - prices[buy])   # [3] sell today
+  return best                          # [4] 0 when prices only fall

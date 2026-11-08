@@ -1,0 +1,12 @@
+[
+  {"name":"classic","input":["ADOBECODEBANC","ABC"],"expected":"BANC"},
+  {"name":"whole string","input":["a","a"],"expected":"a","edge":true},
+  {"name":"duplicates in target","input":["aa","aa"],"expected":"aa","edge":true},
+  {"name":"target needs two, s has one","input":["a","aa"],"expected":"","edge":true},
+  {"name":"letter missing","input":["abc","d"],"expected":""},
+  {"name":"shrinks past a tie","input":["XABYCAB","ABC"],"expected":"CAB"},
+  {"name":"repeats with a unique best","input":["bbaac","aba"],"expected":"baa"},
+  {"name":"target longer than s","input":["ab","abc"],"expected":""},
+  {"name":"minimum at the very end","input":["zzzzabc","abc"],"expected":"abc"},
+  {"name":"capital and lowercase differ","input":["Aa","aA"],"expected":"Aa"}
+]
