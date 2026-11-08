@@ -1,0 +1,10 @@
+[
+  {"name":"classic","input":[[[1,3],[-2,2]],1],"expected":[[-2,2]]},
+  {"name":"five points","input":[[[3,3],[5,-1],[-2,4],[1,1],[0,2]],2],"expected":[[0,2],[1,1]]},
+  {"name":"k equals n","input":[[[1,1],[2,2]],2],"expected":[[1,1],[2,2]],"edge":true},
+  {"name":"point at the origin","input":[[[0,0],[3,4]],1],"expected":[[0,0]],"edge":true},
+  {"name":"same point twice","input":[[[2,2],[2,2],[5,5]],2],"expected":[[2,2],[2,2]]},
+  {"name":"negative coordinates","input":[[[-3,-4],[2,1],[-1,6]],1],"expected":[[2,1]]},
+  {"name":"ties inside the answer","input":[[[1,0],[0,1],[-1,0],[9,9]],3],"expected":[[-1,0],[0,1],[1,0]]},
+  {"name":"large coordinates","input":[[[10000,10000],[-10000,9999],[0,-10000],[5000,5000]],2],"expected":[[0,-10000],[5000,5000]]}
+]

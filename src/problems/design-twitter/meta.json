@@ -1,0 +1,75 @@
+{
+  "slug": "design-twitter",
+  "title": "Design Twitter",
+  "category": "Heap / Priority Queue",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Design a tiny social feed. Users can post a tweet (a unique id), follow and unfollow other users, and ask for a news feed. The feed is the ten most recent tweet ids from the user themselves and everyone they follow, newest first. Fewer than ten is fine if there are fewer tweets.",
+  "example": {
+    "caption": "User 1 posted 5 and 7, user 2 posted 6 in between, and user 1 follows user 2. The feed is 7, 6, 5.",
+    "input": [
+      { "kind": "list", "label": "user 1, oldest to newest", "items": ["5 (t0)", "7 (t2)"] },
+      { "kind": "list", "label": "user 2 (user 1 follows them)", "items": ["6 (t1)"] }
+    ],
+    "output": [{ "kind": "array", "label": "user 1's feed, newest first", "items": [7, 6, 5], "tones": ["hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Each person's tweets are already in time order, so a heap that holds one candidate per person, the newest not yet used, merges them into the feed.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "k-way merge", "plain": "Combine several already-sorted lists into one sorted list by repeatedly taking the best front item. A heap finds that item fast." },
+      { "term": "timestamp", "plain": "A counter that goes up with every post. A bigger number means a newer tweet, so no clocks are needed." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: operation names, then their arguments, e.g. [\"Twitter\",\"postTweet\",\"getNewsFeed\"], [[],[1,5],[1]]",
+    "presets": [
+      { "label": "Follow, then unfollow", "args": [["Twitter", "postTweet", "postTweet", "postTweet", "follow", "getNewsFeed", "unfollow", "getNewsFeed"], [[], [1, 5], [2, 6], [1, 7], [1, 2], [1], [1, 2], [1]]] },
+      { "label": "Three people", "args": [["Twitter", "postTweet", "postTweet", "postTweet", "postTweet", "follow", "follow", "getNewsFeed"], [[], [1, 1], [2, 2], [3, 3], [2, 4], [1, 2], [1, 3], [1]]] },
+      { "label": "Only my own tweets", "args": [["Twitter", "postTweet", "postTweet", "getNewsFeed"], [[], [1, 10], [1, 11], [1]]] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "f", "meaning": "number of users this person follows" },
+      { "sym": "N", "meaning": "feed size, fixed at 10" }
+    ],
+    "compare": { "brute": "n", "optimal": "logn", "bruteLabel": "Gather every tweet of every followed user, then sort", "optimalLabel": "Heap with one candidate per user", "unit": "work per feed (rough, in the number of tweets involved)" },
+    "rows": [
+      { "name": "Gather all tweets and sort", "time": "O(T log T)", "space": "O(T)", "note": "T is the total tweets of everyone followed. Reads every tweet even though only 10 are needed." },
+      { "name": "Heap merge of per-user lists", "time": "O(f + N log f)", "space": "O(f)", "note": "Seed the heap with f newest tweets, then at most N pops and pushes. Old tweets are never touched." }
+    ],
+    "takeaway": "The feed needs only the top ten, so look at as few tweets as you can. Each user's list is sorted, so only its newest unused tweet is ever a candidate."
+  },
+  "variants": [
+    { "id": "heap", "label": "Heap merge of feeds", "tsFn": "run", "goFn": "run", "stages": [
+      { "n": 1, "title": "Post", "note": "Stamp the tweet with a growing counter and append it to the author's list. Each list stays sorted oldest to newest." },
+      { "n": 2, "title": "Follow or unfollow", "note": "Keep a set of followees per user. Adding twice or removing a missing entry does nothing." },
+      { "n": 3, "title": "Seed the heap", "note": "Put the newest tweet of the user and of each followee into a max-heap ordered by time." },
+      { "n": 4, "title": "Pop the newest", "note": "The heap top is the newest tweet among all candidates. Add it to the feed. Stop at ten or when the heap is empty." },
+      { "n": 5, "title": "Push the next older", "note": "If that author has an older tweet, push it as their new candidate." }
+    ] }
+  ],
+  "goArgs": ["[]string", "[][]int"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "edges": [
+    { "title": "No tweets at all", "input": "getNewsFeed(1) on a fresh Twitter", "output": "[]", "why": "The heap stays empty and the loop never runs. Return an empty list, not null." },
+    { "title": "Follow yourself", "input": "follow(1, 1), then feed(1)", "output": "own tweets once each", "why": "Building the set of people as a set stops your own tweets appearing twice." },
+    { "title": "More than ten tweets", "input": "12 tweets by one user", "output": "the newest 10", "why": "The loop stops at ten pops. Older tweets are never pushed or even looked at." },
+    { "title": "Unfollow someone never followed", "input": "unfollow(1, 9)", "output": "no change, no error", "why": "Deleting a key that is not there must be harmless. In TypeScript that needs the optional chain." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Use a global counter for time, not tweet ids. Ids are not guaranteed to grow, and the feed order depends on when a tweet was posted." },
+    { "lang": "General", "text": "Push only the next older tweet of the author you just popped. Pushing every tweet of everyone up front works but wastes the whole point of the heap." },
+    { "lang": "TypeScript", "text": "follows.get(a) is undefined for a user who never followed anyone. Use ?? new Set() when reading and ?. when deleting. Spreading a Set into an array needs ES2015+ iteration, which is fine here." },
+    { "lang": "Go", "text": "Reading a nil inner map is safe, but writing to it panics. In Follow create the inner map first. delete() on a nil map is a safe no-op. Map range order is random, but the heap fixes the feed order, so the result is stable." },
+    { "lang": "Go", "text": "container/heap needs Len, Less, Swap, Push and Pop, and heap.Pop returns any: write heap.Pop(h).(candidate). Return []int{} for an empty feed so it encodes as [] rather than null." }
+  ],
+  "recap": {
+    "pattern": "Design + heap: k-way merge",
+    "key": "Store each user's tweets in time order. For the feed, merge the newest of each person with a max-heap by time.",
+    "complexity": "Post, follow, unfollow O(1). Feed O(f + 10 log f).",
+    "moves": ["Post: append (time, id) to the author's list", "Follow: add to a set", "Feed: push each person's newest tweet", "Pop the newest, then push that author's next older tweet"]
+  }
+}

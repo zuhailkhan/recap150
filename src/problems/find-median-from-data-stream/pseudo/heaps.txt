@@ -1,0 +1,14 @@
+class MedianFinder
+  lower = empty max-heap                    # [1] the smaller half, its top is the biggest of them
+  upper = empty min-heap                    # [1] the bigger half, its top is the smallest of them
+
+  addNum(num)
+    push num into lower                     # [2] enters the lower half first
+    move the top of lower into upper         # [2] now every lower number <= every upper number
+    if size(upper) > size(lower)
+      move the top of upper back into lower  # [3] keep balance: lower may hold one extra
+
+  findMedian()
+    if size(lower) > size(upper)
+      return top of lower                   # [4] odd count
+    return (top of lower + top of upper) / 2   # [4] even count: mean of the two middles

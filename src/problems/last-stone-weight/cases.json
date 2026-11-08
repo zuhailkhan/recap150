@@ -1,0 +1,10 @@
+[
+  {"name":"classic","input":[[2,7,4,1,8,1]],"expected":1},
+  {"name":"one stone","input":[[7]],"expected":7,"edge":true},
+  {"name":"two equal stones","input":[[4,4]],"expected":0,"edge":true},
+  {"name":"everything cancels","input":[[3,3,5,5]],"expected":0},
+  {"name":"leftover stays heaviest","input":[[10,4,3]],"expected":3},
+  {"name":"many ones","input":[[1,1,1,1,1]],"expected":1},
+  {"name":"large weights","input":[[1000,999,500,500,1]],"expected":0},
+  {"name":"already sorted ascending","input":[[1,2,3,4,5,6]],"expected":1}
+]

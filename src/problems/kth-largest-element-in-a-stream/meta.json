@@ -1,0 +1,73 @@
+{
+  "slug": "kth-largest-element-in-a-stream",
+  "title": "Kth Largest Element In a Stream",
+  "category": "Heap / Priority Queue",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "Build a class that is created with a number k and a starting list of numbers. Its add(val) method takes in one more number and returns the kth largest number seen so far. Duplicates count separately. You may assume there are at least k numbers whenever add is called.",
+  "example": {
+    "caption": "k = 3. Start with 4, 5, 8, 2, then add(3). The three biggest are 4, 5, 8, so the answer is 4.",
+    "input": [
+      { "kind": "array", "label": "starting numbers, k = 3", "items": [4, 5, 8, 2] },
+      { "kind": "array", "label": "add(3)", "items": [3], "tones": ["focus"] }
+    ],
+    "output": [{ "kind": "heap", "label": "min-heap of the 3 biggest. Top = answer 4", "items": [4, 5, 8], "tones": ["hit", null, null] }]
+  },
+  "idea": {
+    "sentence": "Keep only the k biggest numbers in a min-heap, so its smallest item, the top, is always the kth largest.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "min-heap", "plain": "A container where the smallest item is always on top. Push and pop cost about log of its size." },
+      { "term": "kth largest", "plain": "The number that would sit at position k if you sorted from biggest to smallest. Duplicates take their own positions." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: operation names, then their arguments, e.g. [\"KthLargest\",\"add\"], [[3,[4,5,8,2]],[3]]",
+    "presets": [
+      { "label": "k = 3", "args": [["KthLargest", "add", "add", "add", "add", "add"], [[3, [4, 5, 8, 2]], [3], [5], [10], [9], [4]]] },
+      { "label": "Start empty, k = 1", "args": [["KthLargest", "add", "add", "add"], [[1, []], [-3], [-2], [-4]]] },
+      { "label": "Duplicates", "args": [["KthLargest", "add", "add", "add"], [[2, [5, 5]], [5], [6], [1]]] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "how many numbers have been added so far" },
+      { "sym": "k", "meaning": "the k in kth largest" }
+    ],
+    "compare": { "brute": "nlogn", "optimal": "logn", "bruteLabel": "Sort everything again on every add", "optimalLabel": "One push and one pop on a heap of size k", "unit": "steps per add (rough)" },
+    "rows": [
+      { "name": "Sort on every add", "time": "O(n log n) per add", "space": "O(n)", "note": "Re-sorts all numbers each time, then reads position k." },
+      { "name": "Min-heap of size k", "time": "O(log k) per add", "space": "O(k)", "note": "At most k + 1 items ever sit in the heap. The log is of k, not of n." }
+    ],
+    "takeaway": "A number that is not among the k biggest can never become the kth largest later, so the heap throws it away for good."
+  },
+  "variants": [
+    { "id": "heap", "label": "Min-heap of size k", "tsFn": "run", "goFn": "run", "stages": [
+      { "n": 1, "title": "Start with the numbers", "note": "Create an empty min-heap and add each starting number through the same add method." },
+      { "n": 2, "title": "Push the new number", "note": "Every incoming number goes into the heap first." },
+      { "n": 3, "title": "Trim to k", "note": "If the heap has more than k numbers, pop the smallest. It can never be the kth largest." },
+      { "n": 4, "title": "Read the top", "note": "The top of the heap is the smallest of the k biggest numbers, which is the kth largest." }
+    ] }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "edges": [
+    { "title": "k is 1", "input": "k = 1, add(-3), add(-2), add(-4)", "output": "-3, -2, -2", "why": "The heap holds one number, the maximum. Negatives work the same, since only comparisons are used." },
+    { "title": "Start empty", "input": "KthLargest(1, [])", "output": "first add returns that number", "why": "No starting numbers is fine as long as k numbers exist by the time you ask. Do not read the top of an empty heap." },
+    { "title": "Small number arrives", "input": "k = 3, heap [4,5,8], add(3)", "output": "4", "why": "3 is pushed and immediately popped again. The answer stays 4." },
+    { "title": "Duplicates", "input": "k = 2, [5,5], add(5)", "output": "5", "why": "Each 5 takes its own place in the ranking. Do not collapse equal numbers." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Push first, then pop if the heap is too big. Doing it the other way round (peek, compare, replace) also works but needs extra care while the heap holds fewer than k numbers." },
+    { "lang": "TypeScript", "text": "There is no built-in heap, so write a small one. Do not sort inside add: [10, 9, 100].sort() is lexicographic and gives [10, 100, 9], and it is O(n log n) anyway." },
+    { "lang": "Go", "text": "container/heap wants five methods: Len, Less, Swap, Push, Pop. Push and Pop only add or remove the last slice item, so always go through heap.Push(h, x) and heap.Pop(h), never h.Push or h.Pop." },
+    { "lang": "Go", "text": "heap.Pop returns any. Add a type assertion (x.(int)) if you use the popped value. The top of the heap is just (*h)[0]." }
+  ],
+  "recap": {
+    "pattern": "Heap: top-k with a min-heap",
+    "key": "Keep a min-heap of the k biggest. Push each number, pop when over k. The top is the kth largest.",
+    "complexity": "add O(log k). Space O(k).",
+    "moves": ["Min-heap, size at most k", "Push the new number", "If size is over k, pop the smallest", "Return the top"]
+  }
+}

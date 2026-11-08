@@ -1,0 +1,78 @@
+{
+  "slug": "kth-largest-element-in-an-array",
+  "title": "Kth Largest Element In An Array",
+  "category": "Heap / Priority Queue",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Given an array of integers and a number k, return the kth largest value. This is the kth in sorted order from biggest to smallest, so repeated values count separately. Try to do better than sorting the whole array.",
+  "example": {
+    "caption": "k = 2. Sorted from biggest: 6, 5, 4, 3, 2, 1. The 2nd largest is 5.",
+    "input": [{ "kind": "array", "label": "nums, k = 2", "items": [3, 2, 1, 5, 6, 4] }],
+    "output": [{ "kind": "array", "label": "2nd largest", "items": [5], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "Keep the k biggest numbers in a min-heap, and its top, the smallest of them, is the kth largest.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "min-heap", "plain": "A container where the smallest item is always on top. Push and pop cost about log of its size." },
+      { "term": "quickselect", "plain": "Quicksort that only follows the side holding the answer. It partitions around a pivot, then ignores the other side." },
+      { "term": "partition", "plain": "Rearrange a range around a pivot value so smaller values are on its left and the rest on its right. The pivot ends in its final sorted place." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the array and k, e.g. [3,2,1,5,6,4], 2",
+    "presets": [
+      { "label": "k = 2", "args": [[3, 2, 1, 5, 6, 4], 2] },
+      { "label": "Duplicates", "args": [[3, 2, 3, 1, 2, 4, 5, 5, 6], 4] },
+      { "label": "k = 1 (the maximum)", "args": [[7, 2, 9, 4], 1] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "length of the array" },
+      { "sym": "k", "meaning": "which largest to find" }
+    ],
+    "compare": { "brute": "nlogn", "optimal": "n", "bruteLabel": "Sort, then read position k", "optimalLabel": "Quickselect, average case (the heap is n log k)", "unit": "comparisons (rough)" },
+    "rows": [
+      { "name": "Sort the array", "time": "O(n log n)", "space": "O(1) or O(n)", "note": "Simple and often good enough. Sort numerically, not as strings." },
+      { "name": "Min-heap of size k", "time": "O(n log k)", "space": "O(k)", "note": "One push and at most one pop per number on a heap of at most k + 1 items." },
+      { "name": "Quickselect", "time": "O(n) average, O(n^2) worst", "space": "O(n) copy", "note": "Partition and follow one side only. The worst case needs consistently bad pivots or many equal values." }
+    ],
+    "takeaway": "You do not need the whole order, only the border at position k. The heap tracks that border, and quickselect finds it directly."
+  },
+  "variants": [
+    { "id": "heap", "label": "Min-heap of size k", "tsFn": "findKthLargest", "goFn": "findKthLargest", "stages": [
+      { "n": 1, "title": "Start a heap", "note": "Create an empty min-heap. It will only ever hold the k biggest numbers seen so far." },
+      { "n": 2, "title": "Push", "note": "Push each number into the min-heap." },
+      { "n": 3, "title": "Trim to k", "note": "If the heap holds more than k numbers, pop the smallest. It cannot be the kth largest." },
+      { "n": 4, "title": "Read the top", "note": "After the last number the heap holds the k biggest. Its top is the kth largest." }
+    ] },
+    { "id": "quick", "label": "Quickselect", "tsFn": "findKthLargest", "goFn": "findKthLargestQuick", "stages": [
+      { "n": 1, "title": "Find the target index", "note": "In ascending order the kth largest sits at index n - k. That is the spot to hit." },
+      { "n": 2, "title": "Partition", "note": "Pick a pivot and rearrange the live range around it. The pivot lands in its final sorted place." },
+      { "n": 3, "title": "Follow one side", "note": "If the pivot is left of the target, keep the right part. If right of it, keep the left part." },
+      { "n": 4, "title": "Done", "note": "When the pivot lands exactly on the target index, that value is the answer." }
+    ] }
+  ],
+  "goArgs": ["[]int", "int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One element", "input": "[1], k = 1", "output": "1", "why": "The heap holds one number and the top is the answer. Quickselect has target index 0 and stops at once." },
+    { "title": "k equals n", "input": "[4, 1, 3], k = 3", "output": "1", "why": "The kth largest is the minimum. Nothing is ever popped from the heap." },
+    { "title": "Duplicates count", "input": "[2, 2, 2], k = 3", "output": "2", "why": "Each 2 is its own entry in the ranking. Do not de-duplicate first." },
+    { "title": "Mixed digits", "input": "[10, 9, 100], k = 1", "output": "100", "why": "Numeric order, not string order. As strings, 9 would beat 100." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "nums.sort() without a comparator sorts as strings: [10, 9, 100] becomes [10, 100, 9]. Use nums.sort((a, b) => b - a). There is no built-in heap, so the shown file has a small one." },
+    { "lang": "General", "text": "Quickselect reorders the array. Copy it first if the caller still needs the original order. With many equal values a plain partition keeps one side huge, so the worst case is O(n^2)." },
+    { "lang": "Go", "text": "container/heap needs five methods: Len, Less, Swap, Push and Pop. Push and Pop touch the last item only, so call heap.Push(h, x) and heap.Pop(h). Pop returns any, so write heap.Pop(h).(int) when you use the value." },
+    { "lang": "Go", "text": "sort.Ints(nums) sorts in place and changes the caller's slice. Copy with append([]int(nil), nums...) first, as the quickselect version does." }
+  ],
+  "recap": {
+    "pattern": "Heap: kth largest with a min-heap",
+    "key": "Hold the k biggest in a min-heap. Push each number, pop when over k. The top is the kth largest.",
+    "complexity": "Heap: O(n log k) time, O(k) space. Quickselect: O(n) average.",
+    "moves": ["Push each number into a min-heap", "If size is over k, pop the smallest", "Return the top", "Alternative: quickselect toward index n - k"]
+  }
+}

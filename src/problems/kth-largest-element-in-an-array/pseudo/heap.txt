@@ -1,0 +1,7 @@
+findKthLargest(nums, k)
+  heap = empty min-heap                     # [1] smallest kept number on top
+  for x in nums
+    push x into heap                        # [2] every number goes in first
+    if size(heap) > k
+      pop the smallest from heap            # [3] it cannot be the kth largest
+  return top of heap                        # [4] the top is the kth largest

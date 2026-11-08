@@ -1,0 +1,29 @@
+class Twitter
+  clock = 0
+  tweets = map user -> list of (time, id), oldest first
+  follows = map user -> set of users
+
+  postTweet(user, id)
+    append (clock, id) to tweets[user]      # [1] the clock makes later tweets bigger
+    clock = clock + 1
+
+  follow(a, b)
+    add b to follows[a]                     # [2] a set, so repeats do nothing
+
+  unfollow(a, b)
+    remove b from follows[a]                # [2]
+
+  getNewsFeed(user)
+    heap = empty max-heap by time           # newest on top
+    people = {user} + follows[user]
+    for p in people
+      if tweets[p] is not empty
+        push the newest tweet of p into heap  # [3] only each person's newest can come first
+
+    feed = []
+    while heap is not empty and len(feed) < 10
+      top = pop the newest from heap        # [4] the next feed entry
+      append top.id to feed
+      if top has an older tweet by the same author
+        push that older tweet into heap     # [5] it is now that author's candidate
+    return feed

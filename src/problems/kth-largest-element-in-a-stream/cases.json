@@ -1,0 +1,9 @@
+[
+  {"name":"classic","input":[["KthLargest","add","add","add","add","add"],[[3,[4,5,8,2]],[3],[5],[10],[9],[4]]],"expected":[null,4,5,5,8,8]},
+  {"name":"k is 1, start empty","input":[["KthLargest","add","add","add"],[[1,[]],[-3],[-2],[-4]]],"expected":[null,-3,-2,-2],"edge":true},
+  {"name":"duplicates","input":[["KthLargest","add","add","add","add"],[[2,[5,5]],[5],[6],[1],[6]]],"expected":[null,5,5,5,6]},
+  {"name":"exactly k starting numbers, smaller add","input":[["KthLargest","add","add","add"],[[3,[1,2,3]],[0],[-1],[4]]],"expected":[null,1,1,2],"edge":true},
+  {"name":"negatives","input":[["KthLargest","add","add","add"],[[2,[-10,-5,-7]],[-6],[-20],[-1]]],"expected":[null,-6,-6,-5]},
+  {"name":"large values","input":[["KthLargest","add","add","add","add"],[[3,[10000,-10000,0]],[9999],[10000],[-10000],[5000]]],"expected":[null,0,9999,9999,9999]},
+  {"name":"one starting number, k = 2","input":[["KthLargest","add","add","add","add"],[[2,[1]],[7],[7],[3],[9]]],"expected":[null,1,7,7,7]}
+]

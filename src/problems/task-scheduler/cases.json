@@ -1,0 +1,11 @@
+[
+  {"name":"classic","input":[["A","A","A","B","B","B"],2],"expected":8},
+  {"name":"no cooldown","input":[["A","A","A","B","B","B"],0],"expected":6,"edge":true},
+  {"name":"one task type","input":[["A","A","A"],2],"expected":7,"edge":true},
+  {"name":"single task","input":[["A"],50],"expected":1,"edge":true},
+  {"name":"plenty of other tasks","input":[["A","A","B","C","D","E"],1],"expected":6},
+  {"name":"one dominant letter","input":[["A","A","A","A","A","A","B","C","D","E","F","G"],2],"expected":16},
+  {"name":"three tied letters","input":[["A","A","A","B","B","B","C","C","C"],1],"expected":9},
+  {"name":"big cooldown, many kinds","input":[["A","B","C","D","A","B","C","D"],6],"expected":11},
+  {"name":"uneven counts","input":[["A","A","A","A","B","B","C"],3],"expected":13}
+]

@@ -1,0 +1,71 @@
+{
+  "slug": "k-closest-points-to-origin",
+  "title": "K Closest Points to Origin",
+  "category": "Heap / Priority Queue",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of points on a plane, each as [x, y], and a number k. Return the k points closest to the origin (0, 0), using straight-line distance. The points may be returned in any order.",
+  "example": {
+    "caption": "k = 2. Squared distances are 18, 26, 20, 2 and 4. The two smallest belong to (1,1) and (0,2).",
+    "input": [{ "kind": "array", "label": "points, k = 2", "items": ["(3,3)", "(5,-1)", "(-2,4)", "(1,1)", "(0,2)"] }],
+    "output": [{ "kind": "array", "label": "the 2 closest", "items": ["(1,1)", "(0,2)"], "tones": ["hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Keep the k closest points seen so far in a max-heap by distance, so the farthest of them is on top and is the first one to throw out.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "max-heap", "plain": "A container where the biggest item is always on top. Here biggest means farthest from the origin." },
+      { "term": "squared distance", "plain": "x*x + y*y. It skips the square root. If a is closer than b, then its squared distance is smaller too, so the order is the same." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the points and k, e.g. [[3,3],[5,-1],[-2,4],[1,1],[0,2]], 2",
+    "presets": [
+      { "label": "Five points, k = 2", "args": [[[3, 3], [5, -1], [-2, 4], [1, 1], [0, 2]], 2] },
+      { "label": "Already in order", "args": [[[1, 0], [0, 2], [3, 3]], 2] },
+      { "label": "Same point twice", "args": [[[2, 2], [2, 2], [5, 5]], 2] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "number of points" },
+      { "sym": "k", "meaning": "how many points to return" }
+    ],
+    "compare": { "brute": "n2", "optimal": "nlogn", "bruteLabel": "Scan for the closest point k times (worst case k = n)", "optimalLabel": "Heap of size k, n log k (worst case k = n)", "unit": "comparisons, worst case k = n (the heap does better when k is small)" },
+    "rows": [
+      { "name": "Sort by distance", "time": "O(n log n)", "space": "O(n)", "note": "Simple, and fine for small inputs." },
+      { "name": "Max-heap of size k", "time": "O(n log k)", "space": "O(k)", "note": "Each point costs one push and at most one pop on a heap of at most k + 1 items." },
+      { "name": "Quickselect", "time": "O(n) average", "space": "O(1)", "note": "Partition around a pivot until the first k points are the closest. Not shown here." }
+    ],
+    "takeaway": "A heap of size k beats sorting when k is small, and it works on a stream where you never see all points at once."
+  },
+  "variants": [
+    { "id": "heap", "label": "Max-heap of size k", "tsFn": "kClosestDriver", "goFn": "kClosestDriver", "stages": [
+      { "n": 1, "title": "Squared distance", "note": "For each point compute x*x + y*y. No square root is needed to compare distances." },
+      { "n": 2, "title": "Push", "note": "Push the point into a max-heap keyed by that distance." },
+      { "n": 3, "title": "Evict the farthest", "note": "If the heap holds more than k points, pop the top. It is the farthest, so it cannot be in the answer." },
+      { "n": 4, "title": "Collect", "note": "After the last point the heap holds exactly the k closest. Return them." }
+    ] }
+  ],
+  "goArgs": ["[][]int", "int"],
+  "goRet": "[][]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "k equals n", "input": "[[1,1],[2,2]], k = 2", "output": "both points", "why": "Nothing is ever evicted. The heap just collects everything." },
+    { "title": "A point at the origin", "input": "[[0,0],[3,4]], k = 1", "output": "[[0,0]]", "why": "Its squared distance is 0, the smallest possible. No special case needed." },
+    { "title": "Equal distances", "input": "[[1,0],[0,1],[-1,0]], k = 2", "output": "any two of them", "why": "Three points tie at distance 1. Any two is a valid answer, so tests must not rely on which." },
+    { "title": "Negative coordinates", "input": "[[-3,-4],[2,1]], k = 1", "output": "[[2,1]]", "why": "Squaring removes the sign. (-3,-4) is at 25 and (2,1) at 5." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The heap must be a max-heap. A min-heap would put the closest point on top, which is the one you want to keep, not evict." },
+    { "lang": "General", "text": "Compare squared distances. Math.sqrt adds nothing and floating point could make two equal distances look different." },
+    { "lang": "TypeScript", "text": "Sorting numbers needs a comparator: [10, 9, 100].sort() is lexicographic and gives [10, 100, 9]. Use (a, b) => a - b. Heap order of equal distances is unspecified, so sort the output before comparing in tests." },
+    { "lang": "Go", "text": "container/heap needs five methods: Len, Less, Swap, Push and Pop. Make Less return h[i].d > h[j].d for a max-heap, and call heap.Push and heap.Pop rather than the methods. Pop returns any, so assert the type if you use it." }
+  ],
+  "recap": {
+    "pattern": "Heap: k smallest with a max-heap",
+    "key": "To keep the k smallest, hold them in a max-heap and evict the top whenever the size passes k.",
+    "complexity": "Time O(n log k). Space O(k).",
+    "moves": ["Squared distance for each point", "Push (distance, point) into a max-heap", "If size is over k, pop the farthest", "Return the points left in the heap"]
+  }
+}

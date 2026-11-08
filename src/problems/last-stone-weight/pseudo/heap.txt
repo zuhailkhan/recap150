@@ -1,0 +1,12 @@
+lastStoneWeight(stones)
+  heap = empty max-heap
+  for s in stones: push s into heap         # [1] put every stone in the heap
+
+  while size(heap) > 1
+    y = pop the largest                     # [2] the two heaviest stones
+    x = pop the largest
+    if y > x
+      push (y - x) into heap                # [3] the heavier one survives with the leftover
+
+  if heap is empty: return 0                # [4] zero or one stone remains
+  return top of heap

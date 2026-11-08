@@ -1,0 +1,18 @@
+leastInterval(tasks, n)
+  count = how many times each task appears                # [1] copies per task
+  ready = max-heap of (task, copies left)                 # [1] busiest task on top
+  cooling = empty queue of (task, back)                   # resting tasks, in the order they return
+  time = 0
+
+  while ready is not empty or cooling is not empty
+    time = time + 1
+    while cooling is not empty and cooling.front.back <= time
+      move cooling.front into ready                       # [2] a rested task may run again
+
+    if ready is not empty
+      task = pop the busiest from ready                   # [3] run it. If none is ready, this unit is idle
+      task.left = task.left - 1
+      if task.left > 0
+        add (task, time + n + 1) to cooling               # [4] it must rest n units before running again
+
+  return time                                             # [5] time units used, idle ones included

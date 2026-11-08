@@ -1,0 +1,74 @@
+{
+  "slug": "task-scheduler",
+  "title": "Task Scheduler",
+  "category": "Heap / Priority Queue",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of tasks, each a letter, and a cooldown n. One task runs per time unit, or the CPU may idle. Two runs of the same letter must have at least n other time units between them. Return the fewest time units needed to finish every task, idle units included.",
+  "example": {
+    "caption": "Tasks A A A B B B with n = 2. A B idle A B idle A B takes 8 time units. The two idle slots are forced by the cooldown.",
+    "input": [{ "kind": "array", "label": "tasks, n = 2", "items": ["A", "A", "A", "B", "B", "B"] }],
+    "output": [{ "kind": "array", "label": "schedule, 8 time units", "items": ["A", "B", "idle", "A", "B", "idle", "A", "B"], "tones": ["keep", "keep", "miss", "keep", "keep", "miss", "keep", "keep"] }]
+  },
+  "idea": {
+    "sentence": "Each time unit, run the ready task with the most copies left, then park it in a cooldown queue until it is allowed again.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "max-heap", "plain": "A container where the biggest item is always on top. Here biggest means the most copies left to run." },
+      { "term": "cooldown queue", "plain": "A waiting line of tasks that just ran. The first one in is the first one allowed back, because every task rests the same n units." },
+      { "term": "idle", "plain": "A time unit where nothing runs because every remaining task is still resting." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the task letters and the cooldown n, e.g. [\"A\",\"A\",\"A\",\"B\",\"B\",\"B\"], 2",
+    "presets": [
+      { "label": "A A A B B B, n = 2", "args": [["A", "A", "A", "B", "B", "B"], 2] },
+      { "label": "No cooldown", "args": [["A", "B", "C", "A"], 0] },
+      { "label": "One task, long wait", "args": [["A", "A", "A"], 2] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "number of tasks (letters)" },
+      { "sym": "m", "meaning": "number of different letters (at most 26)" }
+    ],
+    "compare": { "brute": "n2", "optimal": "nlogm", "bruteLabel": "Scan all letters for the busiest, every time unit", "optimalLabel": "Heap of at most 26 letters", "unit": "comparisons (rough; the heap's log is at most about 5)" },
+    "rows": [
+      { "name": "Scan for the busiest each unit", "time": "O(T * m)", "space": "O(m)", "note": "T is the total time units. Each unit looks at every letter." },
+      { "name": "Max-heap + cooldown queue", "time": "O(T log m)", "space": "O(m)", "note": "Each unit is one pop, and sometimes a push. With at most 26 letters this is close to linear." },
+      { "name": "Counting formula", "time": "O(n)", "space": "O(1)", "note": "(maxCount - 1) * (n + 1) + how many letters tie for maxCount, or the task count if that is larger. Fast, but it hides the schedule. Not shown here." }
+    ],
+    "takeaway": "Always run the busiest ready task, because it is the one that will force idle time if left for last. Resting tasks wait in a queue until they may run again."
+  },
+  "variants": [
+    { "id": "heap", "label": "Heap + cooldown queue", "tsFn": "leastInterval", "goFn": "leastInterval", "stages": [
+      { "n": 1, "title": "Count and heapify", "note": "Count how many times each letter appears and put the counts in a max-heap." },
+      { "n": 2, "title": "Wake rested tasks", "note": "At the start of each time unit, move every task whose rest is over from the queue back into the heap." },
+      { "n": 3, "title": "Run or idle", "note": "Pop the task with the most copies left and run it. If the heap is empty, this time unit is idle." },
+      { "n": 4, "title": "Cool down", "note": "If the task still has copies left, put it in the queue with the first time it may run again: now + n + 1." },
+      { "n": 5, "title": "Finish", "note": "When both the heap and the queue are empty, the clock shows the answer." }
+    ] }
+  ],
+  "goArgs": ["[]string", "int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "No cooldown", "input": "[A, A, B], n = 0", "output": "3", "why": "With n = 0 a task is back in the very next unit. The answer is just the number of tasks." },
+    { "title": "One task only", "input": "[A, A, A], n = 2", "output": "7", "why": "A idle idle A idle idle A. Idle units are counted, even though nothing else can fill them." },
+    { "title": "Plenty of other tasks", "input": "[A, A, B, C, D, E], n = 1", "output": "6", "why": "There is always something else to run during the cooldown, so no idle units. The answer is the task count." },
+    { "title": "Ties for the most", "input": "[A, A, A, B, B, B], n = 2", "output": "8", "why": "A and B tie for most copies. Both finish in the last round, so one slot fewer is idle than with a single leader." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "A task run at time T may run again at T + n + 1, not T + n. There are n other time units between the two runs. Off-by-one here is the classic bug." },
+    { "lang": "General", "text": "When the heap is empty but tasks are still resting, you must still advance the clock. Do not break out of the loop. Check both the heap and the queue." },
+    { "lang": "TypeScript", "text": "Array.shift() is O(length). The cooling queue holds at most 26 entries, so it is fine here. For a big queue, keep a head index instead. There is no built-in heap, so the shown file has a small one." },
+    { "lang": "Go", "text": "Ranging over a map gives a random order, so the heap is built in a different order each run. The answer does not change, because equal counts can run in either order. Tests must not depend on the schedule itself." },
+    { "lang": "Go", "text": "container/heap wants Len, Less, Swap, Push and Pop. Pop returns any, so write heap.Pop(ready).(*slot). Slicing the queue with cooling = cooling[1:] is fine for a short queue." }
+  ],
+  "recap": {
+    "pattern": "Heap + cooldown queue",
+    "key": "Each time unit run the ready task with most copies left. Park it in a queue for n units, then return it to the heap.",
+    "complexity": "Time O(T log m), T = time units, m <= 26. Space O(m).",
+    "moves": ["Count letters, push counts into a max-heap", "Each unit: wake tasks whose rest is over", "Pop the busiest and run it, or idle if none", "Park it until time + n + 1 if copies remain"]
+  }
+}

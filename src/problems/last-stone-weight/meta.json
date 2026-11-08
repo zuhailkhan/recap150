@@ -1,0 +1,68 @@
+{
+  "slug": "last-stone-weight",
+  "title": "Last Stone Weight",
+  "category": "Heap / Priority Queue",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You have a pile of stones with positive weights. Each round, take the two heaviest and smash them together. If they weigh the same, both vanish. Otherwise the lighter vanishes and the heavier keeps the difference. Repeat until at most one stone is left. Return its weight, or 0 if none remain.",
+  "example": {
+    "caption": "Stones 2, 7, 4, 1, 8, 1. The rounds are 8 and 7 (leaves 1), 4 and 2 (leaves 2), 2 and 1 (leaves 1), 1 and 1 (both vanish). One stone of weight 1 remains.",
+    "input": [{ "kind": "array", "label": "stones", "items": [2, 7, 4, 1, 8, 1] }],
+    "output": [{ "kind": "array", "label": "last stone weight", "items": [1], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "Each round needs the heaviest stone, and a max-heap gives it to you in log time even as new leftovers keep arriving.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "max-heap", "plain": "A container where the biggest item is always on top. Push and pop cost about log of its size." },
+      { "term": "priority queue", "plain": "The general name for a container that always hands out the best item first. A heap is the usual way to build one." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: an array of stone weights, e.g. [2,7,4,1,8,1]",
+    "presets": [
+      { "label": "Classic", "args": [[2, 7, 4, 1, 8, 1]] },
+      { "label": "Everything cancels", "args": [[3, 3, 5, 5]] },
+      { "label": "One chain", "args": [[9, 3, 2]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of stones" }],
+    "compare": { "brute": "n2", "optimal": "nlogn", "bruteLabel": "Sort or scan for the two heaviest each round", "optimalLabel": "Heap gives the heaviest in log n", "unit": "comparisons (rough)" },
+    "rows": [
+      { "name": "Re-sort every round", "time": "O(n^2 log n)", "space": "O(1)", "note": "Up to n rounds, each sorting the pile again." },
+      { "name": "Scan for the two heaviest", "time": "O(n^2)", "space": "O(1)", "note": "Up to n rounds, each a full scan." },
+      { "name": "Max-heap", "time": "O(n log n)", "space": "O(n)", "note": "Each round is two pops and at most one push, all log n." }
+    ],
+    "takeaway": "The pile changes every round, so sorting once is not enough. A heap keeps the heaviest reachable while the pile changes."
+  },
+  "variants": [
+    { "id": "heap", "label": "Max-heap", "tsFn": "lastStoneWeight", "goFn": "lastStoneWeight", "stages": [
+      { "n": 1, "title": "Build the heap", "note": "Push every stone into a max-heap." },
+      { "n": 2, "title": "Pop the two heaviest", "note": "While at least two stones remain, pop y (the heaviest) then x (the next)." },
+      { "n": 3, "title": "Smash", "note": "If y is heavier than x, push y - x back. If equal, push nothing." },
+      { "n": 4, "title": "Answer", "note": "At most one stone is left. Return its weight, or 0 if the heap is empty." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One stone", "input": "[7]", "output": "7", "why": "The loop needs two stones, so it never runs. Return the only one." },
+    { "title": "Two equal stones", "input": "[4, 4]", "output": "0", "why": "Both vanish and the heap is empty. Reading the top of an empty heap would be a bug, so check the size first." },
+    { "title": "Everything cancels", "input": "[3, 3, 5, 5]", "output": "0", "why": "5 and 5 vanish, then 3 and 3 vanish. Nothing is pushed back in either round." },
+    { "title": "Leftover is not the heaviest", "input": "[10, 4, 3]", "output": "3", "why": "10 - 4 = 6 goes back and is the heaviest again. 6 - 3 = 3 is the last stone." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Pop twice, but push back only when the two weights differ. Pushing a 0 leaves a stone that should not exist and gives wrong answers." },
+    { "lang": "TypeScript", "text": "JavaScript has no heap, so write a small one. Sorting each round with stones.sort() is both slow and, without a comparator, lexicographic: [10, 9, 100].sort() gives [10, 100, 9]." },
+    { "lang": "Go", "text": "container/heap is a min-heap by default. For a max-heap, make Less return h[i] > h[j]. The five methods are Len, Less, Swap, Push and Pop. Call heap.Push and heap.Pop, not the methods directly." },
+    { "lang": "Go", "text": "heap.Pop returns any, so write heap.Pop(h).(int). Without the assertion the arithmetic y - x will not compile." }
+  ],
+  "recap": {
+    "pattern": "Heap: always take the biggest",
+    "key": "Put the stones in a max-heap. Pop two, push back their difference if it is above 0, repeat.",
+    "complexity": "Time O(n log n). Space O(n).",
+    "moves": ["Push all stones into a max-heap", "While two or more remain, pop the two heaviest", "Push back y - x if y > x", "Return the top, or 0 if empty"]
+  }
+}

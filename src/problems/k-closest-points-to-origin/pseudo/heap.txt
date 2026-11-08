@@ -1,0 +1,9 @@
+kClosest(points, k)
+  heap = empty max-heap keyed by squared distance   # farthest kept point on top
+  for p in points
+    d = p.x * p.x + p.y * p.y               # [1] squared distance, no square root
+    push (d, p) into heap                   # [2] keep it for now
+    if size(heap) > k
+      pop the farthest from heap            # [3] it cannot be in the answer
+
+  return the points left in heap            # [4] exactly the k closest
