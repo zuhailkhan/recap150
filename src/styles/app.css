@@ -89,7 +89,7 @@
   --hit-bg: #0e3a2c;   --hit-fg: #6fe3b4;   --hit-bd: #2db885;
   --miss-bg: #471522;  --miss-fg: #ff8d9b;  --miss-bd: #e04a60;
   --dim-bg: #1b2531;   --dim-fg: #6c7b8a;   --dim-bd: #2b394a;
-  --tile-bg: #1a2635;  --tile-fg: #e6ecf2;  --tile-bd: #3b4e66; --tile-edge: #070b10;
+  --tile-bg: #1a2635;  --tile-fg: #e6ecf2;  --tile-bd: #3b4e66; --tile-edge: #2a3a4f;
   --shadow: none;
   color-scheme: dark;
   position: relative;
@@ -148,7 +148,7 @@ kbd { background: var(--surface); border: 1px solid var(--line); border-bottom-w
 .badge.sm { min-width: 19px; height: 19px; font-size: .68rem; padding: 0 4px; vertical-align: 1px; margin: 0 2px; border-radius: 5px; }
 
 /* ---------- the visual language: tiles ---------- */
-.tile { display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0 10px; background: var(--tile-bg); color: var(--tile-fg); border: 1.5px solid var(--tile-bd); border-bottom-width: 3px; border-bottom-color: var(--tile-edge); border-radius: 9px; font: 600 1rem var(--font-mono); font-variant-numeric: tabular-nums; transition: background .18s, border-color .18s, color .18s; white-space: pre; }
+.tile { display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0 10px; background: var(--tile-bg); color: var(--tile-fg); border: 1.5px solid var(--tile-bd); border-bottom-width: 2px; border-bottom-color: var(--tile-edge); border-radius: 9px; font: 600 1rem var(--font-mono); font-variant-numeric: tabular-nums; transition: background .18s, border-color .18s, color .18s; white-space: pre; }
 .tile.small { min-width: 34px; min-height: 34px; font-size: .88rem; padding: 0 8px; border-radius: 8px; }
 .tone-focus { background: var(--focus-bg); color: var(--focus-fg); border-color: var(--focus-bd); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-bd) 22%, transparent); }
 .tone-keep { background: var(--keep-bg); color: var(--keep-fg); border-color: var(--keep-bd); }

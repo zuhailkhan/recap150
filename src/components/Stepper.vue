@@ -167,7 +167,7 @@ input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 20p
 input[type='range']::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--ink); border: 3px solid #0c121a; box-shadow: 0 0 0 1.5px var(--ink); }
 
 @media (min-width: 1000px) {
-  .stepper { grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr); }
+  .stepper { grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr); grid-template-rows: auto 1fr auto; }
   .viz { grid-row: 1 / span 2; grid-column: 1; padding: 24px 26px 28px; border-right: 1px solid var(--line); }
   .say-area { grid-row: 1; grid-column: 2; border-top: 0; padding: 24px 24px 12px; }
   .more { grid-row: 2; grid-column: 2; border-top: 0; padding: 4px 24px 24px; align-content: start; }
