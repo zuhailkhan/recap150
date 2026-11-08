@@ -20,4 +20,9 @@ defineProps<{ p: DpPanel }>()
 th { font: 600 .75rem var(--font-mono); color: var(--ink-2); padding: 0 4px; text-align: center; }
 td { padding: 0; }
 .tile { min-width: 38px; }
+@media (max-width: 480px) {
+  .dp { border-spacing: 2px; }
+  .tile { min-width: 30px; min-height: 34px; padding: 0 3px; font-size: .82rem; border-radius: 8px; }
+  th { padding: 0 2px; font-size: .68rem; }
+}
 </style>

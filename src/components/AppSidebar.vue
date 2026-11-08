@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { categoryList, metas } from '@/data/problems'
 import { progress } from '@/recap/store'
-import { isMastered } from '@/recap/sm2'
+import { dayNumber, isDue, isMastered, isWeak } from '@/recap/sm2'
 
 const emit = defineEmits<{ navigate: [] }>()
 const route = useRoute()
@@ -15,7 +15,27 @@ const currentCat = computed(() => {
 })
 watch(currentCat, (c) => { if (c) open.value.add(c) }, { immediate: true })
 
+const query = ref('')
+const filter = ref<'all' | 'written' | 'due' | 'weak' | 'todo'>('all')
+const searching = computed(() => query.value.trim() !== '' || filter.value !== 'all')
+
+function keep(e: { slug: string; title: string; category: string; status: string }): boolean {
+  const q = query.value.trim().toLowerCase()
+  if (q && !(e.title.toLowerCase().includes(q) || e.category.toLowerCase().includes(q) || e.slug.includes(q))) return false
+  const card = progress.cards.get(e.slug)
+  switch (filter.value) {
+    case 'written': return e.status === 'ready'
+    case 'todo': return e.status !== 'ready'
+    case 'due': return !!card && isDue(card, dayNumber(Date.now()))
+    case 'weak': return !!card && isWeak(card)
+    default: return true
+  }
+}
+const shown = computed(() => categoryList.map((c) => ({ ...c, entries: c.entries.filter((e) => keep({ ...e, category: c.name })) })).filter((c) => c.entries.length))
+const matchCount = computed(() => shown.value.reduce((n, c) => n + c.entries.length, 0))
+
 function onToggle(name: string, e: Event) {
+  if (searching.value) return
   if ((e.target as HTMLDetailsElement).open) open.value.add(name)
   else open.value.delete(name)
 }
@@ -36,10 +56,19 @@ const dotLabel = { new: 'not reviewed yet', learning: 'in review', mastered: 'ma
         <router-link class="nav" to="/settings" @click="emit('navigate')">Backup</router-link>
       </div>
     </div>
+    <div class="find">
+      <label class="sr-only" for="sb-q">Search problems</label>
+      <input id="sb-q" v-model="query" type="search" placeholder="Search problems" autocomplete="off" spellcheck="false" />
+      <label class="sr-only" for="sb-f">Filter</label>
+      <select id="sb-f" v-model="filter">
+        <option value="all">All problems</option><option value="written">Written</option><option value="due">Due today</option><option value="weak">Weak spots</option><option value="todo">Not written yet</option>
+      </select>
+      <p v-if="searching" class="muted small count" role="status">{{ matchCount }} match{{ matchCount === 1 ? '' : 'es' }}</p>
+    </div>
     <ul class="cats">
-      <li v-for="c in categoryList" :key="c.name">
-        <details :open="open.has(c.name)" @toggle="onToggle(c.name, $event)">
-          <summary><span class="cn">{{ c.name }}</span><span class="ct">{{ c.ready }}/{{ c.entries.length }}</span></summary>
+      <li v-for="c in shown" :key="c.name">
+        <details :open="searching || open.has(c.name)" @toggle="onToggle(c.name, $event)">
+          <summary><span class="cn">{{ c.name }}</span><span class="ct">{{ searching ? c.entries.length : c.ready + '/' + c.entries.length }}</span></summary>
           <ul class="probs">
             <li v-for="p in c.entries" :key="p.slug">
               <router-link v-if="p.status !== 'todo'" class="prob" :to="`/p/${p.slug}`" @click="emit('navigate')">
@@ -68,6 +97,9 @@ const dotLabel = { new: 'not reviewed yet', learning: 'in review', mastered: 'ma
 .nav:hover { background: var(--surface-2); }
 .nav.router-link-exact-active { background: var(--accent-soft); }
 .cats, .probs { list-style: none; margin: 0; padding: 0; }
+.find { display: grid; gap: 6px; padding: 4px 12px 8px; }
+.find input, .find select { min-height: 44px; padding: 0 12px; font: .95rem var(--font-body); color: var(--ink); background: var(--bg); border: 1.5px solid var(--line); border-radius: 10px; width: 100%; }
+.count { margin: 0; padding: 0 4px; }
 .cats { padding: 4px 8px 24px; }
 summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 10px; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: .92rem; list-style: none; }
 summary::-webkit-details-marker { display: none; }

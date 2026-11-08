@@ -6,7 +6,7 @@ export function stagesIn(code: string): number[] {
   for (const line of code.split('\n')) {
     const at = findComment(line)
     if (at < 0) continue
-    for (const m of line.slice(at).matchAll(/\[(\d+)\]/g)) found.add(Number(m[1]))
+    for (const m of line.slice(at).matchAll(/(?<![\w\])])\[([1-9]\d*)\]/g)) found.add(Number(m[1])) // a standalone [n], not dp[2] or a[0]
   }
   return [...found].sort((a, b) => a - b)
 }

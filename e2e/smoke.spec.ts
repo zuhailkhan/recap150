@@ -86,3 +86,17 @@ test('phone: navigation drawer opens and closes', async ({ page }) => {
   await page.keyboard.press('Escape')
   await expect(page.getByRole('navigation', { name: 'Problems' })).toBeHidden()
 })
+
+test('sidebar search and filter narrow the problem list', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('./#/')
+  const nav = page.getByRole('navigation', { name: 'Problems' })
+  await nav.getByLabel('Search problems').fill('two sum')
+  await expect(nav.getByRole('link', { name: /Two Sum/ }).first()).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'Valid Parentheses' })).toHaveCount(0)
+  await nav.getByLabel('Search problems').fill('zzzz-no-such')
+  await expect(nav.getByText('0 matches')).toBeVisible()
+  await nav.getByLabel('Search problems').fill('')
+  await nav.getByLabel('Filter').selectOption('todo')
+  await expect(nav.getByRole('link', { name: 'Valid Parentheses' })).toHaveCount(0)
+})

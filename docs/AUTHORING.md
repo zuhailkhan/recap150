@@ -346,6 +346,10 @@ More lessons (from trees, graphs, heaps, tries and backtracking):
 - Variant `label` is at most 24 characters and each `recap.moves` entry at most 120.
 - If the answer is a set in no fixed order, either use a compare mode that sorts, or have the driver return a canonical order.
 
+- Stage markers are standalone `[n]` with n >= 1 inside a comment. `dp[2]` or `a[0]` in a comment is ignored, so you can write array indexing in comments.
+- A Demo root element must not use the class `hd` (the explainer page styles it). Prefer a short unique prefix for your demo classes.
+- Files must be LF, not CRLF (Python `open()` on Windows can rewrite them). The repo has a `.gitattributes` for this.
+
 ## Drafts
 
 If you cannot finish a problem to the standard, leave it as a draft: `meta.json` containing only

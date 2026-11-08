@@ -18,7 +18,7 @@ const digits = (v: number) => (v >>> 0).toString(2).padStart(w.value, '0').slice
 
 <style scoped>
 .bv { display: grid; gap: 8px; }
-.row { display: flex; align-items: center; gap: 8px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .lab { min-width: 48px; font: 700 .85rem var(--font-mono); }
 .digits { display: flex; gap: 2px; }
 .bit { min-width: 24px; min-height: 30px; padding: 0 2px; font-size: .85rem; border-width: 1.5px; }

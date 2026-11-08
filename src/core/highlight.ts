@@ -8,7 +8,7 @@ const KEYWORDS: Record<Lang, string> = {
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-const badges = (s: string) => s.replace(/\[(\d+)\]/g, '<span class="badge sm">$1</span>')
+const badges = (s: string) => s.replace(/(?<![\w\])])\[([1-9]\d*)\]/g, '<span class="badge sm">$1</span>')
 
 export function highlight(code: string, lang: Lang): string {
   const kw = KEYWORDS[lang].split(' ').join('|')
