@@ -1,0 +1,12 @@
+[
+  {"name":"classic","input":[[2,3,-2,4]],"expected":6},
+  {"name":"zero splits","input":[[-2,0,-1]],"expected":0},
+  {"name":"single negative","input":[[-2]],"expected":-2,"edge":true},
+  {"name":"two negatives flip","input":[[-2,3,-4]],"expected":24},
+  {"name":"zero then positive","input":[[0,2]],"expected":2,"edge":true},
+  {"name":"four negatives","input":[[2,-5,-2,-4,3]],"expected":24},
+  {"name":"all negative odd","input":[[-2,-3,-4]],"expected":12},
+  {"name":"all positive","input":[[1,2,3,4,5]],"expected":120},
+  {"name":"negative then positive","input":[[3,-1,4]],"expected":4},
+  {"name":"only zeros","input":[[0,0]],"expected":0,"edge":true}
+]

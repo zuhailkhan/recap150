@@ -1,0 +1,71 @@
+{
+  "slug": "longest-palindromic-substring",
+  "title": "Longest Palindromic Substring",
+  "category": "1-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a string. Find its longest substring (a block of consecutive letters) that reads the same forwards and backwards. If several blocks tie for longest, any one of them is accepted.",
+  "example": {
+    "caption": "In babad, bab and aba both work. Either one is a correct answer.",
+    "input": [{ "kind": "array", "label": "s", "items": ["b", "a", "b", "a", "d"] }],
+    "output": [{ "kind": "array", "label": "one valid answer: bab", "items": ["b", "a", "b", "a", "d"], "tones": ["hit", "hit", "hit", null, null], "pointers": [{ "name": "l", "at": 0 }, { "name": "r", "at": 2 }] }]
+  },
+  "idea": {
+    "sentence": "Every palindrome mirrors around a centre, so try each letter and each gap between letters as a centre and grow outward while the two ends match.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "palindrome", "plain": "Text that reads the same left to right and right to left." },
+      { "term": "substring", "plain": "A run of consecutive letters. Unlike a subsequence, you cannot skip letters." },
+      { "term": "centre", "plain": "The middle of a palindrome. A letter if its length is odd, the gap between two letters if it is even." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One lowercase string, e.g. \"babad\"",
+    "presets": [
+      { "label": "Odd answer", "args": ["babad"] },
+      { "label": "Even answer", "args": ["cbbd"] },
+      { "label": "No repeats", "args": ["abcd"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of the string" }],
+    "compare": { "brute": "n3", "optimal": "n2", "bruteLabel": "Check every substring", "optimalLabel": "Grow around each centre", "unit": "letter comparisons (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n³)", "space": "O(1)", "note": "n² substrings, each checked in up to n steps." },
+      { "name": "Expand around centres", "time": "O(n²)", "space": "O(1)", "note": "2n - 1 centres, each can grow up to n / 2 steps. No table needed." },
+      { "name": "DP table (n × n)", "time": "O(n²)", "space": "O(n²)", "note": "isPal[i][j] is true when s[i] = s[j] and the inside is a palindrome. Same time, more memory." },
+      { "name": "Manacher", "time": "O(n)", "space": "O(n)", "note": "Reuses mirror information between centres. Worth knowing, rarely asked." }
+    ],
+    "takeaway": "A palindrome's inside is a smaller palindrome. Growing from the middle uses that without any table."
+  },
+  "variants": [
+    { "id": "expand", "label": "Expand around centres", "tsFn": "longestPalindromeDriver", "goFn": "longestPalindromeDriver", "stages": [
+      { "n": 1, "title": "Nothing yet", "note": "Remember the start and length of the best palindrome. Both begin at zero." },
+      { "n": 2, "title": "Grow outward", "note": "From a centre, while the letters at l and r match, the window is a palindrome. Step both outward." },
+      { "n": 3, "title": "Compare with the best", "note": "The growth stopped. Its window is the longest palindrome at this centre. Keep it if it is longer than the best." },
+      { "n": 4, "title": "Answer", "note": "After all centres, cut out the best window." }
+    ] }
+  ],
+  "goArgs": ["string"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Even-length palindrome", "input": "\"cbbd\"", "output": "bb", "why": "Its centre sits between two letters. Trying only letter centres would find just single letters." },
+    { "title": "Single letter", "input": "\"a\"", "output": "a", "why": "A lone letter is a palindrome of length 1. The odd centre finds it with no growth." },
+    { "title": "No repeated letters", "input": "\"abcd\"", "output": "any one letter", "why": "Every answer has length 1 and all four tie. This is why tests check the length and the palindrome, not one exact string." },
+    { "title": "Whole string", "input": "\"racecar\"", "output": "racecar", "why": "The centre at index 3 grows until both pointers fall off the string. The bounds check stops it." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Test both centre kinds. Odd centres start with l = r = c. Even centres start with l = c and r = c + 1." },
+    { "lang": "General", "text": "After the loop, l and r are one step too far. The palindrome is s[l + 1 .. r - 1], and its length is r - l - 1." },
+    { "lang": "TypeScript", "text": "Check the bounds before reading s[l] and s[r]. s[-1] is undefined, not an error, so a missing check can quietly give wrong answers." },
+    { "lang": "Go", "text": "s[i] is a byte, not a character. This is fine for ASCII, but for text with accents or emoji, convert to []rune first." },
+    { "lang": "Go", "text": "Slicing a string with s[a:b] copies nothing. It is cheap, but you must not go past len(s)." }
+  ],
+  "recap": {
+    "pattern": "Expand around centres",
+    "key": "Every palindrome has a centre. From each of the 2n - 1 centres, grow outward while the ends match and remember the longest.",
+    "complexity": "Time O(n²). Space O(1).",
+    "moves": ["For each index c, try an odd centre (c, c) and an even centre (c, c + 1)", "Grow while l >= 0, r < n and s[l] == s[r]", "The window s[l + 1 .. r - 1] is this centre's best; keep it if longer", "Return the longest window"]
+  }
+}

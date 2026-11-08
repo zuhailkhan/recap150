@@ -1,0 +1,12 @@
+function longestPalindrome(s)
+  start = 0, length = 0                 # [1] best palindrome so far: s[start .. start+length-1]
+  for c from 0 to length(s) - 1
+    for w in [0, 1]                     # 0 = odd centre on c, 1 = even centre between c and c+1
+      l = c, r = c + w
+      while l >= 0 and r < length(s) and s[l] == s[r]   # [2] ends match: a palindrome
+        l = l - 1                       # [2] grow outward
+        r = r + 1
+      size = r - l - 1                  # [3] longest palindrome at this centre
+      if size > length                  # [3] keep it only if it beats the best
+        start = l + 1, length = size
+  return s[start .. start+length-1]     # [4] the best window

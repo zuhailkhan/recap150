@@ -1,0 +1,68 @@
+{
+  "slug": "climbing-stairs",
+  "title": "Climbing Stairs",
+  "category": "1-D Dynamic Programming",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "A staircase has n steps. Each move climbs either 1 step or 2 steps. Count the different sequences of moves that take you from the ground to the top step exactly. n is at least 1.",
+  "example": {
+    "caption": "With 4 steps there are 5 ways: 1111, 112, 121, 211 and 22. The table builds that count one step at a time.",
+    "input": [{ "kind": "array", "label": "n", "items": [4] }],
+    "output": [{ "kind": "dp", "label": "dp[i] = ways to reach step i", "cells": [[1, 1, 2, 3, 5]], "colLabels": [0, 1, 2, 3, 4], "tones": [[null, "keep", "keep", "focus", "hit"]] }]
+  },
+  "idea": {
+    "sentence": "Let dp[i] be the number of ways to reach step i. Your last move came from step i - 1 or step i - 2, so dp[i] = dp[i - 1] + dp[i - 2].",
+    "demo": "custom",
+    "jargon": [
+      { "term": "dynamic programming", "plain": "Solve small versions first, store each answer in a table, and build each new answer from stored ones." },
+      { "term": "state", "plain": "What one table cell stands for. Here: the number of ways to reach step i." },
+      { "term": "recurrence", "plain": "The rule that says how a cell is computed from earlier cells." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One number: how many steps, e.g. 5",
+    "presets": [
+      { "label": "5 steps", "args": [5] },
+      { "label": "2 steps", "args": [2] },
+      { "label": "8 steps", "args": [8] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of steps in the staircase" }],
+    "compare": { "brute": "2n", "optimal": "n", "bruteLabel": "Try every move sequence", "optimalLabel": "Fill a table once", "unit": "calls (rough; the real brute force grows like 1.6^n, which 2n stands in for)" },
+    "rows": [
+      { "name": "Plain recursion", "time": "O(2^n)", "space": "O(n)", "note": "Each call splits into two calls and the same step is solved again and again." },
+      { "name": "DP table", "time": "O(n)", "space": "O(n)", "note": "Each step is solved once, from the two cells before it." },
+      { "name": "Two variables", "time": "O(n)", "space": "O(1)", "note": "dp[i] only reads the two previous cells, so keep just those two numbers." }
+    ],
+    "takeaway": "The two-variable form is where this ends up, but the table is the easiest way to see why it works."
+  },
+  "variants": [
+    { "id": "table", "label": "DP table", "tsFn": "climbStairs", "goFn": "climbStairs", "stages": [
+      { "n": 1, "title": "Base cells", "note": "dp has n + 1 cells. The ground and step 1 each have exactly one way." },
+      { "n": 2, "title": "Fill a cell", "note": "dp[i] is dp[i - 1] plus dp[i - 2]: arrive by a 1-step or by a 2-step." },
+      { "n": 3, "title": "Read the answer", "note": "The last cell, dp[n], is the number of ways to reach the top." }
+    ] }
+  ],
+  "goArgs": ["int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One step", "input": "1", "output": "1", "why": "The table still needs two cells (index 0 and 1), so dp[1] must exist. That is why it has n + 1 cells." },
+    { "title": "Two steps", "input": "2", "output": "2", "why": "1+1 and 2. This is the first cell the recurrence computes: dp[2] = 1 + 1." },
+    { "title": "Counts grow like Fibonacci", "input": "45", "output": "1836311903", "why": "This already passes 2^30. It is fine in a 64-bit int, but a 32-bit int would overflow soon after." },
+    { "title": "Table size", "input": "3", "output": "3", "why": "dp = [1, 1, 2, 3]. Using n cells instead of n + 1 makes dp[n] fall off the end." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Allocate n + 1 cells. The ground is index 0, so the top step n is index n. n cells means an off-by-one read." },
+    { "lang": "TypeScript", "text": "new Array(n + 1) is full of holes. Use .fill(0) so every cell is a real number before you read it." },
+    { "lang": "TypeScript", "text": "JS numbers are exact only up to 2^53 - 1. The count at n = 78 is already past that, so use BigInt if n can be that large." },
+    { "lang": "Go", "text": "make([]int, n+1) gives zeros, so you only set the base cells. int is 64-bit on 64-bit machines, but its size depends on the platform." }
+  ],
+  "recap": {
+    "pattern": "1-D DP: last move decides the cell",
+    "key": "dp[i] = ways to reach step i. It equals dp[i - 1] + dp[i - 2], because the last move was a 1-step or a 2-step.",
+    "complexity": "Time O(n). Space O(n), or O(1) with two variables.",
+    "moves": ["Cell meaning: dp[i] = ways to reach step i", "Base: dp[0] = 1 and dp[1] = 1", "Fill left to right: dp[i] = dp[i - 1] + dp[i - 2]", "Answer is dp[n]"]
+  }
+}

@@ -1,0 +1,10 @@
+[
+  {"name":"classic","input":[[1,2,3,1]],"expected":4},
+  {"name":"skip over","input":[[2,7,9,3,1]],"expected":12},
+  {"name":"single house","input":[[5]],"expected":5,"edge":true},
+  {"name":"two houses","input":[[3,9]],"expected":9,"edge":true},
+  {"name":"all zeros","input":[[0,0,0]],"expected":0},
+  {"name":"take every other","input":[[2,1,1,2]],"expected":4},
+  {"name":"greedy trap","input":[[2,10,3,10,2]],"expected":20},
+  {"name":"long alternate","input":[[6,1,6,1,6,1,6,1,6,1,6]],"expected":36}
+]

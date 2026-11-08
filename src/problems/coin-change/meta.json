@@ -1,0 +1,70 @@
+{
+  "slug": "coin-change",
+  "title": "Coin Change",
+  "category": "1-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You have coins of several values and as many of each as you like. Given a target amount, find the fewest coins that add up to exactly that amount. If no mix of coins can make it, return -1. Making amount 0 takes 0 coins.",
+  "example": {
+    "caption": "With coins 1, 2 and 5, amount 11 is 5 + 5 + 1, which is 3 coins.",
+    "input": [{ "kind": "array", "label": "coins", "items": [1, 2, 5] }, { "kind": "array", "label": "amount", "items": [11] }],
+    "output": [{ "kind": "dp", "label": "dp[a] = fewest coins to make a", "cells": [[0, 1, 1, 2, 2, 1, 2, 2, 3, 3, 2, 3]], "colLabels": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], "tones": [[null, null, null, null, null, null, null, null, null, null, null, "hit"]] }]
+  },
+  "idea": {
+    "sentence": "dp[a] is the fewest coins that make amount a. Try each coin as the last one, so dp[a] = 1 + the smallest dp[a - coin] over the coins that fit.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "dynamic programming", "plain": "Fill a table of small answers from the smallest case up, each cell built from cells already filled." },
+      { "term": "sentinel", "plain": "A stand-in value for \"not possible\". Here it is infinity, so a real count always beats it in a min." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the coin list, then the amount, e.g. [1,2,5], 11",
+    "presets": [
+      { "label": "Classic", "args": [[1, 2, 5], 11] },
+      { "label": "Greedy fails", "args": [[1, 3, 4], 6] },
+      { "label": "Impossible", "args": [[2], 3] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "the target amount" },
+      { "sym": "k", "meaning": "number of coin values" }
+    ],
+    "compare": { "brute": "2n", "optimal": "nk", "bruteLabel": "Try every coin sequence", "optimalLabel": "One table cell per amount, one lookup per coin", "unit": "coin choices tried (rough; brute is exponential, 2n is the closest curve)" },
+    "rows": [
+      { "name": "Brute force recursion", "time": "O(k^n)", "space": "O(n)", "note": "Tries every coin at every step and solves the same leftover amount many times." },
+      { "name": "dp table (bottom-up)", "time": "O(n · k)", "space": "O(n)", "note": "Each of the n + 1 cells tries up to k coins and reads one earlier cell per coin." }
+    ],
+    "takeaway": "The leftover after the last coin is a smaller amount you already solved, so each cell is just a min over a few earlier cells."
+  },
+  "variants": [
+    { "id": "table", "label": "dp table", "tsFn": "coinChange", "goFn": "coinChange", "stages": [
+      { "n": 1, "title": "Table of infinity", "note": "dp[0] = 0. Every other amount starts as infinity, meaning no way found yet." },
+      { "n": 2, "title": "Try each coin last", "note": "For amount a, each coin c that fits offers dp[a - c] + 1. Keep the smallest." },
+      { "n": 3, "title": "Answer or -1", "note": "dp[amount] is the answer. If it is still infinity, return -1." }
+    ] }
+  ],
+  "goArgs": ["[]int", "int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Amount zero", "input": "[1], 0", "output": "0", "why": "dp[0] = 0 is the base case. The loop never runs and the answer is already there." },
+    { "title": "Coin bigger than the amount", "input": "[5, 10], 3", "output": "-1", "why": "No coin fits, so dp[3] stays infinity. The c <= a check also keeps the index a - c from going negative." },
+    { "title": "Greedy takes too many", "input": "[1, 3, 4], 6", "output": "2", "why": "Taking the biggest coin first gives 4 + 1 + 1 = 3 coins. The table tries every last coin and finds 3 + 3." },
+    { "title": "No exact mix", "input": "[3, 7], 11", "output": "-1", "why": "Every coin fits but no sum lands on 11. Cells reading an infinity stay infinity." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The table needs amount + 1 cells so that index amount exists. Cell 0 is the base case and the only one that starts at 0." },
+    { "lang": "General", "text": "Skip a coin when c > a. Otherwise a - c is negative and reads outside the table." },
+    { "lang": "TypeScript", "text": "Infinity + 1 is still Infinity, so unreachable cells stay unreachable inside Math.min. Check for Infinity at the end and return -1. Infinity also cannot be sent through JSON, so the panels show the string \"inf\"." },
+    { "lang": "Go", "text": "Do not use math.MaxInt as the sentinel. dp[a-c]+1 then overflows to the most negative number and wins every min. Use amount + 1: no real answer needs that many coins, and adding 1 is safe." },
+    { "lang": "Go", "text": "Go has a built-in min since 1.21. On older versions, write a small helper. The signature differs from math.Min, which takes floats." }
+  ],
+  "recap": {
+    "pattern": "1-D DP: min over the last choice",
+    "key": "dp[a] = 1 + min(dp[a - c]) over coins c <= a, with dp[0] = 0 and infinity for unreachable amounts.",
+    "complexity": "Time O(amount · coins). Space O(amount).",
+    "moves": ["dp[0] = 0, every other cell is infinity", "For each amount a from 1 up", "Try each coin c <= a: dp[a] = min(dp[a], dp[a - c] + 1)", "Answer is dp[amount], or -1 if it is still infinity"]
+  }
+}

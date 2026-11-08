@@ -1,0 +1,10 @@
+function rob(nums)
+  n = length(nums)
+  if n == 0: return 0
+  dp = array of n + 1 zeros             # [1] dp[i] = most loot from the first i houses
+  dp[1] = nums[0]                       # [1] one house: take it
+  for i from 2 to n
+    skip = dp[i - 1]                    # [2] skip house i
+    take = dp[i - 2] + nums[i - 1]      # [2] rob house i, so its neighbour is skipped
+    dp[i] = max(skip, take)             # [2] the better choice
+  return dp[n]                          # [3] best over all houses

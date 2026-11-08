@@ -1,0 +1,68 @@
+{
+  "slug": "maximum-product-subarray",
+  "title": "Maximum Product Subarray",
+  "category": "1-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of integers that may include negatives and zeros. A subarray is a run of neighbouring elements. Find the largest product you can get by multiplying all the numbers of one non-empty subarray, and return that product.",
+  "example": {
+    "caption": "The subarray [2, 3] multiplies to 6, the best of all runs. Including -2 would make it negative.",
+    "input": [{ "kind": "array", "label": "nums", "items": [2, 3, -2, 4] }],
+    "output": [{ "kind": "array", "label": "nums", "items": [2, 3, -2, 4], "tones": ["hit", "hit", null, null] }]
+  },
+  "idea": {
+    "sentence": "Track both the biggest and the smallest product of a subarray ending at i, because multiplying by a negative number turns the smallest into the biggest.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "subarray", "plain": "A run of neighbouring elements. Unlike a subsequence, you cannot skip any in the middle." },
+      { "term": "dynamic programming", "plain": "Build each answer from the answer just before it, stored in a table." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of integers, e.g. [2,3,-2,4]",
+    "presets": [
+      { "label": "Classic", "args": [[2, 3, -2, 4]] },
+      { "label": "Negative flips", "args": [[-2, 3, -4]] },
+      { "label": "Zero resets", "args": [[-2, 0, -1]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of integers in the list" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Multiply every subarray", "optimalLabel": "One pass with two cells per index", "unit": "multiplications (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n²)", "space": "O(1)", "note": "Start at every index and keep multiplying to the right, tracking the biggest." },
+      { "name": "hi and lo tables", "time": "O(n)", "space": "O(n)", "note": "Two cells per index, each built from the two cells just before it." },
+      { "name": "Two running variables", "time": "O(n)", "space": "O(1)", "note": "Only the previous hi and lo are read, so keep two numbers instead of two arrays." }
+    ],
+    "takeaway": "A running best is not enough. A very negative product is dangerous to drop, since one more negative makes it the winner."
+  },
+  "variants": [
+    { "id": "table", "label": "hi and lo tables", "tsFn": "maxProduct", "goFn": "maxProduct", "stages": [
+      { "n": 1, "title": "First cell", "note": "A subarray of one number is that number, so hi[0] and lo[0] are both nums[0]." },
+      { "n": 2, "title": "Biggest ending here", "note": "hi[i] is the biggest of x alone, x times the old hi, and x times the old lo." },
+      { "n": 3, "title": "Smallest ending here", "note": "lo[i] is the smallest of the same three. It is kept because a later negative can flip it." },
+      { "n": 4, "title": "Answer", "note": "The best subarray ends at some index, so the answer is the biggest hi in the table." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Single negative", "input": "[-2]", "output": "-2", "why": "The subarray must be non-empty, so the answer can be negative. Start best at nums[0], not at 0." },
+    { "title": "Two negatives cancel", "input": "[-2, 3, -4]", "output": "24", "why": "hi alone would give 3. The old lo of -6, times -4, becomes 24." },
+    { "title": "Zero cuts the run", "input": "[-2, 0, -1]", "output": "0", "why": "Zero times anything is zero, but x alone is always a candidate, so the next element starts fresh." },
+    { "title": "Only zeros", "input": "[0, 0]", "output": "0", "why": "Every product is 0. The answer 0 comes from the table, not from a default." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Keeping only a running max is the classic bug. After [-2, 3, -4] the max chain would be 3, but the answer is 24 because of the -6 you threw away." },
+    { "lang": "General", "text": "Include x alone as a candidate. That is how a zero, or a long bad run, resets the subarray." },
+    { "lang": "TypeScript", "text": "Multiplying 0 by a negative gives -0, and Math.min can return it. It compares equal to 0 with ===, so answers are fine, but Object.is(-0, 0) is false." },
+    { "lang": "Go", "text": "Products overflow int past about 9.2e18. The usual limits keep this safe. For long inputs of large numbers, use math/big or compare in log space." }
+  ],
+  "recap": {
+    "pattern": "1-D DP: track max and min",
+    "key": "hi[i] and lo[i] are the biggest and smallest product ending at i. Each is the max or min of x, x times old hi, x times old lo.",
+    "complexity": "Time O(n). Space O(n), or O(1) with two variables.",
+    "moves": ["hi[0] = lo[0] = nums[0]", "For each x, compute x times old hi and x times old lo", "hi = max of the three, lo = min of the three", "Answer is the biggest hi seen"]
+  }
+}

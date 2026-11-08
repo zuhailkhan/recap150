@@ -1,0 +1,69 @@
+{
+  "slug": "palindromic-substrings",
+  "title": "Palindromic Substrings",
+  "category": "1-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a string. Count how many of its substrings (runs of consecutive letters) read the same forwards and backwards. Substrings at different positions count separately, even if their letters are equal.",
+  "example": {
+    "caption": "aaa has 6: three single a, two aa (positions 0-1 and 1-2) and one aaa.",
+    "input": [{ "kind": "array", "label": "s", "items": ["a", "a", "a"] }],
+    "output": [{ "kind": "array", "label": "answer = 6 (the whole string aaa is one of them)", "items": ["a", "a", "a"], "tones": ["hit", "hit", "hit"], "pointers": [{ "name": "l", "at": 0 }, { "name": "r", "at": 2 }] }]
+  },
+  "idea": {
+    "sentence": "Every palindrome mirrors around a centre, so from each letter and each gap between letters grow outward, and every time the two ends match, that window is one more palindrome to count.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "palindrome", "plain": "Text that reads the same left to right and right to left." },
+      { "term": "substring", "plain": "A run of consecutive letters. Two runs at different positions are different substrings." },
+      { "term": "centre", "plain": "The middle of a palindrome. A letter if its length is odd, the gap between two letters if it is even." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One lowercase string, e.g. \"aaa\"",
+    "presets": [
+      { "label": "All the same", "args": ["aaa"] },
+      { "label": "Even block", "args": ["abba"] },
+      { "label": "No repeats", "args": ["abc"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of the string" }],
+    "compare": { "brute": "n3", "optimal": "n2", "bruteLabel": "Check every substring", "optimalLabel": "Grow around each centre", "unit": "letter comparisons (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n³)", "space": "O(1)", "note": "n² substrings, each checked in up to n steps." },
+      { "name": "Expand around centres", "time": "O(n²)", "space": "O(1)", "note": "2n - 1 centres, each can grow up to n / 2 steps. Counting is one addition per match." },
+      { "name": "DP table (n × n)", "time": "O(n²)", "space": "O(n²)", "note": "isPal[i][j] is true when s[i] = s[j] and the inside is a palindrome. Same time, more memory." }
+    ],
+    "takeaway": "Each matching window is exactly one palindrome, so counting needs no table, just a running total while growing."
+  },
+  "variants": [
+    { "id": "expand", "label": "Expand around centres", "tsFn": "countSubstrings", "goFn": "countSubstrings", "stages": [
+      { "n": 1, "title": "Count starts at 0", "note": "One counter for every palindrome found." },
+      { "n": 2, "title": "Grow and count", "note": "While the letters at l and r match, s[l..r] is a palindrome: add one, then widen the window." },
+      { "n": 3, "title": "Centre finished", "note": "The growth stopped on a mismatch or an edge. Move to the next centre." },
+      { "n": 4, "title": "Answer", "note": "The counter holds the total over all odd and even centres." }
+    ] }
+  ],
+  "goArgs": ["string"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Single letter", "input": "\"a\"", "output": "1", "why": "One letter is a palindrome of length 1. The odd centre counts it and the even centre finds nothing." },
+    { "title": "Equal letters are separate", "input": "\"aa\"", "output": "3", "why": "Two single a at different positions, plus the pair aa. Equal text at different places counts again." },
+    { "title": "All the same letter", "input": "\"aaaaaaaaaaaa\"", "output": "78", "why": "Every substring is a palindrome, so the answer is n(n + 1) / 2. This is the slowest input: each centre grows the longest." },
+    { "title": "No repeats", "input": "\"abcdef\"", "output": "6", "why": "Only the single letters are palindromes. Every even centre fails on its first test." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Count a window each time the ends match, before widening. A palindrome that grows five times gives five counts, not one." },
+    { "lang": "General", "text": "Odd and even centres are both needed. Skipping even centres misses every palindrome like abba." },
+    { "lang": "TypeScript", "text": "Check l >= 0 and r < s.length before reading s[l] and s[r]. s[-1] is undefined rather than an error, so a missing check can quietly count wrong." },
+    { "lang": "Go", "text": "s[i] is a byte. This works for ASCII letters. For text with accents or emoji, convert to []rune first, or the counts will be off." }
+  ],
+  "recap": {
+    "pattern": "Expand around centres",
+    "key": "From each of the 2n - 1 centres grow outward while the ends match. Every matching window is one palindrome, so add one each time.",
+    "complexity": "Time O(n²). Space O(1).",
+    "moves": ["For each index c, try an odd centre (c, c) and an even centre (c, c + 1)", "While l >= 0, r < n and s[l] == s[r]: count one, then l-- and r++", "Move on when the ends differ or an edge is hit", "Return the total"]
+  }
+}

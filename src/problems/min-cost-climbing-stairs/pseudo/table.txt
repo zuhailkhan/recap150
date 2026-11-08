@@ -1,0 +1,9 @@
+function minCostClimbingStairs(cost)
+  n = length(cost)
+  dp = array of n + 1 zeros             # [1] dp[i] = cheapest cost to stand on step i
+                                        # [1] the first two cells stay 0: start anywhere free
+  for i from 2 to n
+    fromOne = dp[i - 1] + cost[i - 1]   # [2] arrive by a 1-step
+    fromTwo = dp[i - 2] + cost[i - 2]   # [2] arrive by a 2-step
+    dp[i] = min(fromOne, fromTwo)       # [2] the cheaper way in
+  return dp[n]                          # [3] the top, one past the last step

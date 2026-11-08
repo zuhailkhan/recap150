@@ -1,0 +1,7 @@
+function climbStairs(n)
+  dp = array of n + 1 zeros             # [1] dp[i] = ways to reach step i
+  dp[0] = 1                             # [1] one way to be on the ground
+  dp[1] = 1                             # [1] one way to reach step 1
+  for i from 2 to n
+    dp[i] = dp[i - 1] + dp[i - 2]       # [2] came by a 1-step or by a 2-step
+  return dp[n]                          # [3] the top step

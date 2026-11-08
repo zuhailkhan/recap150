@@ -1,0 +1,69 @@
+{
+  "slug": "word-break",
+  "title": "Word Break",
+  "category": "1-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a string and a list of allowed words. Decide whether the whole string can be cut into pieces so that every piece is an allowed word. You may use any word as many times as you like. Return true or false.",
+  "example": {
+    "caption": "\"leetcode\" splits into \"leet\" and \"code\", both allowed.",
+    "input": [{ "kind": "array", "label": "s", "items": ["l", "e", "e", "t", "c", "o", "d", "e"] }, { "kind": "array", "label": "words", "items": ["leet", "code"] }],
+    "output": [{ "kind": "array", "label": "s", "items": ["l", "e", "e", "t", "c", "o", "d", "e"], "tones": ["keep", "keep", "keep", "keep", "hit", "hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "dp[i] says whether the first i letters can be split into words. It is true when some cut j has dp[j] true and the piece s[j..i) is an allowed word.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "prefix", "plain": "The first i letters of the string. dp[i] answers the question for that prefix." },
+      { "term": "cut", "plain": "A position j between letters. Everything before j is a smaller prefix we already solved; the rest is the last word." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the string, then the word list, e.g. \"leetcode\", [\"leet\",\"code\"]",
+    "presets": [
+      { "label": "Splits in two", "args": ["leetcode", ["leet", "code"]] },
+      { "label": "Dead end", "args": ["catsandog", ["cats", "dog", "sand", "and", "cat"]] },
+      { "label": "Word reused", "args": ["aaaaaaa", ["aaaa", "aaa"]] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "length of the string" },
+      { "sym": "L", "meaning": "length of the longest allowed word" }
+    ],
+    "compare": { "brute": "2n", "optimal": "n2", "bruteLabel": "Try every way to cut the string", "optimalLabel": "One cell per prefix, one check per cut", "unit": "cuts tried (rough; brute is exponential, 2n is the closest curve)" },
+    "rows": [
+      { "name": "Brute force recursion", "time": "O(2^n)", "space": "O(n)", "note": "Tries every first word, then repeats for the rest. The same suffix is solved again and again." },
+      { "name": "dp table", "time": "O(n² · L)", "space": "O(n + total word size)", "note": "n cells, up to n cuts each, and each slice and lookup costs about L. Skipping cuts longer than the longest word brings it to O(n · L²)." }
+    ],
+    "takeaway": "Whether a prefix splits only needs the answers for shorter prefixes, so the same sub-question is never solved twice."
+  },
+  "variants": [
+    { "id": "table", "label": "dp table", "tsFn": "wordBreak", "goFn": "wordBreak", "stages": [
+      { "n": 1, "title": "Base cell", "note": "dp has n + 1 cells. dp[0] = true because the empty prefix splits into zero words." },
+      { "n": 2, "title": "Find a good cut", "note": "For each prefix length i, look for a cut j with dp[j] true and s[j..i) in the word set. One is enough." },
+      { "n": 3, "title": "Answer", "note": "The whole string is the prefix of length n, so the answer is dp[n]." }
+    ] }
+  ],
+  "goArgs": ["string", "[]string"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "No word fits", "input": "\"a\", [\"b\"]", "output": "false", "why": "No cut gives an allowed word, so dp[1] stays false." },
+    { "title": "Exactly one word", "input": "\"a\", [\"a\"]", "output": "true", "why": "The cut at 0 has dp[0] true and the piece \"a\" is a word, so dp[1] is true." },
+    { "title": "Greedy prefix fails", "input": "\"goalspecial\", [\"go\",\"goal\",\"goals\",\"special\"]", "output": "true", "why": "Taking goals leaves pecial, which is stuck. The table finds goal + special because it tries every cut." },
+    { "title": "Many a then b", "input": "\"aaaaaaaaaab\", [\"a\",\"aa\",\"aaa\"]", "output": "false", "why": "A plain recursion explodes here. The table fills each prefix once and fails fast." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The table is n + 1 long. dp[0] = true is not a special case in the loop: it is what lets the first word of the string, with cut 0, count." },
+    { "lang": "General", "text": "Put the words in a set first. Searching the word list for every piece makes each check cost the list size instead of about one lookup." },
+    { "lang": "TypeScript", "text": "s.slice(j, i) copies the piece, so the set lookup works by value. Strings compare by content in JS, unlike arrays, so a Set of strings is safe." },
+    { "lang": "Go", "text": "s[j:i] on a string is a cheap view with no copy. A map[string]bool is fine as a set. A missing key gives false, which is exactly the answer wanted here." }
+  ],
+  "recap": {
+    "pattern": "1-D DP: prefix splits into pieces",
+    "key": "dp[i] is true if some cut j has dp[j] true and s[j..i) is a word. dp[0] is true.",
+    "complexity": "Time O(n² · L). Space O(n) plus the word set.",
+    "moves": ["Put the words in a set", "dp[0] = true, the rest false", "For each i, try cuts j: dp[j] and s[j..i) in the set", "Answer is dp[n]"]
+  }
+}

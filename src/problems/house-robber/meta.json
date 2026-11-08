@@ -1,0 +1,67 @@
+{
+  "slug": "house-robber",
+  "title": "House Robber",
+  "category": "1-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Houses stand in a row and each holds some cash. You may rob any set of houses, except that two neighbouring houses cannot both be robbed. Return the most cash you can take in one night.",
+  "example": {
+    "caption": "Rob the houses worth 2, 9 and 1 for 12. Taking 7 and 3 would only give 10.",
+    "input": [{ "kind": "array", "label": "nums", "items": [2, 7, 9, 3, 1] }],
+    "output": [{ "kind": "dp", "label": "dp[i] = most loot from the first i houses", "cells": [[0, 2, 7, 11, 11, 12]], "colLabels": [0, 1, 2, 3, 4, 5], "tones": [[null, null, null, null, "keep", "hit"]] }]
+  },
+  "idea": {
+    "sentence": "Let dp[i] be the most loot from the first i houses. For house i, either skip it (dp[i - 1]) or rob it and build on dp[i - 2], and keep the larger.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "state", "plain": "What one table cell stands for. Here: the best loot using only the first i houses." },
+      { "term": "recurrence", "plain": "The rule that builds a cell from earlier cells. Here: the larger of 'skip this house' and 'rob this house'." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One list of house values, e.g. [2,7,9,3,1]",
+    "presets": [
+      { "label": "Classic", "args": [[2, 7, 9, 3, 1]] },
+      { "label": "Skip the big one", "args": [[2, 1, 1, 2]] },
+      { "label": "Two houses", "args": [[3, 9]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of houses" }],
+    "compare": { "brute": "2n", "optimal": "n", "bruteLabel": "Try every set of houses", "optimalLabel": "One table pass", "unit": "sets or cells (rough)" },
+    "rows": [
+      { "name": "Try every subset", "time": "O(2^n)", "space": "O(n)", "note": "Each house is robbed or not, and neighbours must be checked." },
+      { "name": "DP table", "time": "O(n)", "space": "O(n)", "note": "One cell per prefix of houses, each from the two cells before it." },
+      { "name": "Two variables", "time": "O(n)", "space": "O(1)", "note": "Only dp[i - 1] and dp[i - 2] are read, so two numbers are enough. This is the usual final form." }
+    ],
+    "takeaway": "Each house is one choice: skip it or rob it. The table remembers the best result of each shorter row of houses."
+  },
+  "variants": [
+    { "id": "table", "label": "DP table", "tsFn": "rob", "goFn": "rob", "stages": [
+      { "n": 1, "title": "Base cells", "note": "dp[0] = 0 for no houses. dp[1] is the first house's loot." },
+      { "n": 2, "title": "Skip or rob", "note": "dp[i] is the larger of dp[i - 1] (skip house i) and dp[i - 2] + loot of house i (rob it)." },
+      { "n": 3, "title": "Read the answer", "note": "dp[n] covers every house." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One house", "input": "[5]", "output": "5", "why": "No neighbour, so take it. The table is [0, 5] and the loop never runs." },
+    { "title": "Two houses", "input": "[3, 9]", "output": "9", "why": "They are neighbours, so only one can be robbed. dp[2] = max(3, 0 + 9)." },
+    { "title": "Greedy trap", "input": "[2, 10, 3, 10, 2]", "output": "20", "why": "Rob the two 10s. Picking the single biggest house first would block one of them." },
+    { "title": "All zeros", "input": "[0, 0, 0]", "output": "0", "why": "Nothing to gain. The table stays at 0 and the answer is a plain 0, not an error." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "dp[i] is about the first i houses, so house i is nums[i - 1]. Mixing the two indexes is the usual off-by-one." },
+    { "lang": "General", "text": "Skipping a house does not mean the previous one was robbed. dp[i - 1] is simply the best you could do, whatever it did." },
+    { "lang": "TypeScript", "text": "An empty list needs its own check, because dp[1] = nums[0] would otherwise write undefined into the table." },
+    { "lang": "Go", "text": "nums[0] on an empty slice panics. Return early when len(nums) is 0 before reading it." }
+  ],
+  "recap": {
+    "pattern": "1-D DP: skip or take",
+    "key": "dp[i] = best loot from the first i houses = max(dp[i - 1], dp[i - 2] + nums[i - 1]).",
+    "complexity": "Time O(n). Space O(n), or O(1) with two variables.",
+    "moves": ["Cell meaning: dp[i] = best loot from the first i houses", "Base: dp[0] = 0, dp[1] = nums[0]", "Fill left to right: max(skip, take)", "Answer is dp[n]"]
+  }
+}

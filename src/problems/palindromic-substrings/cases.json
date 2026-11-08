@@ -1,0 +1,12 @@
+[
+  {"name":"all same","input":["aaa"],"expected":6},
+  {"name":"abc","input":["abc"],"expected":3},
+  {"name":"even block","input":["abba"],"expected":6},
+  {"name":"single letter","input":["a"],"expected":1,"edge":true},
+  {"name":"two equal","input":["aa"],"expected":3,"edge":true},
+  {"name":"mixed","input":["aabaa"],"expected":9},
+  {"name":"no repeats","input":["abcdef"],"expected":6},
+  {"name":"all same longer","input":["aaaaaaaaaaaa"],"expected":78,"edge":true},
+  {"name":"nested","input":["abacaba"],"expected":12},
+  {"name":"thirty","input":["abacdfgdcabaxyzzyxabacdfgdcaba"],"expected":42}
+]

@@ -1,0 +1,13 @@
+[
+  {"name":"two readings","input":["12"],"expected":2},
+  {"name":"three readings","input":["226"],"expected":3},
+  {"name":"leading zero","input":["06"],"expected":0,"edge":true},
+  {"name":"ten only","input":["10"],"expected":1,"edge":true},
+  {"name":"lone zero","input":["0"],"expected":0,"edge":true},
+  {"name":"single digit","input":["1"],"expected":1,"edge":true},
+  {"name":"27 is too big to pair","input":["27"],"expected":1},
+  {"name":"hundred","input":["100"],"expected":0,"edge":true},
+  {"name":"zero after a pair","input":["11106"],"expected":2},
+  {"name":"long mixed","input":["2611055971756562"],"expected":4},
+  {"name":"thirty ones","input":["111111111111111111111111111111"],"expected":1346269}
+]

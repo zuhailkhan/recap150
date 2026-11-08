@@ -1,0 +1,11 @@
+function wordBreak(s, wordDict)
+  words = set of wordDict
+  n = length(s)
+  dp = list of n + 1 false values
+  dp[0] = true                           # [1] empty prefix: zero words
+  for i from 1 to n
+    for j from 0 to i - 1
+      if dp[j] and s[j..i) is in words   # [2] good prefix, then one word
+        dp[i] = true
+        stop the j loop
+  return dp[n]                           # [3] can the whole string be split

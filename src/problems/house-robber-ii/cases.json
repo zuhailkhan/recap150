@@ -1,0 +1,11 @@
+[
+  {"name":"classic","input":[[2,3,2]],"expected":3},
+  {"name":"four houses","input":[[1,2,3,1]],"expected":4},
+  {"name":"single house","input":[[7]],"expected":7,"edge":true},
+  {"name":"two houses","input":[[4,9]],"expected":9,"edge":true},
+  {"name":"three equal","input":[[5,5,5]],"expected":5,"edge":true},
+  {"name":"wrap trap","input":[[10,1,1,10]],"expected":11},
+  {"name":"five houses","input":[[1,2,3,4,5]],"expected":8},
+  {"name":"varied","input":[[11,48,85,122,159,196,233,270,307,344,381,18,55,92]],"expected":1257},
+  {"name":"zeros","input":[[0,0]],"expected":0}
+]

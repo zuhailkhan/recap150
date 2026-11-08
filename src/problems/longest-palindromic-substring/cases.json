@@ -1,0 +1,14 @@
+[
+  {"name":"odd answer","input":["babad"],"expected":[3,1]},
+  {"name":"even answer","input":["cbbd"],"expected":[2,1]},
+  {"name":"single letter","input":["a"],"expected":[1,1],"edge":true},
+  {"name":"no repeats","input":["abcde"],"expected":[1,1],"edge":true},
+  {"name":"whole string","input":["racecar"],"expected":[7,1]},
+  {"name":"all same","input":["aaaaaaaa"],"expected":[8,1],"edge":true},
+  {"name":"palindrome inside","input":["xabbaxyz"],"expected":[6,1]},
+  {"name":"two letters equal","input":["aa"],"expected":[2,1],"edge":true},
+  {"name":"ends at the edge","input":["abcdcba"],"expected":[7,1]},
+  {"name":"long even in the middle","input":["zzabccbaqq"],"expected":[6,1]},
+  {"name":"tie lengths","input":["abcd"],"expected":[1,1]},
+  {"name":"thirty letters","input":["abacdfgdcabaxyzzyxabacdfgdcaba"],"expected":[16,1]}
+]

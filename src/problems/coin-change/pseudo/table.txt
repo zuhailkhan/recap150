@@ -1,0 +1,10 @@
+function coinChange(coins, amount)
+  dp = list of amount + 1 cells, all "inf"   # [1] fewest coins per amount
+  dp[0] = 0
+  for a from 1 to amount
+    for each coin c in coins
+      if c <= a
+        dp[a] = min(dp[a], dp[a - c] + 1)    # [2] coin c last, plus the best for the rest
+  if dp[amount] is inf
+    return -1                                # [3] impossible
+  return dp[amount]                          # [3] the fewest coins

@@ -1,0 +1,9 @@
+function lengthOfLISTails(nums)
+  tails = empty list                     # [1] tails[k] = smallest last number of a run of length k + 1
+  for each x in nums
+    lo = index of the first tail >= x    # [2] binary search; tails is always sorted
+    if lo equals length(tails)
+      append x to tails                  # [3] x extends the longest run
+    else
+      tails[lo] = x                      # [3] x is a smaller tail for that length
+  return length(tails)                   # [4] length of the longest run

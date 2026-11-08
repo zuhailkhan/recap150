@@ -1,0 +1,14 @@
+function maxProduct(nums)
+  n = length(nums)
+  hi = list of n zeros                   # biggest product ending at i
+  lo = list of n zeros                   # smallest product ending at i
+  hi[0] = lo[0] = nums[0]                # [1] one number alone
+  best = nums[0]
+  for i from 1 to n - 1
+    x = nums[i]
+    a = x * hi[i - 1]
+    b = x * lo[i - 1]
+    hi[i] = max(x, a, b)                 # [2] biggest of the three
+    lo[i] = min(x, a, b)                 # [3] smallest of the three
+    best = max(best, hi[i])              # [4] best seen anywhere
+  return best                            # [4]

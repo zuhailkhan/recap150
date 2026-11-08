@@ -1,0 +1,12 @@
+function canPartition(nums)
+  total = sum of nums
+  if total is odd
+    return false                         # [1] cannot split into equal halves
+  target = total / 2
+  dp = list of target + 1 false values   # [2] dp[s]: some numbers add up to s
+  dp[0] = true                           # [2] the empty subset
+  for each x in nums
+    for s from target down to x          # [3] backwards: use each number once
+      if dp[s] is false and dp[s - x]    # [4] s - x reachable, so s is too
+        dp[s] = true
+  return dp[target]                      # [5] can we reach half the total

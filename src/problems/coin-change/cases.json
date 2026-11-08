@@ -1,0 +1,12 @@
+[
+  {"name":"classic","input":[[1,2,5],11],"expected":3},
+  {"name":"impossible","input":[[2],3],"expected":-1},
+  {"name":"amount zero","input":[[1],0],"expected":0,"edge":true},
+  {"name":"one coin","input":[[1],1],"expected":1},
+  {"name":"greedy fails","input":[[1,3,4],6],"expected":2},
+  {"name":"coin too big","input":[[5,10],3],"expected":-1,"edge":true},
+  {"name":"mixed","input":[[2,5,10,1],27],"expected":4},
+  {"name":"no combination","input":[[3,7],11],"expected":-1,"edge":true},
+  {"name":"larger amount","input":[[7,13,29],250],"expected":12},
+  {"name":"unsorted coins","input":[[5,1,3],9],"expected":3}
+]

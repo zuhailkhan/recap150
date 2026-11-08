@@ -1,0 +1,13 @@
+[
+  {"name":"classic","input":[[1,5,11,5]],"expected":true},
+  {"name":"odd total","input":[[1,2,3,5]],"expected":false,"edge":true},
+  {"name":"one number reused would cheat","input":[[1,5]],"expected":false,"edge":true},
+  {"name":"two equal","input":[[3,3]],"expected":true},
+  {"name":"single","input":[[1]],"expected":false,"edge":true},
+  {"name":"even total no split","input":[[2,2,3,5]],"expected":false},
+  {"name":"six numbers","input":[[14,9,8,4,3,2]],"expected":true},
+  {"name":"four small","input":[[2,2,1,1]],"expected":true},
+  {"name":"big values","input":[[100,100]],"expected":true},
+  {"name":"no split small","input":[[1,2,5]],"expected":false},
+  {"name":"seven numbers","input":[[23,13,11,7,6,5,5]],"expected":true}
+]

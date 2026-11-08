@@ -1,0 +1,70 @@
+{
+  "slug": "house-robber-ii",
+  "title": "House Robber II",
+  "category": "1-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Same as House Robber, but the houses stand in a circle, so the last house is a neighbour of the first. You cannot rob two neighbouring houses. Return the most cash you can take in one night.",
+  "example": {
+    "caption": "The two 2s touch across the circle, so only one can be robbed. Rob the 3 alone: 3.",
+    "input": [{ "kind": "array", "label": "nums", "items": [2, 3, 2] }],
+    "output": [{ "kind": "array", "label": "best set", "items": [2, 3, 2], "tones": ["dim", "hit", "dim"] }]
+  },
+  "idea": {
+    "sentence": "In a circle the first and last houses cannot both be robbed, so solve the straight row without the first house and the one without the last, and take the larger answer.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "state", "plain": "What one table cell stands for. Here: the best loot from the first k houses of a straight row." },
+      { "term": "reduction", "plain": "Turning a new problem (a circle) into copies of one you can already solve (a row)." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One list of house values in a circle, e.g. [2,3,2]",
+    "presets": [
+      { "label": "Three houses", "args": [[2, 3, 2]] },
+      { "label": "Four houses", "args": [[1, 2, 3, 1]] },
+      { "label": "Wrap trap", "args": [[10, 1, 1, 10]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of houses" }],
+    "compare": { "brute": "2n", "optimal": "n", "bruteLabel": "Try every set of houses", "optimalLabel": "Two table passes", "unit": "sets or cells (rough)" },
+    "rows": [
+      { "name": "Try every subset", "time": "O(2^n)", "space": "O(n)", "note": "Choose a set and check each neighbouring pair, including first with last." },
+      { "name": "Two row DPs", "time": "O(n)", "space": "O(n)", "note": "Two passes of about n cells each. A table per row." },
+      { "name": "Two rows, two variables", "time": "O(n)", "space": "O(1)", "note": "Each row only reads the two previous cells, so two numbers per row are enough." }
+    ],
+    "takeaway": "The circle adds one rule. Cutting the circle open at that rule gives two ordinary rows."
+  },
+  "variants": [
+    { "id": "circle", "label": "Two rows", "tsFn": "robCircle", "goFn": "robCircle", "stages": [
+      { "n": 1, "title": "Cut the circle", "note": "One house is a special case. Otherwise the first and last cannot both be used, so make two rows." },
+      { "n": 2, "title": "Skip the last house", "note": "Run the row DP on houses 0 to n - 2." },
+      { "n": 3, "title": "Skip the first house", "note": "Run the row DP on houses 1 to n - 1." },
+      { "n": 4, "title": "Row base cells", "note": "dp[0] = 0 and dp[1] is the first house of the row." },
+      { "n": 5, "title": "Skip or rob", "note": "dp[k] is the larger of dp[k - 1] (skip) and dp[k - 2] + loot (rob)." },
+      { "n": 6, "title": "Take the better row", "note": "The answer is the larger of the two row results." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One house", "input": "[7]", "output": "7", "why": "With one house the first and the last are the same house, and cutting it out of both rows would leave nothing. Return it directly." },
+    { "title": "Two houses", "input": "[4, 9]", "output": "9", "why": "They are neighbours. Each row has one house, so the answer is the larger one." },
+    { "title": "Wrap trap", "input": "[10, 1, 1, 10]", "output": "11", "why": "The two 10s touch across the circle. The best is a 10 plus one of the 1s." },
+    { "title": "Three equal", "input": "[5, 5, 5]", "output": "5", "why": "Every house touches both others, so only one can be robbed." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Do not run the plain row solution on the whole list and hope. It may pick both ends. Splitting into two rows rules that out." },
+    { "lang": "General", "text": "n = 1 must be handled first. The two rows would both be empty, and returning 0 would be wrong." },
+    { "lang": "TypeScript", "text": "nums.slice(1) and nums.slice(0, -1) copy the array. Passing lo and hi bounds into one helper avoids the copies." },
+    { "lang": "Go", "text": "nums[1:] and nums[:n-1] share memory with nums and cost nothing, but never append to them. Bounds, as here, avoid any aliasing worries." }
+  ],
+  "recap": {
+    "pattern": "1-D DP on two rows",
+    "key": "A circle means skip the first house or skip the last. Run the House Robber row DP on both and take the max.",
+    "complexity": "Time O(n). Space O(n), or O(1) with two variables per row.",
+    "moves": ["If there is one house, return it", "Row A: houses 0 to n - 2", "Row B: houses 1 to n - 1", "Each row: dp[k] = max(dp[k - 1], dp[k - 2] + loot); answer is the max of the two rows"]
+  }
+}

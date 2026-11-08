@@ -1,0 +1,67 @@
+{
+  "slug": "min-cost-climbing-stairs",
+  "title": "Min Cost Climbing Stairs",
+  "category": "1-D Dynamic Programming",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "Each step of a staircase has a fee you pay when you leave it. You may start on step 0 or step 1, and each move climbs 1 or 2 steps. The top is one position past the last step. Find the smallest total fee to reach the top.",
+  "example": {
+    "caption": "Start on step 1 (free), pay 15 to jump two steps to the top. Total 15. Starting on step 0 and paying 10 then 20 costs 30.",
+    "input": [{ "kind": "array", "label": "cost", "items": [10, 15, 20] }],
+    "output": [{ "kind": "dp", "label": "dp[i] = cheapest way to stand on step i", "cells": [[0, 0, 10, 15]], "colLabels": [0, 1, 2, 3], "tones": [["keep", "keep", "keep", "hit"]] }]
+  },
+  "idea": {
+    "sentence": "Let dp[i] be the cheapest total paid to stand on step i, then dp[i] = min(dp[i - 1] + cost[i - 1], dp[i - 2] + cost[i - 2]).",
+    "demo": "custom",
+    "jargon": [
+      { "term": "state", "plain": "What one table cell stands for. Here: the cheapest total paid to stand on step i, before paying that step's own fee." },
+      { "term": "recurrence", "plain": "The rule that builds a cell from earlier cells. Here: the cheaper of two ways in." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One list of fees, e.g. [10,15,20]",
+    "presets": [
+      { "label": "Classic", "args": [[10, 15, 20]] },
+      { "label": "Zigzag", "args": [[1, 100, 1, 1, 1, 100]] },
+      { "label": "Two steps", "args": [[5, 3]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of steps (length of the cost list)" }],
+    "compare": { "brute": "2n", "optimal": "n", "bruteLabel": "Try every path", "optimalLabel": "Fill a table once", "unit": "paths or cells (rough; paths grow like 1.6^n, which 2n stands in for)" },
+    "rows": [
+      { "name": "Plain recursion", "time": "O(2^n)", "space": "O(n)", "note": "Every step branches into a 1-step and a 2-step and repeats work." },
+      { "name": "DP table", "time": "O(n)", "space": "O(n)", "note": "One cell per step, each from the two cells before it." },
+      { "name": "Two variables", "time": "O(n)", "space": "O(1)", "note": "Only the last two cells are ever read, so keep two numbers instead of the table." }
+    ],
+    "takeaway": "Same shape as Climbing Stairs, but the cell holds a minimum cost instead of a count."
+  },
+  "variants": [
+    { "id": "table", "label": "DP table", "tsFn": "minCostClimbingStairs", "goFn": "minCostClimbingStairs", "stages": [
+      { "n": 1, "title": "Base cells", "note": "dp has n + 1 cells. Starting on step 0 or step 1 is free, so both start at 0." },
+      { "n": 2, "title": "Fill a cell", "note": "Two ways in: from step i - 1 paying its fee, or from step i - 2 paying its fee. Keep the cheaper." },
+      { "n": 3, "title": "Read the answer", "note": "The top is index n, one past the last fee. dp[n] is the answer." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Two steps only", "input": "[5, 3]", "output": "3", "why": "Start on step 1 and jump straight to the top paying 3. The table has 3 cells, so dp[2] = min(0 + 5, 0 + 3)." },
+    { "title": "Starting step matters", "input": "[100, 1, 100, 1, 100]", "output": "2", "why": "Starting on step 1 skips the first 100. Both start cells are 0 because both starts are free." },
+    { "title": "Huge first fee", "input": "[999, 1, 1, 1]", "output": "2", "why": "You never have to pay cost[0] if you start on step 1." },
+    { "title": "Zero fees", "input": "[0, 0, 50, 0]", "output": "0", "why": "Leave step 1 by a 2-step to land on step 3, then another to the top. The 50 is jumped over." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The top is index n, not n - 1. Returning dp[n - 1] is the usual off-by-one, and reaching the last step is not yet reaching the top." },
+    { "lang": "General", "text": "The fee is paid when you leave a step, so dp[i] adds cost[i - 1] and cost[i - 2], not cost[i]." },
+    { "lang": "TypeScript", "text": "Math.min(...) is fine for two numbers. Do not spread a big array into it, because very long argument lists can overflow the call stack." },
+    { "lang": "Go", "text": "The built-in min needs Go 1.21 or newer. On older versions, write a small helper." }
+  ],
+  "recap": {
+    "pattern": "1-D DP: cheaper of two ways in",
+    "key": "dp[i] = cheapest total to stand on step i = min(dp[i - 1] + cost[i - 1], dp[i - 2] + cost[i - 2]). The answer is dp[n].",
+    "complexity": "Time O(n). Space O(n), or O(1) with two variables.",
+    "moves": ["Cell meaning: dp[i] = cheapest cost to stand on step i", "Base: dp[0] = dp[1] = 0 (free start)", "Fill left to right with the min of two ways in", "Answer is dp[n], one past the last step"]
+  }
+}

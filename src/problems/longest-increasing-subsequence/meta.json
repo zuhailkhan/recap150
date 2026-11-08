@@ -1,0 +1,76 @@
+{
+  "slug": "longest-increasing-subsequence",
+  "title": "Longest Increasing Subsequence",
+  "category": "1-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of integers. Pick some of them, keeping their original left-to-right order, so that each picked number is strictly bigger than the one before. The picked numbers need not be neighbours. Return the largest count of numbers you can pick this way.",
+  "example": {
+    "caption": "Picking 2, 3, 7 and 18 (or 2, 5, 7, 101) gives 4 numbers in strictly rising order.",
+    "input": [{ "kind": "array", "label": "nums", "items": [10, 9, 2, 5, 3, 7, 101, 18] }],
+    "output": [{ "kind": "array", "label": "nums", "items": [10, 9, 2, 5, 3, 7, 101, 18], "tones": [null, null, "hit", "hit", null, "hit", "hit", null] }]
+  },
+  "idea": {
+    "sentence": "dp[i] is the longest rising run that ends exactly at index i, and it equals 1 plus the biggest dp[j] over earlier numbers that are smaller than nums[i].",
+    "demo": "custom",
+    "jargon": [
+      { "term": "subsequence", "plain": "Some of the items, in their original order, with gaps allowed. Unlike a subarray, the picks need not touch." },
+      { "term": "strictly increasing", "plain": "Each pick is bigger than the previous one. Equal values do not count as rising." },
+      { "term": "tails", "plain": "For each run length, the smallest last number any run of that length can have. It stays sorted, so binary search works on it." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of integers, e.g. [10,9,2,5,3,7,101,18]",
+    "presets": [
+      { "label": "Classic", "args": [[10, 9, 2, 5, 3, 7, 101, 18]] },
+      { "label": "Equal values", "args": [[7, 7, 7, 4]] },
+      { "label": "Already rising", "args": [[1, 2, 3, 4]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of integers in the list" }],
+    "compare": { "brute": "n2", "optimal": "nlogn", "bruteLabel": "Table: look back at every earlier number", "optimalLabel": "Tails list + binary search", "unit": "comparisons (rough)" },
+    "rows": [
+      { "name": "Brute force (all subsets)", "time": "O(2^n)", "space": "O(n)", "note": "Check every way to pick numbers. Far too slow beyond a few dozen items." },
+      { "name": "dp table", "time": "O(n²)", "space": "O(n)", "note": "Each cell scans all earlier cells once. The easy version to explain and trace." },
+      { "name": "Tails + binary search", "time": "O(n log n)", "space": "O(n)", "note": "Keep the smallest possible tail for each run length. Each number finds its spot with a binary search." }
+    ],
+    "takeaway": "The table version finds the idea (a run ends somewhere, extend a smaller earlier run). The tails version keeps only what can still help later, and binary-searches it."
+  },
+  "variants": [
+    { "id": "dp", "label": "dp table, O(n²)", "tsFn": "lengthOfLIS", "goFn": "lengthOfLIS", "stages": [
+      { "n": 1, "title": "All ones", "note": "Each number alone is a rising run of length 1, so every dp cell starts at 1." },
+      { "n": 2, "title": "Look back", "note": "For index i, scan the earlier indexes j. Only those with a smaller number can come just before i." },
+      { "n": 3, "title": "Extend a run", "note": "dp[i] becomes the larger of itself and dp[j] + 1 for each smaller nums[j]." },
+      { "n": 4, "title": "Answer", "note": "A run can end at any index, so the answer is the biggest value in dp." }
+    ] },
+    { "id": "tails", "label": "Tails + binary search", "tsFn": "lengthOfLISTails", "goFn": "lengthOfLISTails", "stages": [
+      { "n": 1, "title": "Empty tails", "note": "tails[k] will hold the smallest last number of any rising run of length k + 1." },
+      { "n": 2, "title": "Binary search", "note": "Find the first tail that is greater than or equal to x. Tails stay sorted, so this is O(log n)." },
+      { "n": 3, "title": "Place x", "note": "If every tail is smaller, append x: the longest run grew. Otherwise x replaces that tail with a smaller one." },
+      { "n": 4, "title": "Answer", "note": "The number of tails is the length of the longest run. The tails are not the run itself." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One number", "input": "[5]", "output": "1", "why": "A single number is a run of length 1. The look-back loop never runs." },
+    { "title": "All equal", "input": "[7, 7, 7, 7]", "output": "1", "why": "Rising must be strict. Equal numbers fail the nums[j] < nums[i] test, so no run grows." },
+    { "title": "Strictly falling", "input": "[5, 4, 3, 2, 1]", "output": "1", "why": "No earlier number is smaller, so every dp cell stays 1." },
+    { "title": "Answer does not end last", "input": "[1, 2, 3, 0]", "output": "3", "why": "The best run ends at index 2, not at the last cell. Take the biggest cell, not dp[n - 1]." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The answer is the maximum of the whole dp table, not its last cell. A long run may end early, and the last number may be small." },
+    { "lang": "General", "text": "Use < and not <= for the check. With <= equal numbers chain together and [7, 7, 7, 7] would wrongly give 4." },
+    { "lang": "General", "text": "In the tails version, search for the first tail greater than or equal to x. Searching for strictly greater lets equal numbers append, which breaks the strict rule." },
+    { "lang": "TypeScript", "text": "Math.max(...dp) spreads the array into arguments. Very large arrays can overflow the call stack, and an empty one gives -Infinity. Loop with a running best for big inputs." },
+    { "lang": "Go", "text": "sort.Search wants the first index where the test turns true, so the test must be monotonic. tails[k] >= x is, because tails is sorted." }
+  ],
+  "recap": {
+    "pattern": "1-D DP: best run ending here",
+    "key": "dp[i] = 1 + max dp[j] over j < i with nums[j] < nums[i]. The answer is the max over all i. Tails + binary search gets O(n log n).",
+    "complexity": "Time O(n²) for the table, O(n log n) with tails. Space O(n).",
+    "moves": ["dp[i] starts at 1 for every index", "For each i, scan j < i with nums[j] < nums[i]", "dp[i] = max(dp[i], dp[j] + 1)", "Answer is the biggest dp value"]
+  }
+}

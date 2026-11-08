@@ -1,0 +1,73 @@
+{
+  "slug": "partition-equal-subset-sum",
+  "title": "Partition Equal Subset Sum",
+  "category": "1-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of positive integers. Decide whether you can split all of them into two groups so that both groups have the same sum. Every number goes into exactly one group. Return true if such a split exists, otherwise false.",
+  "example": {
+    "caption": "[1, 5, 11, 5] splits into {11} and {1, 5, 5}. Both groups add up to 11.",
+    "input": [{ "kind": "array", "label": "nums", "items": [1, 5, 11, 5] }],
+    "output": [{ "kind": "array", "label": "nums", "items": [1, 5, 11, 5], "tones": ["keep", "keep", "hit", "keep"] }]
+  },
+  "idea": {
+    "sentence": "Two equal halves means some subset adds up to half the total, so keep dp[s] = can the numbers so far reach sum s, and sweep s downward for each number so it is used only once.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "0/1 knapsack", "plain": "Each item is taken once or not at all, and you ask which totals are reachable." },
+      { "term": "subset", "plain": "Some of the numbers, in any positions. The empty subset adds up to 0." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of positive integers, e.g. [1,5,11,5]",
+    "presets": [
+      { "label": "Splits evenly", "args": [[1, 5, 11, 5]] },
+      { "label": "No split", "args": [[1, 2, 5]] },
+      { "label": "Reuse trap", "args": [[1, 5]] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "number of integers" },
+      { "sym": "S", "meaning": "half of the total sum (the target)" }
+    ],
+    "compare": { "brute": "2n", "optimal": "nm", "bruteLabel": "Try every subset", "optimalLabel": "One sweep over the sums per number", "unit": "operations (rough; brute is exponential, 2n is the closest curve; the table size is n x S)" },
+    "rows": [
+      { "name": "Brute force (all subsets)", "time": "O(2^n)", "space": "O(n)", "note": "Add up every possible subset and compare with half the total." },
+      { "name": "1-D boolean table", "time": "O(n · S)", "space": "O(S)", "note": "One true/false cell per sum up to S. Each number makes one backward sweep over the cells." },
+      { "name": "2-D table (item by sum)", "time": "O(n · S)", "space": "O(n · S)", "note": "The textbook form. The 1-D table is the same table with each row written over the previous one." }
+    ],
+    "takeaway": "Instead of trying subsets, track which sums are reachable. The table is small when the numbers are small, even if n is large."
+  },
+  "variants": [
+    { "id": "table", "label": "1-D boolean table", "tsFn": "canPartition", "goFn": "canPartition", "stages": [
+      { "n": 1, "title": "Half the total", "note": "Add up the numbers. If the total is odd there is no equal split. Otherwise the target is total / 2." },
+      { "n": 2, "title": "Reachable sums", "note": "dp[s] says whether some of the numbers so far add up to s. Only dp[0] starts true." },
+      { "n": 3, "title": "Sweep downward", "note": "For each number x, visit s from target down to x. Downward keeps each number to one use." },
+      { "n": 4, "title": "Reach a new sum", "note": "If dp[s - x] is true, then adding x reaches s, so dp[s] becomes true." },
+      { "n": 5, "title": "Answer", "note": "If dp[target] is true, one group sums to target, so the rest does too." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Odd total", "input": "[1, 2, 3, 5]", "output": "false", "why": "The total 11 cannot be cut into two equal whole halves. Return before building any table." },
+    { "title": "One number", "input": "[1]", "output": "false", "why": "The total 1 is odd, so the early check returns false. A lone positive number can never split into two equal groups." },
+    { "title": "Reuse would cheat", "input": "[1, 5]", "output": "false", "why": "Total 6, target 3. Sweeping upward would use the 1 three times and say true. Sweeping downward says false." },
+    { "title": "Number above the target", "input": "[100, 100]", "output": "true", "why": "Each 100 equals the target 100 exactly. A number bigger than the target is skipped because the sweep range is empty." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Sweep the sums downward. An upward sweep lets dp[s - x] already include this same number, so one number can be counted many times. That gives wrong true answers such as [1, 5]." },
+    { "lang": "General", "text": "Check the total first. If it is odd, return false straight away. It also stops you using integer division that would silently round the target down." },
+    { "lang": "General", "text": "dp needs target + 1 cells so that index target exists. dp[0] = true is the base: the empty subset adds up to 0." },
+    { "lang": "TypeScript", "text": "Pass 0 as the start value of reduce. Without it, reduce on an empty list throws a TypeError instead of returning 0." },
+    { "lang": "Go", "text": "Integer division truncates, so 11 / 2 is 5. Test total%2 first. Make the table with make([]bool, target+1), which starts all false." }
+  ],
+  "recap": {
+    "pattern": "0/1 knapsack on a 1-D boolean table",
+    "key": "Reach half the total with a subset. dp[s] is true if dp[s - x] was true before this number, sweeping s downward.",
+    "complexity": "Time O(n · S). Space O(S), where S is half the total.",
+    "moves": ["Return false if the total is odd; target = total / 2", "dp[0] = true, the rest false", "For each x, sweep s from target down to x", "If dp[s - x] then dp[s] = true; answer dp[target]"]
+  }
+}

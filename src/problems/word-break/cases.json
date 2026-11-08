@@ -1,0 +1,13 @@
+[
+  {"name":"two words","input":["leetcode",["leet","code"]],"expected":true},
+  {"name":"word reused","input":["applepenapple",["apple","pen"]],"expected":true},
+  {"name":"dead end","input":["catsandog",["cats","dog","sand","and","cat"]],"expected":false},
+  {"name":"no word fits","input":["a",["b"]],"expected":false,"edge":true},
+  {"name":"same word repeats","input":["aaaaaaa",["aaaa","aaa"]],"expected":true},
+  {"name":"greedy prefix fails","input":["goalspecial",["go","goal","goals","special"]],"expected":true},
+  {"name":"single letter words","input":["ab",["a","b"]],"expected":true},
+  {"name":"exact one word","input":["a",["a"]],"expected":true,"edge":true},
+  {"name":"many a then b","input":["aaaaaaaaaab",["a","aa","aaa"]],"expected":false,"edge":true},
+  {"name":"middle word","input":["abcd",["a","abc","b","cd"]],"expected":true},
+  {"name":"cars","input":["cars",["car","ca","rs"]],"expected":true}
+]

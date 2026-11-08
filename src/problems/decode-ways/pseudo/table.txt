@@ -1,0 +1,11 @@
+function numDecodings(s)
+  n = length(s)
+  dp = list of n + 1 zeros
+  dp[0] = 1                              # [1] empty prefix: one reading
+  for i from 1 to n
+    if s[i - 1] is not "0"
+      dp[i] += dp[i - 1]                 # [2] last digit alone is a letter
+    pair = the last two digits as a number (0 when i < 2)
+    if pair is between 10 and 26
+      dp[i] += dp[i - 2]                 # [3] last two digits make a letter
+  return dp[n]                           # [4] readings of the whole string

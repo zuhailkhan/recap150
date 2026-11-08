@@ -1,0 +1,16 @@
+function robCircle(nums)
+  n = length(nums)
+  if n == 1: return nums[0]             # [1] one house, no neighbour
+  skipLast  = robLine(nums, 0, n - 1)   # [2] houses 0 .. n-2
+  skipFirst = robLine(nums, 1, n)       # [3] houses 1 .. n-1
+  return max(skipLast, skipFirst)       # [6] the better row
+
+function robLine(nums, lo, hi)          # straight row nums[lo .. hi-1]
+  m = hi - lo
+  dp = array of m + 1 zeros             # [4] dp[k] = most loot from the first k houses
+  dp[1] = nums[lo]                      # [4] one house: take it
+  for k from 2 to m
+    skip = dp[k - 1]                    # [5] skip this house
+    take = dp[k - 2] + nums[lo + k - 1] # [5] rob it
+    dp[k] = max(skip, take)             # [5] the better choice
+  return dp[m]

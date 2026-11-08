@@ -1,0 +1,8 @@
+[
+  {"name":"one step","input":[1],"expected":1,"edge":true},
+  {"name":"two steps","input":[2],"expected":2,"edge":true},
+  {"name":"classic three","input":[3],"expected":3},
+  {"name":"five","input":[5],"expected":8},
+  {"name":"ten","input":[10],"expected":89},
+  {"name":"top of the range","input":[45],"expected":1836311903,"edge":true}
+]

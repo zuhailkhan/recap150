@@ -1,0 +1,68 @@
+{
+  "slug": "decode-ways",
+  "title": "Decode Ways",
+  "category": "1-D Dynamic Programming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "A string of digits stands for a message. Digits 1 to 26 map to the letters A to Z, so \"1\" is A and \"26\" is Z. A digit string can often be cut into letters in several ways. Count how many different readings the whole string has. A leading zero never forms a letter.",
+  "example": {
+    "caption": "\"226\" reads as 2-2-6, 22-6 or 2-26. Three ways.",
+    "input": [{ "kind": "array", "label": "s", "items": ["2", "2", "6"] }],
+    "output": [{ "kind": "dp", "label": "dp[i] = ways to read the first i digits", "cells": [[1, 1, 2, 3]], "colLabels": [0, 1, 2, 3], "tones": [[null, null, null, "hit"]] }]
+  },
+  "idea": {
+    "sentence": "dp[i] counts the readings of the first i digits, and it is the sum of two cells behind it: dp[i-1] if the last digit alone is a letter, plus dp[i-2] if the last two digits make 10 to 26.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "dynamic programming", "plain": "Solve a big question by filling a table of smaller answers, each built from cells you already filled." },
+      { "term": "prefix", "plain": "The first i characters of the string. dp[i] is about the prefix of length i." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a string of digits, e.g. \"226\"",
+    "presets": [
+      { "label": "226 (three ways)", "args": ["226"] },
+      { "label": "11106 (zeros)", "args": ["11106"] },
+      { "label": "06 (leading zero)", "args": ["06"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of digits in the string" }],
+    "compare": { "brute": "2n", "optimal": "n", "bruteLabel": "Try every way to cut the string", "optimalLabel": "Fill one table cell per digit", "unit": "readings visited (rough; the brute shape is exponential, 2n is the closest curve)" },
+    "rows": [
+      { "name": "Brute force recursion", "time": "O(2^n)", "space": "O(n)", "note": "Each digit can start a one-digit or two-digit letter, and the same suffix is solved again and again." },
+      { "name": "dp table", "time": "O(n)", "space": "O(n)", "note": "One cell per prefix, each built from two earlier cells in constant time." },
+      { "name": "Two rolling variables", "time": "O(n)", "space": "O(1)", "note": "Only dp[i-1] and dp[i-2] are ever read, so keep just those two numbers." }
+    ],
+    "takeaway": "The count for a prefix only depends on the two shorter prefixes before it, so one left-to-right pass fills the whole table."
+  },
+  "variants": [
+    { "id": "table", "label": "dp table", "tsFn": "numDecodings", "goFn": "numDecodings", "stages": [
+      { "n": 1, "title": "Base cell", "note": "dp has n + 1 cells. dp[0] = 1 for the empty prefix, which gives later cells something to add." },
+      { "n": 2, "title": "Last digit alone", "note": "If the last digit is not 0, it is a letter by itself. Copy dp[i-1]." },
+      { "n": 3, "title": "Last two digits", "note": "If the last two digits read 10 to 26, they are one letter. Add dp[i-2]." },
+      { "n": 4, "title": "Answer", "note": "The whole string is the prefix of length n, so the answer is dp[n]." }
+    ] }
+  ],
+  "goArgs": ["string"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Leading zero", "input": "\"06\"", "output": "0", "why": "A zero cannot start a letter. \"6\" alone is fine but \"06\" is not 6, so nothing reads the string." },
+    { "title": "Zero that must pair", "input": "\"10\"", "output": "1", "why": "The 0 cannot stand alone, so only the pair 10 works. dp[2] gets dp[0] and nothing from dp[1]." },
+    { "title": "Pair too large", "input": "\"27\"", "output": "1", "why": "27 is over 26, so only 2-7 reads. The pair step adds nothing." },
+    { "title": "Two zeros in a row", "input": "\"100\"", "output": "0", "why": "The second 0 has no valid partner: 00 is not a letter and 0 alone is not one." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Make the table n + 1 long. Index i means the first i digits, so dp[0] is the empty prefix and the answer is dp[n]. A table of length n shifts every index by one." },
+    { "lang": "General", "text": "Check the pair as a number from 10 to 26, not just less than 27. \"06\" is the number 6, but it is not a valid pair because of its leading zero." },
+    { "lang": "TypeScript", "text": "Compare digit characters, not numbers: s[i - 1] !== '0'. Writing s[i - 1] !== 0 is always true because a string never equals the number 0." },
+    { "lang": "Go", "text": "Indexing a string gives a byte, not a number. Subtract '0' to get the digit value. This is safe for digits, but would split non-ASCII text in the middle of a character." }
+  ],
+  "recap": {
+    "pattern": "1-D DP: sum two earlier cells",
+    "key": "dp[i] = readings of the first i digits = (dp[i-1] if the last digit is not 0) + (dp[i-2] if the last two digits are 10 to 26).",
+    "complexity": "Time O(n). Space O(n), or O(1) with two variables.",
+    "moves": ["Make dp of length n + 1, with dp[0] = 1", "For each i, add dp[i-1] when s[i-1] is not 0", "Add dp[i-2] when the last two digits are 10 to 26", "Answer is dp[n]"]
+  }
+}
