@@ -2,7 +2,7 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { runTrace } from '@/core/tracer'
-import { leetcodeUrl, loadVariants, metas, NEETCODE_LIST_URL, officialBySlug, videoUrl, type LoadedVariant } from '@/data/problems'
+import { customDemo, leetcodeUrl, loadVariants, metas, NEETCODE_LIST_URL, officialBySlug, videoUrl, type LoadedVariant } from '@/data/problems'
 import type { ReadyMeta } from '@/core/schema'
 import ExampleVisual from '@/components/ExampleVisual.vue'
 import Stepper from '@/components/Stepper.vue'
@@ -73,7 +73,7 @@ const runner = computed(() => (args: unknown[]) => runTrace(variants.value[0].fn
             <template v-for="j in ready.idea.jargon" :key="j.term"><dt>{{ j.term }}</dt><dd>{{ j.plain }}</dd></template>
           </dl>
         </div>
-        <div class="card"><component :is="DEMOS[ready.idea.demo]" /></div>
+        <div class="card"><component :is="ready.idea.demo === 'custom' ? customDemo(ready.slug) : DEMOS[ready.idea.demo]" /></div>
       </div>
     </section>
 

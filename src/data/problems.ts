@@ -1,3 +1,4 @@
+import { defineAsyncComponent, type Component } from 'vue'
 import official from './neetcode150.json'
 import type { ProblemMeta, ReadyMeta, Variant } from '@/core/schema'
 import { CATEGORIES } from '@/core/schema'
@@ -27,6 +28,7 @@ export const NEETCODE_LIST_URL = 'https://neetcode.io/practice?tab=neetcode150'
 
 // ---- lazily loaded code and solvers (kept out of the first bundle)
 const raw = import.meta.glob('../problems/*/{ts/*.ts,go/*.go,pseudo/*.txt}', { query: '?raw', import: 'default' }) as Record<string, () => Promise<string>>
+const customDemos = import.meta.glob('../problems/*/Demo.vue') as Record<string, () => Promise<{ default: Component }>>
 const modules = import.meta.glob('../problems/*/ts/*.ts') as Record<string, () => Promise<Record<string, (...a: any[]) => unknown>>>
 
 export interface LoadedVariant extends Variant { pseudo: string; ts: string; go: string; fn: (...a: any[]) => unknown }
@@ -35,8 +37,14 @@ export async function loadVariants(meta: ReadyMeta): Promise<LoadedVariant[]> {
   return Promise.all(meta.variants.map(async (v) => {
     const base = `../problems/${meta.slug}`
     const [pseudo, ts, go, mod] = await Promise.all([
-      raw[`${base}/pseudo/${v.id}.txt`](), raw[`${base}/ts/${v.id}.ts`](), raw[`${base}/go/${v.id}.go`](), modules[`${base}/ts/${v.id}.ts`](),
+      raw[`${base}/pseudo/${v.id}.txt`](), raw[`${base}/ts/${v.id}.ts`](), raw[`${base}/go/${v.id}.go`](), (modules[`${base}/ts/${v.id}.driver.ts`] ?? modules[`${base}/ts/${v.id}.ts`])(),
     ])
     return { ...v, pseudo, ts: stripTraceCode(ts), go: stripGoPackage(go), fn: mod[v.tsFn] }
   }))
+}
+
+/** Shared demo by name, or problems/<slug>/Demo.vue when idea.demo is "custom". */
+export function customDemo(slug: string): Component | undefined {
+  const load = customDemos[`../problems/${slug}/Demo.vue`]
+  return load ? defineAsyncComponent(load) : undefined
 }

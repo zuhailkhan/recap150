@@ -91,5 +91,17 @@ kbd { background: var(--surface-2); border: 1px solid var(--line); border-bottom
 .tone-dim { background: var(--dim-bg); color: var(--dim-fg); border-color: var(--dim-bd); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
 
+/* ---------- svg visuals (same tones as tiles) ---------- */
+.svn { fill: var(--tile-bg); stroke: var(--tile-bd); stroke-width: 2; transition: fill .2s; }
+.svt { fill: var(--tile-fg); font: 600 13px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+.svs { fill: var(--ink-2); font: 500 10px var(--font-mono); text-anchor: middle; }
+.sve { stroke: var(--tile-bd); stroke-width: 2; fill: none; }
+.svn.t-focus { fill: var(--focus-bg); stroke: var(--focus-bd); } .svt.t-focus { fill: var(--focus-fg); } .sve.t-focus { stroke: var(--focus-bd); } .svs.t-focus { fill: var(--focus-fg); }
+.svn.t-keep { fill: var(--keep-bg); stroke: var(--keep-bd); } .svt.t-keep { fill: var(--keep-fg); } .sve.t-keep { stroke: var(--keep-bd); } .svs.t-keep { fill: var(--keep-fg); }
+.svn.t-hit { fill: var(--hit-bg); stroke: var(--hit-bd); } .svt.t-hit { fill: var(--hit-fg); } .sve.t-hit { stroke: var(--hit-bd); } .svs.t-hit { fill: var(--hit-fg); }
+.svn.t-miss { fill: var(--miss-bg); stroke: var(--miss-bd); } .svt.t-miss { fill: var(--miss-fg); } .sve.t-miss { stroke: var(--miss-bd); } .svs.t-miss { fill: var(--miss-fg); }
+.svn.t-dim { fill: var(--dim-bg); stroke: var(--dim-bd); } .svt.t-dim { fill: var(--dim-fg); } .sve.t-dim { stroke: var(--dim-bd); } .svs.t-dim { fill: var(--dim-fg); }
+.svarrow { fill: var(--tile-bd); }
+
 /* ---------- code tokens ---------- */
 .tk-c { color: var(--tk-c); font-style: italic; } .tk-s { color: var(--tk-s); } .tk-k { color: var(--tk-k); font-weight: 600; } .tk-n { color: var(--tk-n); }

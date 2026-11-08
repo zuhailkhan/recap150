@@ -20,7 +20,13 @@ const eq = (a: number[], b: number[]) => a.join() === b.join()
 const readyForGo: { meta: ReadyMeta; pkg: string }[] = []
 const status = new Map<string, 'ready' | 'draft'>()
 
-const slugs = readdirSync(problemsDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)
+const argv = process.argv.slice(2)
+const onlyArg = argv.find((a) => a.startsWith('--only='))?.slice(7)
+const only = onlyArg ? new Set(onlyArg.split(',').filter(Boolean)) : null
+const skipProgress = argv.includes('--no-progress') || !!only
+const allSlugs = readdirSync(problemsDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)
+const slugs = only ? allSlugs.filter((s) => only.has(s)) : allSlugs
+if (only) for (const o of only) if (!allSlugs.includes(o)) errors.push(`${o}: no such problem folder`)
 
 for (const slug of slugs) {
   const dir = join(problemsDir, slug)
@@ -50,6 +56,10 @@ for (const slug of slugs) {
   if (cases.filter((c) => c.edge).length < 2) fail(slug, 'cases.json needs at least 2 cases marked "edge": true')
   for (const c of cases) if (c.input.length !== meta.goArgs.length) fail(slug, `case "${c.name}" has ${c.input.length} args, goArgs has ${meta.goArgs.length}`)
 
+  // ---- demo
+  if (!['fingerprint', 'complement', 'match', 'custom'].includes(meta.idea.demo)) fail(slug, `idea.demo "${meta.idea.demo}" is not a shared demo. Use "custom" with a Demo.vue`)
+  if (meta.idea.demo === 'custom' && !existsSync(join(dir, 'Demo.vue'))) fail(slug, 'idea.demo is "custom" but Demo.vue is missing')
+
   // ---- variants: files, shared stages, TypeScript cases
   const stageSets: number[][] = []
   meta.variants.forEach((v, vi) => {
@@ -70,7 +80,11 @@ for (const slug of slugs) {
     }
     for (const [lang, st] of Object.entries(got)) if (!eq(st, want)) fail(slug, `${v.id}: ${lang} stages [${st}] differ from meta stages [${want}]`)
     if (/\bt\.step\b|Tracer/.test(stripTraceCode(tsRaw))) fail(slug, `${v.id}: tracer code leaked into the displayed TypeScript`)
-    ;(v as any)._mod = paths.ts
+    const driver = join(dir, 'ts', `${v.id}.driver.ts`)
+    ;(v as any)._mod = existsSync(driver) ? driver : paths.ts
+    const gdriver = join(dir, 'go', `${v.id}.driver.go`)
+    if (existsSync(gdriver) && !readFileSync(gdriver, 'utf8').startsWith(`package ${pkg}
+`)) fail(slug, `${v.id}: Go driver must start with "package ${pkg}"`)
   })
   for (const s of stageSets) if (!eq(s, stageSets[0])) fail(slug, 'all variants must use the same stage numbers')
 
@@ -113,7 +127,7 @@ for (const slug of slugs) {
 }
 
 // ---- Go: copy sources, generate tests from cases.json, gofmt, vet, test
-const goRoot = join(root, '.verify/go')
+const goRoot = join(root, '.verify', only ? `go-${[...only].sort().join('_').slice(0, 60)}` : 'go')
 rmSync(goRoot, { recursive: true, force: true })
 mkdirSync(goRoot, { recursive: true })
 writeFileSync(join(goRoot, 'go.mod'), 'module recap150verify\n\ngo 1.22\n')
@@ -124,7 +138,11 @@ for (const { meta, pkg } of readyForGo) {
   mkdirSync(out, { recursive: true })
   const src = join(problemsDir, meta.slug)
   writeFileSync(join(out, 'cases.json'), readFileSync(join(src, 'cases.json')))
-  for (const v of meta.variants) writeFileSync(join(out, `${v.id}.go`), readFileSync(join(src, 'go', `${v.id}.go`)))
+  for (const v of meta.variants) {
+    writeFileSync(join(out, `${v.id}.go`), readFileSync(join(src, 'go', `${v.id}.go`)))
+    const gd = join(src, 'go', `${v.id}.driver.go`)
+    if (existsSync(gd)) writeFileSync(join(out, `${v.id}.driver.go`), readFileSync(gd))
+  }
   const tests = meta.variants.map((v) => {
     const decls = meta.goArgs.map((t, i) => `\t\t\tvar a${i} ${t}\n\t\t\tdecode(t, c.Input[${i}], &a${i})`).join('\n')
     const args = meta.goArgs.map((_, i) => `a${i}`).join(', ')
@@ -143,6 +161,7 @@ package ${pkg}
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"reflect"
 	"sort"
@@ -208,16 +227,23 @@ func key(v any) string {
 	return string(b)
 }
 
+func less(a, b any) bool {
+	if x, ok := a.(float64); ok {
+		return x < b.(float64)
+	}
+	return a.(string) < b.(string)
+}
+
 func normalize(v any) any {
 	switch mode {
 	case "sortedFlat":
 		xs := v.([]any)
-		sort.Slice(xs, func(i, j int) bool { return xs[i].(float64) < xs[j].(float64) })
+		sort.Slice(xs, func(i, j int) bool { return less(xs[i], xs[j]) })
 	case "sortedGroups":
 		gs := v.([]any)
 		for _, g := range gs {
 			inner := g.([]any)
-			sort.Slice(inner, func(i, j int) bool { return inner[i].(string) < inner[j].(string) })
+			sort.Slice(inner, func(i, j int) bool { return less(inner[i], inner[j]) })
 		}
 		sort.Slice(gs, func(i, j int) bool { return key(gs[i]) < key(gs[j]) })
 	}
@@ -228,6 +254,13 @@ func check(t *testing.T, got any, expected json.RawMessage) {
 	t.Helper()
 	var want any
 	decode(t, expected, &want)
+	if mode == "approx" {
+		g, w := generic(t, got).(float64), fixNil(want).(float64)
+		if math.Abs(g-w) > 1e-5*math.Max(1, math.Abs(w)) {
+			t.Fatalf("got %v, want %v", g, w)
+		}
+		return
+	}
 	g, w := normalize(generic(t, got)), normalize(fixNil(want))
 	if !reflect.DeepEqual(g, w) {
 		t.Fatalf("got %s, want %s", key(g), key(w))
@@ -249,7 +282,7 @@ if (readyForGo.length) {
   if (test.status !== 0) fail('go', `go test failed:\n${test.stdout}${test.stderr}`)
 }
 
-// ---- PROGRESS.md
+// ---- PROGRESS.md (only on a full run)
 const lines = ['# Progress', '', 'Generated by `npm run verify:content`. Do not edit by hand.', '', '| Category | Ready | Draft | Not started | Total |', '|---|---:|---:|---:|---:|']
 let R = 0, D = 0, T = 0
 for (const cat of CATEGORIES) {
@@ -260,7 +293,7 @@ for (const cat of CATEGORIES) {
   lines.push(`| ${cat} | ${ready} | ${draft} | ${all.length - ready - draft} | ${all.length} |`)
 }
 lines.push(`| **All** | **${R}** | **${D}** | **${T - R - D}** | **${T}** |`, '')
-writeFileSync(join(root, 'PROGRESS.md'), lines.join('\n'))
+if (!skipProgress) writeFileSync(join(root, 'PROGRESS.md'), lines.join('\n'))
 
 if (errors.length) {
   console.error(`\nverify:content FAILED (${errors.length})\n` + errors.map((e) => ' - ' + e).join('\n'))

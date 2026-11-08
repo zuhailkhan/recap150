@@ -1,0 +1,9 @@
+function reverseList(head)
+  prev = null                  # [1] the reversed part, empty so far
+  cur = head                   # [1] the node we are about to flip
+  while cur is not null
+    next = cur.next            # [2] remember the rest before cutting the link
+    cur.next = prev            # [3] flip: point this node backwards
+    prev = cur                 # [4] step forward: cur joins the reversed part
+    cur = next
+  return prev                  # [5] prev is the new head

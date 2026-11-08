@@ -1,0 +1,9 @@
+[
+  {"name":"five nodes","input":[[1,2,3,4,5]],"expected":[5,4,3,2,1]},
+  {"name":"two nodes","input":[[1,2]],"expected":[2,1]},
+  {"name":"empty list","input":[[]],"expected":[],"edge":true},
+  {"name":"single node","input":[[7]],"expected":[7],"edge":true},
+  {"name":"repeated values","input":[[2,2,3,2]],"expected":[2,3,2,2],"edge":true},
+  {"name":"negatives","input":[[-1,0,-3]],"expected":[-3,0,-1]},
+  {"name":"long list","input":[[1,2,3,4,5,6,7,8,9,10,11,12]],"expected":[12,11,10,9,8,7,6,5,4,3,2,1],"edge":true}
+]

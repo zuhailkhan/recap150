@@ -21,9 +21,28 @@ export interface BucketsPanel { kind: 'buckets'; label?: string; keyLabel?: stri
 /** items are listed bottom -> top */
 export interface StackPanel { kind: 'stack'; label?: string; items: Cell[]; tones?: Tones; empty?: string }
 
-// More kinds (list, tree, graph, grid, dp, intervals, heap, trie, bits) are added in the
-// category that first needs them, so the library only holds visuals that are in use.
-export type Panel = ArrayPanel | BucketsPanel | StackPanel
+/** Singly linked list drawn left to right. cycleTo draws the tail pointing back to that index. links are extra arrows (e.g. random pointers). */
+export interface ListPanel { kind: "list"; label?: string; items: Cell[]; tones?: Tones; pointers?: Pointer[]; cycleTo?: number; links?: { from: number; to: number; label?: string }[]; doubly?: boolean }
+/** Binary tree from a level-order array (null = no child), like the usual LeetCode notation. tones are by array index. */
+export interface TreePanel { kind: "tree"; label?: string; nodes: (Cell | null)[]; tones?: Tones; pointers?: Pointer[] }
+export interface GraphNode { id: string; x?: number; y?: number }
+export interface GraphEdge { from: string; to: string; directed?: boolean; weight?: number; tone?: Tone }
+/** Nodes without x/y are placed on a circle. x and y are 0..100. */
+export interface GraphPanel { kind: "graph"; label?: string; nodes: GraphNode[]; edges: GraphEdge[]; tones?: Record<string, Tone>; notes?: Record<string, string> }
+/** Plain 2-D grid (islands, matrices, boards). */
+export interface GridPanel { kind: "grid"; label?: string; cells: Cell[][]; tones?: Tones[]; pointers?: { r: number; c: number; name: string; tone?: Tone }[] }
+/** DP table with optional row and column headers. 1-D tables use a single row. */
+export interface DpPanel { kind: "dp"; label?: string; cells: Cell[][]; tones?: Tones[]; rowLabels?: Cell[]; colLabels?: Cell[] }
+export interface Span { start: number; end: number; label?: string; tone?: Tone }
+export interface IntervalsPanel { kind: "intervals"; label?: string; spans: Span[]; min?: number; max?: number; marks?: { at: number; label?: string }[] }
+/** Binary heap in array form. Drawn as a tree with the array underneath. */
+export interface HeapPanel { kind: "heap"; label?: string; items: Cell[]; tones?: Tones; max?: boolean }
+/** Trie built from words. hot is a prefix to highlight. */
+export interface TriePanel { kind: "trie"; label?: string; words: string[]; hot?: string; hotTone?: Tone }
+/** Rows of binary digits, e.g. a, b and a & b. */
+export interface BitsPanel { kind: "bits"; label?: string; width?: number; rows: { label: string; value: number; tones?: Tones }[] }
+
+export type Panel = ArrayPanel | BucketsPanel | StackPanel | ListPanel | TreePanel | GraphPanel | GridPanel | DpPanel | IntervalsPanel | HeapPanel | TriePanel | BitsPanel
 
 export interface Frame { stage: number; say: string; panels: Panel[] }
 
@@ -43,3 +62,27 @@ export const withTop = (items: Cell[], top: Cell | undefined, tone: Tone): Stack
 /** Turn a Map into bucket data. Values may be a single cell or a list of cells. */
 export const fromMap = (m: Map<Cell, Cell | Cell[]>, hot?: Cell): Bucket[] =>
   [...m].map(([k, v]) => ({ key: String(k), items: Array.isArray(v) ? v : [v], tone: k === hot ? 'focus' : undefined }))
+
+export const list = (items: Cell[], o: Omit<ListPanel, "kind" | "items"> = {}): ListPanel => ({ kind: "list", items: [...items], ...o })
+export const tree = (nodes: (Cell | null)[], o: Omit<TreePanel, "kind" | "nodes"> = {}): TreePanel => ({ kind: "tree", nodes: [...nodes], ...o })
+export const graph = (nodes: (string | number)[] | GraphNode[], edges: GraphEdge[], o: Omit<GraphPanel, "kind" | "nodes" | "edges"> = {}): GraphPanel => ({
+  kind: "graph", nodes: (nodes as (string | number | GraphNode)[]).map((n) => (typeof n === "object" ? n : { id: String(n) })), edges: edges.map((e) => ({ ...e })), ...o,
+})
+export const grid = (cells: Cell[][], o: Omit<GridPanel, "kind" | "cells"> = {}): GridPanel => ({ kind: "grid", cells: cells.map((r) => [...r]), ...o })
+export const dp = (cells: Cell[][], o: Omit<DpPanel, "kind" | "cells"> = {}): DpPanel => ({ kind: "dp", cells: cells.map((r) => [...r]), ...o })
+export const intervals = (spans: Span[], o: Omit<IntervalsPanel, "kind" | "spans"> = {}): IntervalsPanel => ({ kind: "intervals", spans: spans.map((s) => ({ ...s })), ...o })
+export const heap = (items: Cell[], o: Omit<HeapPanel, "kind" | "items"> = {}): HeapPanel => ({ kind: "heap", items: [...items], ...o })
+export const trie = (words: string[], o: Omit<TriePanel, "kind" | "words"> = {}): TriePanel => ({ kind: "trie", words: [...words], ...o })
+export const bits = (rows: BitsPanel["rows"], o: Omit<BitsPanel, "kind" | "rows"> = {}): BitsPanel => ({ kind: "bits", rows: rows.map((r) => ({ ...r })), ...o })
+/** 2-D tones with only the given [r,c] cells set. */
+export const mark2 = (rows: number, cols: number, set: [number, number, Tone][]): Tones[] => {
+  const t: Tones[] = Array.from({ length: rows }, () => Array<Tone | null>(cols).fill(null))
+  for (const [r, c, tone] of set) if (t[r]) t[r][c] = tone
+  return t
+}
+/** Values of a linked list, head first. Stops after cap nodes so a cycle cannot hang the tracer. */
+export const listVals = <N extends { val: Cell; next: N | null }>(head: N | null, cap = 40): Cell[] => {
+  const out: Cell[] = []
+  for (let n = head; n && out.length < cap; n = n.next) out.push(n.val)
+  return out
+}

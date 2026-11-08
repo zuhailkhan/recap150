@@ -1,0 +1,68 @@
+{
+  "slug": "reverse-linked-list",
+  "title": "Reverse Linked List",
+  "category": "Linked List",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get the first node of a singly linked list. Reverse the list so the arrows point the other way, and return the new first node. The list may be empty.",
+  "example": {
+    "caption": "Same nodes, arrows flipped. The old tail 4 becomes the new head.",
+    "input": [{ "kind": "list", "label": "head", "items": [1, 2, 3, 4] }],
+    "output": [{ "kind": "list", "label": "new head", "items": [4, 3, 2, 1], "tones": ["hit", "hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Walk the list once and turn each node's arrow around, but save the next node before you cut the link.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "singly linked list", "plain": "Nodes that each hold a value and one pointer to the next node. You can only walk forward." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the node values in order, e.g. [1,2,3]",
+    "presets": [
+      { "label": "Five nodes", "args": [[1, 2, 3, 4, 5]] },
+      { "label": "Two nodes", "args": [[1, 2]] },
+      { "label": "One node", "args": [[7]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }],
+    "compare": { "brute": "n", "optimal": "1", "bruteLabel": "Copy values to an array, write them back reversed", "optimalLabel": "Flip the arrows in place", "unit": "extra memory cells" },
+    "rows": [
+      { "name": "Copy to an array", "time": "O(n)", "space": "O(n)", "note": "Two passes and a side array that holds every value." },
+      { "name": "Flip pointers in place", "time": "O(n)", "space": "O(1)", "note": "One pass. Only three pointers: prev, cur and next." }
+    ],
+    "takeaway": "Both are one pass. Flipping the arrows needs no extra memory, because the list itself becomes the answer."
+  },
+  "variants": [
+    { "id": "iterative", "label": "Iterative", "tsFn": "reverseListDriver", "goFn": "reverseListDriver", "stages": [
+      { "n": 1, "title": "Set up prev and cur", "note": "prev is the reversed part, empty at first. cur is the node about to be flipped, the head." },
+      { "n": 2, "title": "Save next", "note": "Remember cur.next. After the flip the old link is gone, so this is the only way to the rest." },
+      { "n": 3, "title": "Flip the arrow", "note": "Point cur at prev instead of at the next node." },
+      { "n": 4, "title": "Step forward", "note": "cur joins the reversed part (prev = cur). Then cur moves to the saved next." },
+      { "n": 5, "title": "Return prev", "note": "When cur runs off the end, prev is the old tail and the new head." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty list", "input": "[]", "output": "[]", "why": "The loop never runs and prev is still null. Returning prev is correct." },
+    { "title": "One node", "input": "[7]", "output": "[7]", "why": "One flip: the node points at null, which it already did." },
+    { "title": "Repeated values", "input": "[2, 2, 3, 2]", "output": "[2, 3, 2, 2]", "why": "Equal values are fine. You reverse nodes, not values." },
+    { "title": "Long list", "input": "12 nodes", "output": "reversed", "why": "The loop is not recursive, so a long list cannot overflow the call stack." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Save cur.next before cur.next = prev. Do it in the other order and the rest of the list is lost." },
+    { "lang": "General", "text": "Return prev, not cur. When the loop ends cur is null." },
+    { "lang": "TypeScript", "text": "Declare prev as ListNode | null. Plain let prev = null makes TypeScript infer the type null and reject the assignment later." },
+    { "lang": "Go", "text": "var prev *ListNode starts as nil, which is exactly the empty reversed list. Do not allocate a dummy node for it." },
+    { "lang": "TypeScript", "text": "Build nodes with next: null, not undefined. A loop that tests cur !== null would never stop on a node whose next is undefined." }
+  ],
+  "recap": {
+    "pattern": "Linked list: three pointers",
+    "key": "Walk once. For each node save next, point it backwards, then move forward. Return prev.",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": ["prev = null, cur = head", "Save cur.next", "Point cur.next at prev", "Advance prev and cur. Return prev at the end"]
+  }
+}

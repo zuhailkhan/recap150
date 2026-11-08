@@ -9,6 +9,7 @@ export const router = createRouter({
     { path: '/p/:slug', component: () => import('@/views/ProblemView.vue') },
     { path: '/recap', component: () => import('@/views/RecapHomeView.vue') },
     { path: '/recap/run', component: () => import('@/views/RecapSessionView.vue') },
+    { path: '/lab', component: () => import('@/views/LabView.vue') },
     { path: '/settings', component: () => import('@/views/SettingsView.vue') },
     { path: '/:rest(.*)*', redirect: '/' },
   ],
