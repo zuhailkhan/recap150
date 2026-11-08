@@ -1,0 +1,15 @@
+function subsets(nums)
+  out = empty list
+  path = empty list                          # [1] the numbers taken so far
+
+  function walk(i)
+    if i == length of nums                   # [4] every number is decided
+      add a copy of path to out
+      return
+    push nums[i] onto path                   # [2] take it, then decide the rest
+    walk(i + 1)
+    pop path                                 # [3] undo the take
+    walk(i + 1)                              # [3] decide the rest without nums[i]
+
+  walk(0)
+  return out                                 # [4] all subsets

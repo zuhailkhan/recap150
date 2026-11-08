@@ -1,0 +1,18 @@
+function letterCombinations(digits)
+  out = empty list
+  if digits is empty                         # [1] no digits, no combinations
+    return out
+  path = empty list of letters               # [1] one letter per digit so far
+
+  function walk(i)
+    if i == length of digits                 # [4] a letter for every digit
+      add join(path) to out
+      return
+    options = letters on digit digits[i]     # [2] 2 = abc, 3 = def, ... 9 = wxyz
+    for each letter in options
+      push letter onto path                  # [3] pick it, handle the next digit
+      walk(i + 1)
+      pop path                               # [5] undo, try the next letter
+
+  walk(0)
+  return out                                 # [5] all combinations

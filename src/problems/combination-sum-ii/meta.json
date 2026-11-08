@@ -1,0 +1,69 @@
+{
+  "slug": "combination-sum-ii",
+  "title": "Combination Sum II",
+  "category": "Backtracking",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of positive integers, which may repeat, and a target. Find every different group of them that adds up to the target. Each number in the list can be used at most once. Do not return the same group twice.",
+  "example": {
+    "caption": "Using 1, 2, 2, 3 with target 4: the two 2s make one group, and 1 + 3 makes the other.",
+    "input": [{ "kind": "array", "label": "candidates", "items": [1, 2, 2, 3] }, { "kind": "array", "label": "target", "items": [4] }],
+    "output": [{ "kind": "array", "label": "combinations", "items": ["[1,3]", "[2,2]"], "tones": ["hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Sort, then walk forward through the numbers. Skip a number equal to the one before it at the same depth, and stop the loop once a number is bigger than what is left.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "backtracking", "plain": "Make a choice, explore everything that follows, then undo the choice and try the next one." },
+      { "term": "pruning", "plain": "Cutting off a branch early because it cannot lead to an answer. Here: once a number is too big, so is every number after it." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: a list of positive numbers (repeats allowed), then the target, e.g. [1,2,2,3], 4",
+    "presets": [
+      { "label": "Two groups", "args": [[1, 2, 2, 3], 4] },
+      { "label": "Repeat makes one group", "args": [[3, 1, 3, 5], 6] },
+      { "label": "Nothing fits", "args": [[9, 8], 3] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of candidates" }],
+    "compare": { "brute": "2n", "optimal": "2n", "bruteLabel": "Check all 2^n subsets, dedupe the winners", "optimalLabel": "Prune and skip repeats", "unit": "paths looked at (rough, exponential)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n · 2ⁿ)", "space": "O(n · 2ⁿ)", "note": "Try every subset, keep those with the right sum, and use a set to drop repeated groups." },
+      { "name": "Sort, skip, prune", "time": "O(2ⁿ) worst case", "space": "O(n)", "note": "Sorting costs n log n, which is small. The break on a too-big number and the skip of repeated values cut most branches in practice." }
+    ],
+    "takeaway": "The worst case is still exponential, but pruning and the skip rule mean no group is built twice and many dead ends are never entered."
+  },
+  "variants": [
+    { "id": "backtrack", "label": "Sort, skip, prune", "tsFn": "combinationSum2Driver", "goFn": "combinationSum2Driver", "stages": [
+      { "n": 1, "title": "Sort", "note": "Sort a copy so equal numbers are neighbours and a too-big number means all later ones are too big." },
+      { "n": 2, "title": "Choose", "note": "Push sorted[i] and recurse from i + 1 with the smaller left, so each number is used once." },
+      { "n": 3, "title": "Skip or stop", "note": "Skip a number equal to its left neighbour at this depth. Break when a number is more than left." },
+      { "n": 4, "title": "Record", "note": "When left is exactly 0 the path adds up to the target. Save a copy." },
+      { "n": 5, "title": "Undo", "note": "Pop the choice after exploring it. Return all results at the end." }
+    ] }
+  ],
+  "goArgs": ["[]int", "int"],
+  "goRet": "[][]int",
+  "compare": "sortedGroups",
+  "edges": [
+    { "title": "No answer", "input": "[2, 4], target 5", "output": "[]", "why": "Only sums 2, 4 and 6 are possible. The search ends without ever recording." },
+    { "title": "Use each number once", "input": "[1, 1], target 2", "output": "[[1,1]]", "why": "Two separate 1s in the list may both be used. A single 1 could not be used twice." },
+    { "title": "All equal", "input": "[1, 1, 1, 1], target 3", "output": "[[1,1,1]]", "why": "Without the skip rule, the four choices of which three 1s would give four copies of the same group." },
+    { "title": "Everything too big", "input": "[9, 8], target 3", "output": "[]", "why": "The first sorted number is already more than the target, so the loop breaks at once." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Array.sort() with no argument sorts as strings, so 10 comes before 2. Pass (a, b) => a - b. Sort a copy, not the caller's list." },
+    { "lang": "TypeScript", "text": "Save [...path], not path. The array is mutated after the save, so a stored reference would end up empty." },
+    { "lang": "Go", "text": "Save append([]int{}, path...), because slices share a backing array and a later append can overwrite a stored one. Also copy before sort.Ints, which sorts in place." },
+    { "lang": "General", "text": "Skip with i > start, not i > 0. A repeated value is legal on a deeper level, where it extends the path (1 then 1)." },
+    { "lang": "General", "text": "break is safe here only because the list is sorted. In Combination Sum with unsorted numbers you must use continue." }
+  ],
+  "recap": {
+    "pattern": "Backtracking: sort, skip, prune",
+    "key": "Sort. Loop from start. Skip a repeat of the previous value. Break when bigger than left. Recurse on i + 1.",
+    "complexity": "Time O(2ⁿ) worst case. Space O(n) for the recursion.",
+    "moves": ["Sort a copy of the candidates", "Skip when i > start and sorted[i] == sorted[i - 1]", "Break when sorted[i] > left", "Push, recurse on (i + 1, left - sorted[i]), pop"]
+  }
+}

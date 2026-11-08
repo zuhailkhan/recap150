@@ -1,0 +1,68 @@
+{
+  "slug": "word-search",
+  "title": "Word Search",
+  "category": "Backtracking",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a grid of letters and a word. Decide whether the word can be spelled by a path of cells where each step moves up, down, left or right to a neighbour. A single cell may not be used twice in the same path.",
+  "example": {
+    "caption": "CATS is spelled along the top row, then down from the T to the S.",
+    "input": [{ "kind": "grid", "label": "board", "cells": [["C", "A", "T"], ["A", "T", "S"]] }, { "kind": "array", "label": "word", "items": ["CATS"] }],
+    "output": [{ "kind": "grid", "label": "the path", "cells": [["C", "A", "T"], ["A", "T", "S"]], "tones": [["hit", "hit", "hit"], [null, null, "hit"]] }, { "kind": "array", "label": "exists?", "items": ["true"], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "From each start cell, match one letter at a time. Mark the cell as in use while exploring from it, and restore it when you back up, so other paths can use it.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "backtracking", "plain": "Make a choice, explore everything that follows, then undo the choice and try the next one." },
+      { "term": "DFS", "plain": "Depth-first search: follow one path as far as it goes before trying another." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: a grid of one-letter strings, then the word. Keep the grid to 2 by 3.",
+    "presets": [
+      { "label": "CATS is there", "args": [[["C", "A", "T"], ["A", "T", "S"]], "CATS"] },
+      { "label": "Dead ends everywhere", "args": [[["C", "A", "T"], ["A", "T", "S"]], "CAS"] },
+      { "label": "Needs the same cell twice", "args": [[["C", "A", "T"], ["A", "T", "S"]], "CAC"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "m x n", "meaning": "grid rows and columns" }, { "sym": "L", "meaning": "length of the word" }],
+    "compare": { "brute": "2n", "optimal": "2n", "bruteLabel": "Copy the visited set at every step", "optimalLabel": "Mark in place, restore after", "unit": "cells touched (rough, exponential in the word length)" },
+    "rows": [
+      { "name": "Copy the visited set", "time": "O(m·n · 3ᴸ · L)", "space": "O(m·n · L)", "note": "Pass a fresh set of used cells down each step. Same paths, but every step copies up to L cells." },
+      { "name": "Mark in place and restore", "time": "O(m·n · 3ᴸ)", "space": "O(L)", "note": "From each start, a path has at most 3 new neighbours per step (not the one it came from) and is at most L deep. Space is only the recursion." }
+    ],
+    "takeaway": "Both are exponential in the word length. Writing # into the board and putting the letter back keeps each step cheap and needs no extra set."
+  },
+  "variants": [
+    { "id": "backtrack", "label": "Mark and restore", "tsFn": "existDriver", "goFn": "existDriver", "stages": [
+      { "n": 1, "title": "Pick a start", "note": "Try each cell as the first letter. Stop with true at the first success, false if none works." },
+      { "n": 2, "title": "Match or stop", "note": "If every letter is matched, the word is found. If the cell is off the board, already in use, or the wrong letter, this branch is a dead end." },
+      { "n": 3, "title": "Mark and explore", "note": "Write # into the cell so the path cannot revisit it, then try right, down, left and up for the next letter." },
+      { "n": 4, "title": "Restore", "note": "Put the original letter back. This is the undo: other paths, and other start cells, see the board as it was." }
+    ] }
+  ],
+  "goArgs": ["[][]string", "string"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "One-cell board", "input": "[[\"A\"]], \"A\"", "output": "true", "why": "The start cell matches the only letter, and k reaches the word length at once." },
+    { "title": "Word longer than the board", "input": "[[\"A\"]], \"AA\"", "output": "false", "why": "The second A would need a different cell. The only neighbour is off the board, and the first A is in use." },
+    { "title": "Reuse is not allowed", "input": "CAC on the 2 by 3 board", "output": "false", "why": "The second C is the cell the path started on. It holds # at that moment, so it does not match." },
+    { "title": "First start fails", "input": "[[B,A],[C,B]], \"AB\"", "output": "true", "why": "Starting at the top-left B fails. The next start, the A, works. Starts do not stop the search on a miss." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "The board is changed while searching. Restore every cell before returning, on the success path too, or the caller's board stays full of #." },
+    { "lang": "TypeScript", "text": "Chain the four calls with ||. It stops at the first true, so later neighbours are not explored. Do not store them in an array first, which would run all four." },
+    { "lang": "Go", "text": "Convert the board to [][]byte once. board[r][c] != word[k] then compares two bytes, with no string allocation. Remember a string cell holds one letter, so cell[0] is the byte." },
+    { "lang": "Go", "text": "dfs calls itself, so declare it first with var dfs func(...), then assign it. A short := declaration cannot refer to itself." },
+    { "lang": "General", "text": "Check the bounds before indexing the board, and keep the word-length check first. Doing it in the other order reads past the end or fails a finished match." }
+  ],
+  "recap": {
+    "pattern": "DFS with mark and restore",
+    "key": "From each cell, match letter k. Put # in the cell, try four neighbours with k + 1, then put the letter back.",
+    "complexity": "Time O(m·n · 3ᴸ). Space O(L) for the recursion.",
+    "moves": ["Try every cell as the start", "Stop on a full match, or on a wrong, used or off-board cell", "Mark the cell, then try the four neighbours with ||", "Restore the letter before returning"]
+  }
+}

@@ -1,0 +1,16 @@
+function subsetsWithDup(nums)
+  sorted = sorted copy of nums               # [1] equal numbers become neighbours
+  out = empty list
+  path = empty list
+
+  function walk(start)
+    add a copy of path to out                # [4] every path is a subset
+    for i from start to last index
+      if i > start and sorted[i] == sorted[i - 1]
+        continue                             # [3] same value already tried at this depth
+      push sorted[i] onto path               # [2] choose it, look only at what follows
+      walk(i + 1)
+      pop path                               # [5] undo the choice
+
+  walk(0)
+  return out                                 # [5] all different subsets

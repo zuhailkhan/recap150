@@ -1,0 +1,20 @@
+function combinationSum2(candidates, target)
+  sorted = sorted copy of candidates         # [1] equal numbers become neighbours
+  out = empty list
+  path = empty list
+
+  function walk(start, left)
+    if left == 0                             # [4] the path adds up to the target
+      add a copy of path to out
+      return
+    for i from start to last index
+      if i > start and sorted[i] == sorted[i - 1]
+        continue                             # [3] same value already tried at this depth
+      if sorted[i] > left
+        break                                # [3] too big, and so is the rest
+      push sorted[i] onto path               # [2] choose it, look only at what follows
+      walk(i + 1, left - sorted[i])
+      pop path                               # [5] undo the choice
+
+  walk(0, target)
+  return out                                 # [5] all different combinations

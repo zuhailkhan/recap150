@@ -1,0 +1,17 @@
+function combinationSum(candidates, target)
+  out = empty list
+  path = empty list                          # [1] the numbers picked so far
+
+  function walk(start, left)
+    if left == 0                             # [4] the path adds up to the target
+      add a copy of path to out
+      return
+    for i from start to last candidate
+      if candidates[i] > left                # [3] too big: skip it
+        continue
+      push candidates[i] onto path           # [2] pick it
+      walk(i, left - candidates[i])          # i, not i + 1: it may be used again
+      pop path                               # [5] undo, then try the next candidate
+
+  walk(0, target)
+  return out                                 # [5] all combinations

@@ -1,0 +1,69 @@
+{
+  "slug": "letter-combinations-of-a-phone-number",
+  "title": "Letter Combinations of a Phone Number",
+  "category": "Backtracking",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "On an old phone keypad, digits 2 to 9 carry letters: 2 has abc, 3 has def, and so on up to 9 with wxyz. Given a string of such digits, list every word you could spell by taking one letter for each digit in order. An empty input gives an empty list.",
+  "example": {
+    "caption": "Digit 2 offers a, b, c and digit 3 offers d, e, f, so there are 3 x 3 = 9 words.",
+    "input": [{ "kind": "array", "label": "digits", "items": ["2", "3"] }],
+    "output": [{ "kind": "array", "label": "words", "items": ["ad", "ae", "af", "bd", "be", "bf", "cd", "ce", "cf"], "tones": ["hit", "hit", "hit", "hit", "hit", "hit", "hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Each digit is one level of a tree. At a level, try every letter on that digit, go down to the next digit, then undo the letter to try the next.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "backtracking", "plain": "Make a choice, explore everything that follows, then undo the choice and try the next one." },
+      { "term": "Cartesian product", "plain": "All ways to pick one item from each of several lists. This problem is exactly that, one list per digit." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a string of digits 2 to 9, e.g. 23 (keep it to 2 digits)",
+    "presets": [
+      { "label": "Two digits", "args": ["23"] },
+      { "label": "One digit", "args": ["9"] },
+      { "label": "Same digit twice", "args": ["22"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of digits" }],
+    "compare": { "brute": "2n", "optimal": "2n", "bruteLabel": "Build the product list by list", "optimalLabel": "Depth-first with one shared path", "unit": "words built (rough: 3 to 4 choices per digit, so exponential)" },
+    "rows": [
+      { "name": "Iterative product", "time": "O(n · 4ⁿ)", "space": "O(n · 4ⁿ)", "note": "Start with [''] and for each digit extend every word so far by each letter. Keeps every half-built word alive at once." },
+      { "name": "Backtracking", "time": "O(n · 4ⁿ)", "space": "O(n)", "note": "At most 4 letters per digit, so at most 4^n words, each n long. One shared path is built and undone, so only the output is large." }
+    ],
+    "takeaway": "Both produce the same words. Backtracking needs only one path in memory at a time, besides the answer."
+  },
+  "variants": [
+    { "id": "backtrack", "label": "Backtracking", "tsFn": "letterCombinationsDriver", "goFn": "letterCombinationsDriver", "stages": [
+      { "n": 1, "title": "Start empty", "note": "No digits means no words, so return an empty list. Otherwise path holds one letter per digit so far." },
+      { "n": 2, "title": "Look at a digit", "note": "Find the letters printed on this digit. Each one will be tried in turn." },
+      { "n": 3, "title": "Pick a letter", "note": "Push the letter on the path and go to the next digit." },
+      { "n": 4, "title": "Record", "note": "When every digit has a letter, join the path into a word and save it." },
+      { "n": 5, "title": "Undo", "note": "Pop the letter and try the next one. Return all words at the end." }
+    ] }
+  ],
+  "goArgs": ["string"],
+  "goRet": "[]string",
+  "compare": "sortedFlat",
+  "edges": [
+    { "title": "Empty input", "input": "\"\"", "output": "[]", "why": "No digits means no words. Without the early return, the walk would save one empty word." },
+    { "title": "One digit", "input": "\"2\"", "output": "[\"a\", \"b\", \"c\"]", "why": "One level, three letters, three words of length one." },
+    { "title": "Four-letter digits", "input": "\"79\"", "output": "16 words", "why": "7 and 9 each carry four letters, so 4 x 4. The branch factor is not always 3." },
+    { "title": "Same digit twice", "input": "\"22\"", "output": "9 words: aa, ab, ac, ba ...", "why": "Each level is independent. The same digit twice gives the full 3 x 3 grid, including aa, bb and cc." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Check digits === '' before the walk and return []. Starting the recursion on an empty string would save [''] (one empty word), which is wrong for this problem." },
+    { "lang": "TypeScript", "text": "Digits are characters. Number(digits[i]) - 2 turns '2' into index 0. Using the character directly as an index would read the wrong row or undefined." },
+    { "lang": "Go", "text": "path is a []byte, and string(path) copies it. Appending the byte slice itself would alias one backing array and every saved word would change." },
+    { "lang": "Go", "text": "Index the letters table with digits[i]-'2'. digits[i] is a byte, so the subtraction gives a small number with no conversion needed." },
+    { "lang": "General", "text": "Digits 7 and 9 have four letters, the others three. Read the letters from a table instead of assuming 3." }
+  ],
+  "recap": {
+    "pattern": "Backtracking: one level per digit",
+    "key": "For digit i, try each of its letters: push, recurse on i + 1, pop. Save the word when i == n. Return [] for empty input.",
+    "complexity": "Time O(n · 4ⁿ). Space O(n) for the recursion, plus the output.",
+    "moves": ["Return [] for empty input", "Look up the letters for digits[i]", "Push a letter, recurse on i + 1, pop", "At i == n join the path and save the word"]
+  }
+}

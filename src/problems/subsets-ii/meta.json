@@ -1,0 +1,69 @@
+{
+  "slug": "subsets-ii",
+  "title": "Subsets II",
+  "category": "Backtracking",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of integers that may contain repeats. Return every possible subset, but list each different subset only once. Two subsets are the same if they hold the same numbers, whatever the order. The subsets can come back in any order.",
+  "example": {
+    "caption": "The two 2s are interchangeable, so [1,2] appears once, not twice. Six different subsets remain.",
+    "input": [{ "kind": "array", "label": "nums", "items": [1, 2, 2] }],
+    "output": [{ "kind": "array", "label": "subsets", "items": ["[]", "[1]", "[2]", "[1,2]", "[2,2]", "[1,2,2]"], "tones": ["hit", "hit", "hit", "hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Sort the numbers, then never choose the same value twice in one loop: inside a loop, skip any number that equals the one just before it.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "backtracking", "plain": "Make a choice, explore everything that follows, then undo the choice and try the next one." },
+      { "term": "same depth", "plain": "Choices made in the same loop, as siblings in the tree. A repeat is fine on a deeper level, where it extends the path, but not as a second sibling." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of numbers with repeats, e.g. [1,2,2] (keep it to 3 or 4)",
+    "presets": [
+      { "label": "One repeated 2", "args": [[1, 2, 2]] },
+      { "label": "Pair", "args": [[2, 2]] },
+      { "label": "All the same", "args": [[4, 4, 4]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "how many numbers" }],
+    "compare": { "brute": "2n", "optimal": "2n", "bruteLabel": "Build all 2^n subsets, then remove duplicates", "optimalLabel": "Skip duplicate branches as you go", "unit": "subsets built (rough, exponential)" },
+    "rows": [
+      { "name": "Generate then dedupe", "time": "O(n · 2ⁿ)", "space": "O(n · 2ⁿ)", "note": "Make every subset of the sorted list and keep a set of seen ones. Wasteful, and the set stores every subset." },
+      { "name": "Skip duplicate siblings", "time": "O(n · 2ⁿ)", "space": "O(n)", "note": "In the worst case (all different) it is the same as Subsets. With repeats it builds fewer, since duplicate branches are never entered." }
+    ],
+    "takeaway": "The bound is the same as Subsets, but the skip rule means no subset is ever built twice, so no set of seen subsets is needed."
+  },
+  "variants": [
+    { "id": "backtrack", "label": "Sort and skip", "tsFn": "subsetsWithDupDriver", "goFn": "subsetsWithDupDriver", "stages": [
+      { "n": 1, "title": "Sort", "note": "Sort a copy so equal numbers sit side by side. Without this the skip rule cannot see them." },
+      { "n": 2, "title": "Choose", "note": "Push sorted[i] on the path and recurse from i + 1, so only later numbers can follow." },
+      { "n": 3, "title": "Skip a repeat", "note": "If i is past start and sorted[i] equals sorted[i - 1], that value was already tried at this depth. Skip it." },
+      { "n": 4, "title": "Record", "note": "Every path is a subset, so save a copy as soon as you enter, before the loop." },
+      { "n": 5, "title": "Undo", "note": "Pop the choice after exploring it. Return all results at the end." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "[][]int",
+  "compare": "sortedGroups",
+  "edges": [
+    { "title": "All the same", "input": "[4, 4, 4]", "output": "[[],[4],[4,4],[4,4,4]]", "why": "Only the count of 4s differs, so there are four subsets. Each later 4 is skipped as a sibling." },
+    { "title": "Repeats out of order", "input": "[2, 1, 2]", "output": "same six as [1,2,2]", "why": "Sorting first groups the 2s. Skipping the sort would let [2,1] and [1,2] both appear." },
+    { "title": "Single number", "input": "[0]", "output": "[[], [0]]", "why": "No neighbour to compare with, so nothing is skipped. i > start guards the i - 1 lookup." },
+    { "title": "Repeat at both ends", "input": "[1, 2, 3, 1]", "output": "12 subsets, not 16", "why": "After sorting, the two 1s are neighbours. Four subsets would repeat without the skip." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Array.sort() with no argument compares as strings, so 10 comes before 2. Pass (a, b) => a - b. Sort a copy so the caller's list is left alone." },
+    { "lang": "TypeScript", "text": "Save [...path], not path. The array keeps changing, so a stored reference ends up wrong." },
+    { "lang": "Go", "text": "Save append([]int{}, path...). Appending path shares one backing array, so saved subsets change as the search continues. Copy nums before sort.Ints, which sorts in place." },
+    { "lang": "General", "text": "Use i > start, not i > 0. With i > 0 you would skip a repeat on a deeper level, where it is legal, and lose [1,2,2]." },
+    { "lang": "General", "text": "Compare with the neighbour sorted[i - 1], not a seen set. Sorting makes the neighbour check enough." }
+  ],
+  "recap": {
+    "pattern": "Backtracking with duplicate skip",
+    "key": "Sort. Record every path. In the loop, skip sorted[i] when i > start and it equals sorted[i - 1].",
+    "complexity": "Time O(n · 2ⁿ). Space O(n) for the recursion, plus the output.",
+    "moves": ["Sort a copy of nums", "Save a copy of the path on entry", "Skip when i > start and sorted[i] == sorted[i - 1]", "Push, recurse on i + 1, pop"]
+  }
+}

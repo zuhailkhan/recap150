@@ -1,0 +1,10 @@
+[
+  {"name":"classic","input":[[2,3,6,7],7],"expected":[[7],[2,2,3]]},
+  {"name":"small candidates repeat a lot","input":[[2,3,5],8],"expected":[[3,5],[2,3,3],[2,2,2,2]]},
+  {"name":"no way to reach it","input":[[2],1],"expected":[],"edge":true},
+  {"name":"one candidate used many times","input":[[1],4],"expected":[[1,1,1,1]],"edge":true},
+  {"name":"target equals a candidate","input":[[3,5],5],"expected":[[5]]},
+  {"name":"unsorted candidates","input":[[7,3,2],9],"expected":[[3,2,2,2],[3,3,3],[7,2]],"edge":true},
+  {"name":"many combinations","input":[[2,3,4,5],10],"expected":[[5,5],[3,3,4],[2,4,4],[2,3,5],[2,2,3,3],[2,2,2,4],[2,2,2,2,2]]},
+  {"name":"candidate larger than the target is skipped","input":[[8,2],4],"expected":[[2,2]]}
+]

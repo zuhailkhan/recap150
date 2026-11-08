@@ -1,0 +1,69 @@
+{
+  "slug": "combination-sum",
+  "title": "Combination Sum",
+  "category": "Backtracking",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of different positive integers and a target. Find every group of those numbers that adds up to the target. A number may be used any number of times. Two groups are the same if they use each number the same number of times.",
+  "example": {
+    "caption": "With 2, 3 and 5 and target 5, two groups work: 2 + 3, and 5 alone.",
+    "input": [{ "kind": "array", "label": "candidates", "items": [2, 3, 5] }, { "kind": "array", "label": "target", "items": [5] }],
+    "output": [{ "kind": "array", "label": "combinations", "items": ["[2,3]", "[5]"], "tones": ["hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Pick a number, subtract it from what is left, and recurse. Pass the same index down so a number can repeat, and never look back so a group is not built twice in another order.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "backtracking", "plain": "Make a choice, explore everything that follows, then undo the choice and try the next one." },
+      { "term": "start index", "plain": "The first candidate position still allowed. Candidates before it are never picked again on this path, which stops [2,3] and [3,2] both appearing." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: a list of different positive numbers, then the target, e.g. [2,3,5], 5",
+    "presets": [
+      { "label": "Two ways to make 5", "args": [[2, 3, 5], 5] },
+      { "label": "Repeat a number", "args": [[2, 3], 6] },
+      { "label": "No way", "args": [[7], 3] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of candidates" }, { "sym": "T", "meaning": "the target" }],
+    "compare": { "brute": "2n", "optimal": "2n", "bruteLabel": "Try every multiset of candidates up to the target", "optimalLabel": "Prune the moment a pick overshoots", "unit": "paths looked at (rough, exponential)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(nᵀ)", "space": "O(T)", "note": "Pick any candidate at every step with no start index and no limit check, then filter. Orders repeat and overshoots are explored." },
+      { "name": "Backtracking", "time": "O(nᵀ/ᵐ) roughly", "space": "O(T/m)", "note": "m is the smallest candidate. A path is at most T/m deep. Pruning overshoots and using a start index keeps each group once." }
+    ],
+    "takeaway": "Still exponential in the worst case, since the number of answers can be. Pruning and the start index remove the wasted branches."
+  },
+  "variants": [
+    { "id": "backtrack", "label": "Backtracking", "tsFn": "combinationSumDriver", "goFn": "combinationSumDriver", "stages": [
+      { "n": 1, "title": "Start empty", "note": "path holds the numbers picked so far. left is the target minus their sum." },
+      { "n": 2, "title": "Pick one", "note": "Push candidates[i] and recurse with the smaller left. Pass i again, so the same number may be picked once more." },
+      { "n": 3, "title": "Skip if too big", "note": "If candidates[i] is more than left, picking it would overshoot. Skip it." },
+      { "n": 4, "title": "Record", "note": "When left is exactly 0 the path adds up to the target. Save a copy." },
+      { "n": 5, "title": "Undo", "note": "Pop the pick after exploring it so the next candidate starts from the same path. Return all results at the end." }
+    ] }
+  ],
+  "goArgs": ["[]int", "int"],
+  "goRet": "[][]int",
+  "compare": "sortedGroups",
+  "edges": [
+    { "title": "No answer", "input": "[2], target 1", "output": "[]", "why": "2 is more than the 1 left, so nothing is ever picked. An empty result is right, not an error." },
+    { "title": "One number repeated", "input": "[1], target 4", "output": "[[1,1,1,1]]", "why": "Passing i again lets the same number be picked four times. Passing i + 1 would find nothing." },
+    { "title": "Unsorted candidates", "input": "[7, 3, 2], target 9", "output": "[[7,2],[3,3,3],[3,2,2,2]] in some order", "why": "The code skips with continue, not break, so the order of the candidates does not matter." },
+    { "title": "Target equals a candidate", "input": "[3, 5], target 5", "output": "[[5]]", "why": "left hits exactly 0 right after one pick, which is the stopping rule for a hit." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Save [...path], not path. The array keeps being pushed to and popped, so a stored reference ends up empty." },
+    { "lang": "Go", "text": "Save append([]int{}, path...). A plain append(out, path) stores a slice that shares one backing array with path, so every saved group changes as the search goes on." },
+    { "lang": "General", "text": "Recurse with i, not i + 1, to allow reuse. Recurse with start 0 instead, and [2,3] and [3,2] both appear as different groups." },
+    { "lang": "General", "text": "With unsorted candidates use continue when a number is too big. break is only safe when the list is sorted, as in Combination Sum II." },
+    { "lang": "General", "text": "Check left == 0 before the loop. Checking it inside would miss the case where the target is already reached." }
+  ],
+  "recap": {
+    "pattern": "Backtracking with a start index",
+    "key": "Pick candidates[i], recurse on (i, left - candidates[i]). Record at left == 0. Skip numbers bigger than left.",
+    "complexity": "Time exponential: about n^(T/m). Space O(T/m) for the recursion.",
+    "moves": ["Track path, start index and what is left", "Skip a number bigger than left", "Pick it, recurse with the same i", "At left == 0 save a copy, then pop to undo"]
+  }
+}

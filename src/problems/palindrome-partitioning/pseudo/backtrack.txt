@@ -1,0 +1,18 @@
+function partition(s)
+  out = empty list
+  path = empty list                          # [1] the pieces cut so far
+
+  function walk(start)
+    if start == length of s                  # [4] the whole string is cut
+      add a copy of path to out
+      return
+    for end from start + 1 to length of s
+      piece = s[start .. end)
+      if piece is not a palindrome           # [2] reject this piece
+        continue
+      push piece onto path                   # [3] cut it off, split the rest
+      walk(end)
+      pop path                               # [5] undo the cut, try a longer piece
+
+  walk(0)
+  return out                                 # [5] all partitions

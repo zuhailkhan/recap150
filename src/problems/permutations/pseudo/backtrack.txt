@@ -1,0 +1,20 @@
+function permute(nums)
+  out = empty list
+  path = empty list                          # [1] the order built so far
+  used = list of false, one per number
+
+  function walk()
+    if length of path == length of nums      # [4] every slot is filled
+      add a copy of path to out
+      return
+    for i from 0 to last index
+      if used[i]                             # [3] already in the path: skip
+        continue
+      used[i] = true                         # [2] choose nums[i] for this slot
+      push nums[i] onto path
+      walk()
+      pop path                               # [5] undo, free the number again
+      used[i] = false
+
+  walk()
+  return out                                 # [5] all orders

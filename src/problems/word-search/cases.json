@@ -1,0 +1,12 @@
+[
+  {"name":"found along the first row and down","input":[[["C","A","T"],["A","T","S"]],"CATS"],"expected":true},
+  {"name":"dead end, then no other start","input":[[["C","A","T"],["A","T","S"]],"CAS"],"expected":false},
+  {"name":"would need to reuse a cell","input":[[["C","A","T"],["A","T","S"]],"CAC"],"expected":false,"edge":true},
+  {"name":"single cell board, match","input":[[["A"]],"A"],"expected":true,"edge":true},
+  {"name":"single cell board, too long","input":[[["A"]],"AA"],"expected":false,"edge":true},
+  {"name":"three by four, snakes around","input":[[["A","B","C","E"],["S","F","C","S"],["A","D","E","E"]],"ABCCED"],"expected":true},
+  {"name":"three by four, forced to reuse","input":[[["A","B","C","E"],["S","F","C","S"],["A","D","E","E"]],"ABCB"],"expected":false},
+  {"name":"three by four, a letter that is not there","input":[[["A","B","C","E"],["S","F","C","S"],["A","D","E","E"]],"XYZ"],"expected":false},
+  {"name":"word starts mid-board","input":[[["A","B","C","E"],["S","F","C","S"],["A","D","E","E"]],"SEE"],"expected":true},
+  {"name":"first start fails but a later one works","input":[[["B","A"],["C","B"]],"AB"],"expected":true}
+]

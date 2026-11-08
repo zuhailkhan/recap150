@@ -1,0 +1,20 @@
+function solveNQueens(n)
+  out = empty list
+  queens = empty list                        # [1] queens[r] = column of the queen in row r
+  cols, down, up = three empty sets          # columns, r - c, r + c
+
+  function walk(r)
+    if r == n                                # [4] every row has a queen
+      add the board drawn from queens to out
+      return
+    for c from 0 to n - 1
+      if c in cols or r - c in down or r + c in up
+        continue                             # [2] this square is attacked
+      push c onto queens                     # [3] place a queen
+      add c to cols, r - c to down, r + c to up
+      walk(r + 1)
+      pop queens                             # [5] remove the queen
+      remove c from cols, r - c from down, r + c from up
+
+  walk(0)
+  return out                                 # [5] all boards

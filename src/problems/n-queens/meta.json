@@ -1,0 +1,69 @@
+{
+  "slug": "n-queens",
+  "title": "N Queens",
+  "category": "Backtracking",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "Place n chess queens on an n by n board so that no two attack each other: no two share a row, a column or a diagonal. Return every valid board. Draw each board as a list of strings, with Q for a queen and a dot for an empty square.",
+  "example": {
+    "caption": "On a 4 by 4 board there are exactly two ways. This is one of them.",
+    "input": [{ "kind": "array", "label": "n", "items": [4] }],
+    "output": [{ "kind": "grid", "label": "one valid board", "cells": [[".", "Q", ".", "."], [".", ".", ".", "Q"], ["Q", ".", ".", "."], [".", ".", "Q", "."]], "tones": [[null, "hit", null, null], [null, null, null, "hit"], ["hit", null, null, null], [null, null, "hit", null]] }]
+  },
+  "idea": {
+    "sentence": "Put one queen in each row, top to bottom. Keep three sets of taken columns and diagonals so each square is checked in one step, and remove the queen to try the next column.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "backtracking", "plain": "Make a choice, explore everything that follows, then undo the choice and try the next one." },
+      { "term": "diagonal id", "plain": "Squares on the same down-right diagonal share r - c. Squares on the same up-right diagonal share r + c." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the board size n, e.g. 4 (keep it to 4 or less)",
+    "presets": [
+      { "label": "4 queens", "args": [4] },
+      { "label": "3 queens: no board", "args": [3] },
+      { "label": "1 queen", "args": [1] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "board size, and number of queens" }],
+    "compare": { "brute": "2n", "optimal": "2n", "bruteLabel": "Choose n squares of n^2, then check", "optimalLabel": "One queen per row, prune attacks", "unit": "boards looked at (rough: the real counts are n^2 choose n vs about n!, both faster than 2^n)" },
+    "rows": [
+      { "name": "Any n squares", "time": "O(n² choose n)", "space": "O(n)", "note": "Choose any n squares of the n² and check them. Far too many to try." },
+      { "name": "Row by row with sets", "time": "O(n!) roughly", "space": "O(n)", "note": "Each row has at most n columns left, fewer after attacks. Checking a square is O(1) with three sets. Space is the recursion plus the sets." }
+    ],
+    "takeaway": "One queen per row removes the row clash by design. The three sets turn the column and diagonal checks into lookups, and pruning cuts most of the n! orders."
+  },
+  "variants": [
+    { "id": "backtrack", "label": "Row by row with sets", "tsFn": "solveNQueensDriver", "goFn": "solveNQueensDriver", "stages": [
+      { "n": 1, "title": "Empty board", "note": "queens[r] will hold the column of the queen in row r. Three sets track taken columns, r - c and r + c." },
+      { "n": 2, "title": "Check the square", "note": "In the current row, a square is safe only if its column, r - c and r + c are all free. Otherwise skip it." },
+      { "n": 3, "title": "Place a queen", "note": "Push the column and add the column and both diagonals to the sets. Go to the next row." },
+      { "n": 4, "title": "Record the board", "note": "When every row has a queen, draw the board as strings and save it." },
+      { "n": 5, "title": "Remove the queen", "note": "Pop it and clear the three sets for it, then try the next column. Return all boards at the end." }
+    ] }
+  ],
+  "goArgs": ["int"],
+  "goRet": "[][]string",
+  "compare": "exact",
+  "edges": [
+    { "title": "One queen", "input": "n = 1", "output": "[[\"Q\"]]", "why": "A single square, no one to attack. The board is just Q." },
+    { "title": "No solution", "input": "n = 2", "output": "[]", "why": "The first queen covers the whole 2 by 2 board. An empty list is correct, not an error." },
+    { "title": "Also none", "input": "n = 3", "output": "[]", "why": "Every first column leaves the second row with a safe square that kills the third row." },
+    { "title": "Counts to know", "input": "n = 5, 6, 7", "output": "10, 4, 40 boards", "why": "Not monotonic: 6 has fewer boards than 5. Good for testing a solution." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Build each board row with '.'.repeat(c) + 'Q' + '.'.repeat(n - c - 1). Strings are immutable, so you cannot set a character in place." },
+    { "lang": "TypeScript", "text": "Do not draw a grid with Array(n).fill(Array(n).fill('.')). That puts the same inner array in every row, so placing one queen puts it in every row." },
+    { "lang": "Go", "text": "Diagonal r - c goes negative, so offset it with + n - 1. The array has 2n - 1 slots, and r + c needs the same size." },
+    { "lang": "Go", "text": "Each board is a fresh []string made in the record branch and then appended. Reusing one slice between boards would make all saved boards equal the last one." },
+    { "lang": "General", "text": "Remove the queen from all three sets when undoing. Clearing only the column leaves ghost diagonals that block valid squares later." }
+  ],
+  "recap": {
+    "pattern": "Backtracking: row by row with sets",
+    "key": "One queen per row. A square is safe if its column, r - c and r + c are all free. Place, recurse, remove.",
+    "complexity": "Time about O(n!). Space O(n) for the recursion and the sets.",
+    "moves": ["Walk the rows top to bottom", "Skip a column that is in cols, r-c in down or r+c in up", "Place: record the column and both diagonals", "At row n draw a board; then remove the queen"]
+  }
+}

@@ -1,0 +1,10 @@
+[
+  {"name":"two digits","input":["23"],"expected":["ad","ae","af","bd","be","bf","cd","ce","cf"]},
+  {"name":"empty input gives nothing","input":[""],"expected":[],"edge":true},
+  {"name":"one digit","input":["2"],"expected":["a","b","c"]},
+  {"name":"digit with four letters","input":["7"],"expected":["p","q","r","s"],"edge":true},
+  {"name":"two four-letter digits","input":["79"],"expected":["pw","px","py","pz","qw","qx","qy","qz","rw","rx","ry","rz","sw","sx","sy","sz"]},
+  {"name":"three digits","input":["234"],"expected":["adg","adh","adi","aeg","aeh","aei","afg","afh","afi","bdg","bdh","bdi","beg","beh","bei","bfg","bfh","bfi","cdg","cdh","cdi","ceg","ceh","cei","cfg","cfh","cfi"]},
+  {"name":"same digit twice","input":["22"],"expected":["aa","ab","ac","ba","bb","bc","ca","cb","cc"]},
+  {"name":"four digits, 81 words","input":["2345"],"expected":["adgj","adgk","adgl","adhj","adhk","adhl","adij","adik","adil","aegj","aegk","aegl","aehj","aehk","aehl","aeij","aeik","aeil","afgj","afgk","afgl","afhj","afhk","afhl","afij","afik","afil","bdgj","bdgk","bdgl","bdhj","bdhk","bdhl","bdij","bdik","bdil","begj","begk","begl","behj","behk","behl","beij","beik","beil","bfgj","bfgk","bfgl","bfhj","bfhk","bfhl","bfij","bfik","bfil","cdgj","cdgk","cdgl","cdhj","cdhk","cdhl","cdij","cdik","cdil","cegj","cegk","cegl","cehj","cehk","cehl","ceij","ceik","ceil","cfgj","cfgk","cfgl","cfhj","cfhk","cfhl","cfij","cfik","cfil"]}
+]

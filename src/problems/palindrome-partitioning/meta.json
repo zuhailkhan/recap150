@@ -1,0 +1,69 @@
+{
+  "slug": "palindrome-partitioning",
+  "title": "Palindrome Partitioning",
+  "category": "Backtracking",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a string. Cut it into consecutive pieces so that every piece reads the same forwards and backwards. Return every way to do that. The cuts keep the original letter order, and the partitions can come back in any order.",
+  "example": {
+    "caption": "aab can be cut as a | a | b or as aa | b. The piece ab is not a palindrome, so it is never used.",
+    "input": [{ "kind": "array", "label": "s", "items": ["a", "a", "b"] }],
+    "output": [{ "kind": "array", "label": "partitions", "items": ["a | a | b", "aa | b"], "tones": ["hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Choose the first piece as any prefix that is a palindrome, then split the rest the same way. Undo the cut to try a longer first piece.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "backtracking", "plain": "Make a choice, explore everything that follows, then undo the choice and try the next one." },
+      { "term": "palindrome", "plain": "Text that reads the same from left to right and right to left, such as aa or aba. One letter always counts." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a short lowercase string, e.g. aab (keep it to 3 or 4 letters)",
+    "presets": [
+      { "label": "aab", "args": ["aab"] },
+      { "label": "aba", "args": ["aba"] },
+      { "label": "No long pieces", "args": ["abc"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of the string" }],
+    "compare": { "brute": "2n", "optimal": "2n", "bruteLabel": "Try all 2^(n-1) ways to place cuts, then check", "optimalLabel": "Only cut off palindromic pieces", "unit": "cut patterns looked at (rough, exponential)" },
+    "rows": [
+      { "name": "All cut patterns", "time": "O(n · 2ⁿ)", "space": "O(n)", "note": "Each gap between letters is cut or not. Check every piece of every pattern. Most patterns are rejected late." },
+      { "name": "Backtracking", "time": "O(n · 2ⁿ)", "space": "O(n)", "note": "The worst case, a string of one repeated letter, has 2^(n-1) partitions. A bad piece is rejected the moment it is cut, so bad branches never grow." }
+    ],
+    "takeaway": "Same worst case, because the answer can be 2^(n-1) partitions. Rejecting a bad piece immediately keeps the work close to the size of the answer."
+  },
+  "variants": [
+    { "id": "backtrack", "label": "Cut a prefix", "tsFn": "partitionDriver", "goFn": "partitionDriver", "stages": [
+      { "n": 1, "title": "Start with no cuts", "note": "path holds the pieces cut so far, in order. start is where the next piece begins." },
+      { "n": 2, "title": "Test the piece", "note": "Look at s[start..end). If it is not a palindrome, reject it and try a longer one." },
+      { "n": 3, "title": "Cut it", "note": "Push the palindromic piece on the path and split the rest of the string from end." },
+      { "n": 4, "title": "Record", "note": "When start reaches the end of the string, every letter is in a piece. Save a copy of the path." },
+      { "n": 5, "title": "Undo", "note": "Pop the piece, then try a longer first piece. Return all results at the end." }
+    ] }
+  ],
+  "goArgs": ["string"],
+  "goRet": "[][]string",
+  "compare": "exact",
+  "edges": [
+    { "title": "One letter", "input": "a", "output": "[[\"a\"]]", "why": "A single letter is a palindrome, so one piece covers the string." },
+    { "title": "No repeats", "input": "abc", "output": "[[a,b,c]]", "why": "No piece longer than one letter is a palindrome, so only the all-singles cut works." },
+    { "title": "Same letter many times", "input": "aaaaaa", "output": "32 partitions", "why": "Every piece is a palindrome, so each of the 5 gaps is cut or not: 2^5." },
+    { "title": "Palindrome in the middle", "input": "aba", "output": "[[a,b,a],[aba]]", "why": "aba as one piece is valid. The piece ab is rejected on the way." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Push [...path], not path. The array is popped later, so a stored reference would end up shorter or empty." },
+    { "lang": "TypeScript", "text": "s.slice(start, end) has an exclusive end, but the palindrome check takes inclusive indices. Pass end - 1 to isPal." },
+    { "lang": "Go", "text": "Save append([]string{}, path...). Slices share a backing array, so appending path itself would let later cuts overwrite saved partitions." },
+    { "lang": "Go", "text": "s[start:end] on a string is a cheap view with no copy, and is safe because strings are immutable. It is the path slice that needs the copy." },
+    { "lang": "General", "text": "Order inside a partition matters (a | ab is not ab | a), so the test driver sorts only the outer list, not the pieces." }
+  ],
+  "recap": {
+    "pattern": "Backtracking: cut a prefix",
+    "key": "Try every prefix from start. If it is a palindrome, cut it, recurse on the rest, then pop. Record at the end of the string.",
+    "complexity": "Time O(n · 2ⁿ). Space O(n) for the recursion, plus the output.",
+    "moves": ["Track path and the start of the next piece", "Try each end; skip non-palindromes", "Push the piece, recurse from end, pop", "At start == n save a copy of the path"]
+  }
+}

@@ -1,0 +1,10 @@
+[
+  {"name":"two pieces or three","input":["aab"],"expected":[["aa","b"],["a","a","b"]]},
+  {"name":"palindrome in the middle","input":["aba"],"expected":[["aba"],["a","b","a"]]},
+  {"name":"single letter","input":["a"],"expected":[["a"]],"edge":true},
+  {"name":"no repeated letters, only singles","input":["abc"],"expected":[["a","b","c"]],"edge":true},
+  {"name":"all the same letter","input":["aaa"],"expected":[["aaa"],["aa","a"],["a","aa"],["a","a","a"]]},
+  {"name":"longer, mixed","input":["abbab"],"expected":[["abba","b"],["a","bb","a","b"],["a","b","bab"],["a","b","b","a","b"]]},
+  {"name":"even-length palindrome","input":["abba"],"expected":[["abba"],["a","bb","a"],["a","b","b","a"]]},
+  {"name":"six of one letter, 32 ways","input":["aaaaaa"],"expected":[["aaaaaa"],["aaaaa","a"],["aaaa","aa"],["aaaa","a","a"],["aaa","aaa"],["aaa","aa","a"],["aaa","a","aa"],["aaa","a","a","a"],["aa","aaaa"],["aa","aaa","a"],["aa","aa","aa"],["aa","aa","a","a"],["aa","a","aaa"],["aa","a","aa","a"],["aa","a","a","aa"],["aa","a","a","a","a"],["a","aaaaa"],["a","aaaa","a"],["a","aaa","aa"],["a","aaa","a","a"],["a","aa","aaa"],["a","aa","aa","a"],["a","aa","a","aa"],["a","aa","a","a","a"],["a","a","aaaa"],["a","a","aaa","a"],["a","a","aa","aa"],["a","a","aa","a","a"],["a","a","a","aaa"],["a","a","a","aa","a"],["a","a","a","a","aa"],["a","a","a","a","a","a"]]}
+]

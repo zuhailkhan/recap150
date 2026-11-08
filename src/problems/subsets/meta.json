@@ -1,0 +1,68 @@
+{
+  "slug": "subsets",
+  "title": "Subsets",
+  "category": "Backtracking",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of different integers. Return every possible subset: any selection of the numbers, including none of them and all of them. The result must not repeat a subset. The subsets can come back in any order.",
+  "example": {
+    "caption": "Three numbers give 2 x 2 x 2 = 8 subsets, from the empty one to all three.",
+    "input": [{ "kind": "array", "label": "nums", "items": [1, 2, 3] }],
+    "output": [{ "kind": "array", "label": "subsets", "items": ["[]", "[1]", "[2]", "[3]", "[1,2]", "[1,3]", "[2,3]", "[1,2,3]"], "tones": ["hit", "hit", "hit", "hit", "hit", "hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Walk through the numbers and, for each one, branch twice: take it, or leave it out. Every full walk is one subset, and you undo each choice to try the other.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "backtracking", "plain": "Make a choice, explore everything that follows, then undo the choice and make the other one." },
+      { "term": "decision tree", "plain": "A tree where each level is one yes or no question. Every leaf is one finished answer." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of different numbers, e.g. [1,2,3] (keep it to 3 or 4)",
+    "presets": [
+      { "label": "Three numbers", "args": [[1, 2, 3]] },
+      { "label": "Two numbers", "args": [[1, 2]] },
+      { "label": "One number", "args": [[5]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "how many numbers" }],
+    "compare": { "brute": "2n", "optimal": "2n", "bruteLabel": "Bitmask: write each number 0 to 2^n as bits", "optimalLabel": "Take-or-leave recursion", "unit": "subsets built (it doubles with every extra number, so 2^n is the closest shape)" },
+    "rows": [
+      { "name": "Bitmask loop", "time": "O(n · 2ⁿ)", "space": "O(n)", "note": "Count from 0 to 2^n - 1. Each bit says whether that number is in the subset. No recursion, same output size." },
+      { "name": "Take or leave", "time": "O(n · 2ⁿ)", "space": "O(n)", "note": "There are 2^n leaves. Copying each subset costs up to n. Space is the recursion depth, not counting the output." }
+    ],
+    "takeaway": "The answer itself has 2^n subsets, so nothing can beat that. The point is a clean way to visit each subset exactly once."
+  },
+  "variants": [
+    { "id": "backtrack", "label": "Take or leave", "tsFn": "subsetsDriver", "goFn": "subsetsDriver", "stages": [
+      { "n": 1, "title": "Start empty", "note": "path holds the numbers taken so far. It works like a stack: push to take, pop to undo." },
+      { "n": 2, "title": "Take it", "note": "Push nums[i] on the path and decide the next number." },
+      { "n": 3, "title": "Undo, then leave it", "note": "Pop nums[i] so the path is as before, then decide the next number without it." },
+      { "n": 4, "title": "Record", "note": "When every number has been decided, the path is one subset. Save a copy of it." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "[][]int",
+  "compare": "sortedGroups",
+  "edges": [
+    { "title": "Empty input", "input": "[]", "output": "[[]]", "why": "There is exactly one subset of nothing: the empty one. The walk has no decisions, so it records the empty path once." },
+    { "title": "One number", "input": "[5]", "output": "[[], [5]]", "why": "One decision, two leaves. Leave it gives [], take it gives [5]." },
+    { "title": "Negatives and zero", "input": "[-1, 0, 2]", "output": "8 subsets", "why": "Values play no part in the walk. Only positions matter, so negatives and zero need no special case." },
+    { "title": "Count doubles", "input": "10 numbers", "output": "1024 subsets", "why": "Each extra number doubles the leaves. That is why the input is kept tiny." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Push [...path], not path. Pushing the array stores a reference, and the later pops would empty every saved subset." },
+    { "lang": "Go", "text": "Save append([]int{}, path...). Appending path itself, or a reslice of it, shares one backing array, so saved subsets change as the search goes on. This is the classic Go backtracking bug." },
+    { "lang": "Go", "text": "append([]int(nil), path...) copies too, but gives nil for the empty path. That marshals to null, not []. Use []int{} as the seed so the empty subset stays an empty list." },
+    { "lang": "General", "text": "Do the pop on every path that did a push. The undo is what lets the second branch start from the same path as the first." },
+    { "lang": "General", "text": "The empty subset and the full set both count. They are the first and last leaves of the walk." }
+  ],
+  "recap": {
+    "pattern": "Backtracking: take or leave",
+    "key": "For each number, push it and recurse, then pop and recurse again. At the end, save a copy of the path.",
+    "complexity": "Time O(n · 2ⁿ). Space O(n) for the recursion, plus the output.",
+    "moves": ["Keep a path and an index i", "Take: push nums[i], recurse on i + 1", "Leave: pop, recurse on i + 1 again", "At i == n save a copy of the path"]
+  }
+}
