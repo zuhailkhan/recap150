@@ -1,7 +1,7 @@
 {
   "slug": "chat-system",
-  "title": "Chat System",
-  "group": "Messaging and real time",
+  "title": "WhatsApp (Chat System)",
+  "group": "Social and messaging",
   "difficulty": "Hard",
   "status": "ready",
   "brief": "Design a chat service for one-to-one and group messages. A message must reach the other person in well under a second if they are online, and wait safely if they are not. Messages must arrive in order, never get lost, and history must be there when you open the app.",

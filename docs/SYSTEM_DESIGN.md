@@ -10,30 +10,35 @@ Each explainer teaches how to turn a vague brief into classes, and why those cla
 
 | Group | Topics |
 |---|---|
-| Booking and reservation | Parking Lot, Movie Ticket Booking, Hotel Reservation, Library Management |
+| Big products | Cab Booking (Uber), Food Ordering (Zomato), Online Shopping (Amazon), Movie Booking (BookMyShow), Social Feed (Instagram), Music Player (Spotify) |
+| Booking and reservation | Parking Lot, Hotel Reservation, Library Management |
 | State machines | Vending Machine, ATM, Elevator System, Traffic Signal |
 | Games | Tic-Tac-Toe, Chess, Snake and Ladder |
 | Events and messaging | Notification System, Pub-Sub Message Broker, Logger Framework |
-| Money and rules | Splitwise (expense sharing), Rate Limiter, Coupon and Discount Engine |
-| Storage-like | In-memory File System, Key-Value Store with TTL |
+| Money and rules | Splitwise, Rate Limiter, Coupon and Discount Engine |
+| Storage-like | In-Memory File System, Key-Value Store with TTL |
 
-**Pilots (3):** Parking Lot (Strategy, Factory), Vending Machine (State), Notification System (Observer, Strategy).
+**Built (pilots):** Parking Lot, Vending Machine, Notification System.
 
 ## HLD: high-level design (architecture, scale, trade-offs)
 
 Each explainer starts from requirements and numbers, then grows the architecture one forced step at a time. No code. An estimator with live sliders turns assumptions into QPS, storage and bandwidth. Request-flow steppers show what happens on each hop.
 
+The topics are real products, because that is what people are asked and what they want to learn. The reusable pieces those products are built from sit in "Building blocks" and are referred to from the product pages.
+
 | Group | Topics |
 |---|---|
-| Storage and lookup | URL Shortener, Pastebin, Distributed Key-Value Store, Distributed Cache |
-| Feeds and social | News Feed, Twitter Timeline, Instagram, Typeahead (Autocomplete) |
-| Messaging and real time | Chat System, Notification Service, Live Comments |
-| Media and files | Video Streaming, File Sync (Dropbox), Image Hosting |
-| Marketplace and location | Ride Hailing, Food Delivery, Nearby Friends or Places |
-| Infrastructure | Distributed Rate Limiter, Web Crawler, Unique ID Generator, Job Scheduler |
-| Transactions | Ticket Booking, Payment System, Hotel Booking |
+| Ride, food and marketplaces | Uber, Zomato, Amazon, Airbnb, BookMyShow |
+| Social and messaging | Instagram, WhatsApp, Twitter / X, LinkedIn, TikTok, Tinder, Slack |
+| Media and streaming | Netflix, YouTube, Spotify, Hotstar (live streaming), Zoom |
+| Productivity, maps and payments | Google Maps, Google Docs, Dropbox, UPI Payments (PhonePe), Google Search |
+| Building blocks | URL Shortener, News Feed, Pastebin, Distributed Cache, Distributed Key-Value Store, Distributed Rate Limiter, Unique ID Generator, Notification Service, Typeahead, Nearby Places, Web Crawler, Job Scheduler |
 
-**Pilots (3):** URL Shortener (storage, caching, ID generation), News Feed (fan-out on write vs read), Chat System (connections, ordering, delivery).
+**Built (pilots):** URL Shortener, News Feed, WhatsApp (Chat System).
+
+## About product designs
+
+A product page is "a system like Uber", designed from public, general knowledge and common architecture. It is **not** a claim about how the company really builds it, and it never presents invented internals, numbers or incidents as fact. Every number is a labelled assumption. Each product page must lead with what is **distinctive** about that product (for example the live location index for Uber, the three-sided marketplace for Zomato, the media pipeline for Instagram) and point to the building blocks it reuses instead of re-teaching them.
 
 ## Folder layout
 

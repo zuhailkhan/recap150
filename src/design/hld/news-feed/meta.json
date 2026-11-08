@@ -1,7 +1,7 @@
 {
   "slug": "news-feed",
   "title": "News Feed",
-  "group": "Feeds and social",
+  "group": "Building blocks",
   "difficulty": "Medium",
   "status": "ready",
   "brief": "Design the home feed of a social app: a list of recent posts from the people you follow, newest first. People open it many times a day, so it must load fast. Some accounts have millions of followers, and one post from them must not melt the system.",

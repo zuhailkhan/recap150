@@ -5,8 +5,8 @@ const slug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
 const short = (max: number, min = 3) => z.string().min(min).max(max)
 const difficulty = z.enum(['Easy', 'Medium', 'Hard'])
 
-export const LLD_GROUPS = ['Booking and reservation', 'State machines', 'Games', 'Events and messaging', 'Money and rules', 'Storage-like'] as const
-export const HLD_GROUPS = ['Storage and lookup', 'Feeds and social', 'Messaging and real time', 'Media and files', 'Marketplace and location', 'Infrastructure', 'Transactions'] as const
+export const LLD_GROUPS = ['Big products', 'Booking and reservation', 'State machines', 'Games', 'Events and messaging', 'Money and rules', 'Storage-like'] as const
+export const HLD_GROUPS = ['Ride, food and marketplaces', 'Social and messaging', 'Media and streaming', 'Productivity, maps and payments', 'Building blocks'] as const
 
 export const catalogSchema = z.array(z.object({
   slug, title: z.string().min(2), track: z.enum(['lld', 'hld']), group: z.string(), difficulty,

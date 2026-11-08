@@ -1,7 +1,7 @@
 {
   "slug": "url-shortener",
   "title": "URL Shortener",
-  "group": "Storage and lookup",
+  "group": "Building blocks",
   "difficulty": "Easy",
   "status": "ready",
   "brief": "Design a service that turns a long web address into a short one, like sho.rt/aZ3k, and sends anyone who opens the short link to the original page. Far more people will open links than create them, and a link must keep working for years.",

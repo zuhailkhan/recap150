@@ -83,6 +83,16 @@ npx vue-tsc --noEmit
 
 Open the crops. Step through every evolution step in the browser (or take crops at several steps): the newest part must be the amber one, nothing may overlap, labels must be readable, and the estimator numbers must make sense when you move each slider.
 
+## Product topics (Uber, Zomato, Instagram and so on)
+
+Many topics are real products. Rules for these:
+
+- Write "a system like X". Design it from public, general knowledge and standard architecture. Do **not** claim how the company actually builds it, and never invent internals, incidents, version names or exact figures and present them as fact. All numbers are labelled assumptions (a slider the reader can change).
+- Lead with what is **distinctive** about the product, the one or two problems that make it hard (for Uber: a live location index and matching under constant movement; for Zomato: a three-sided marketplace of customers, restaurants and riders; for Instagram: the media upload and delivery pipeline; for Netflix: encoding once and serving from edge caches; for UPI payments: idempotency, a ledger and reconciliation). The evolution steps should be forced by those problems.
+- Reuse, do not re-teach. Where the product relies on a building block that has its own page (feed, cache, rate limiter, ID generator, notifications, nearby search, URL shortener), name it in one sentence and show it as a single node. Spend the page on what is new.
+- Keep the first screen honest: the brief says what the product does, in your words, in two sentences.
+- Requirements are what a reasonable interview asks for, not the full product. Say what is out of scope.
+
 ## What you may edit
 
 Only files inside your own `src/design/lld/<slug>/` or `src/design/hld/<slug>/` folders. Do not edit shared code, the catalog, docs, scripts or `package.json`. If you need a shared change, say what and why in your report and use the closest existing option. Do not run git, `npm run verify`, `npm run build`, `npm run preview` or `npx playwright test`.
