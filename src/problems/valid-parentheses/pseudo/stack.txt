@@ -1,0 +1,11 @@
+function isValid(s)
+  pairs = {")": "(", "]": "[", "}": "{"}    # [1] closer -> its opener
+  stack = empty list
+  for each character c in s
+    if c is not a closer
+      push c onto stack                      # [2] opener: wait for its partner
+      continue
+    top = pop stack, or none if it is empty  # [3] closer: must match the latest opener
+    if top != pairs[c]
+      return false
+  return stack is empty                      # [4] nothing may be left open

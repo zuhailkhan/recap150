@@ -1,0 +1,10 @@
+[
+  {"name":"classic","input":[[2,7,11,15],9],"expected":[0,1]},
+  {"name":"answer in the middle","input":[[3,2,4],6],"expected":[1,2]},
+  {"name":"same value twice","input":[[3,3],6],"expected":[0,1],"edge":true},
+  {"name":"zero is index 0","input":[[0,4,3,0],0],"expected":[0,3],"edge":true},
+  {"name":"negatives","input":[[-1,-2,-3,-4,-5],-8],"expected":[2,4],"edge":true},
+  {"name":"two elements","input":[[1,2],3],"expected":[0,1],"edge":true},
+  {"name":"mixed signs","input":[[-3,4,3,90],0],"expected":[0,2]},
+  {"name":"large values","input":[[1000000000,3,2000000000,5],3000000000],"expected":[0,2],"edge":true}
+]

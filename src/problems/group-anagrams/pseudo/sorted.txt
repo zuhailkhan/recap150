@@ -1,0 +1,6 @@
+function groupAnagrams(words)
+  bins = empty map                    # [1] fingerprint -> list of words
+  for each word in words
+    key = letters of word, sorted     # [2] anagrams end up with the same key
+    add word to bins[key]             # [3] create the bin first if it is missing
+  return every list in bins           # [4] the bins are the answer

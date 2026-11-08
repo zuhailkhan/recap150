@@ -1,0 +1,8 @@
+function groupAnagrams(words)
+  bins = empty map                    # [1] fingerprint -> list of words
+  for each word in words
+    counts = 26 zeros, one per letter
+    for each letter in word: counts[letter] += 1
+    key = counts joined with "#"      # [2] anagrams have identical counts
+    add word to bins[key]             # [3] create the bin first if it is missing
+  return every list in bins           # [4] the bins are the answer

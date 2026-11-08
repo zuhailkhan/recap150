@@ -1,0 +1,8 @@
+function twoSum(nums, target)
+  seen = empty map                      # [1] value -> index
+  for i from 0 to length(nums) - 1
+    need = target - nums[i]             # [2] the partner this number wants
+    if need is in seen                  # [3] partner already seen: done
+      return [seen[need], i]
+    seen[nums[i]] = i                   # [4] remember this number for later
+  return empty list                     # [3] only if the input had no pair

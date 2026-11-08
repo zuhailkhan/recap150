@@ -1,0 +1,83 @@
+{
+  "slug": "group-anagrams",
+  "title": "Group Anagrams",
+  "category": "Arrays & Hashing",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of lowercase words. Put words that use exactly the same letters, in any order, into the same group. Return all the groups. The order of the groups, and of the words inside a group, does not matter.",
+  "example": {
+    "caption": "Six words become three groups. Words in a group are the same letters shuffled.",
+    "input": [{ "kind": "array", "label": "words", "items": ["eat", "tea", "tan", "ate", "nat", "bat"] }],
+    "output": [{ "kind": "buckets", "keyLabel": "letters", "buckets": [
+      { "key": "aet", "items": ["eat", "tea", "ate"], "tone": "hit" },
+      { "key": "ant", "items": ["tan", "nat"], "tone": "hit" },
+      { "key": "abt", "items": ["bat"], "tone": "hit" }
+    ] }]
+  },
+  "idea": {
+    "sentence": "Give every word a fingerprint that is identical for all its anagrams, then use the fingerprint as a map key.",
+    "demo": "fingerprint",
+    "jargon": [
+      { "term": "anagram", "plain": "A word made by rearranging the letters of another word." },
+      { "term": "fingerprint", "plain": "One fixed form that every equivalent input turns into (also called a canonical key)." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of words, e.g. [\"eat\",\"tea\",\"tan\"]",
+    "presets": [
+      { "label": "Classic", "args": [["eat", "tea", "tan", "ate", "nat", "bat"]] },
+      { "label": "Repeats", "args": [["ab", "ba", "ab"]] },
+      { "label": "Empty word", "args": [["", "a", ""]] },
+      { "label": "No matches", "args": [["abc", "def", "ghi"]] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "number of words" },
+      { "sym": "k", "meaning": "length of the longest word" }
+    ],
+    "compare": { "brute": "n2k", "optimal": "nk", "bruteLabel": "Compare every word with every group", "optimalLabel": "Fingerprint, then one map lookup", "unit": "letter comparisons (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n² · k)", "space": "O(n · k)", "note": "Each word is checked against a sample from every group so far." },
+      { "name": "Sorted key", "time": "O(n · k log k)", "space": "O(n · k)", "note": "Sorting each word costs k log k." },
+      { "name": "Tally key", "time": "O(n · k)", "space": "O(n · k)", "note": "Counting 26 letters is one pass over the word. Key size is fixed." }
+    ],
+    "takeaway": "Brute force asks every group \"are you my anagram family?\". The fingerprint answers that with one map lookup."
+  },
+  "variants": [
+    { "id": "sorted", "label": "Sorted key", "tsFn": "groupAnagramsSorted", "goFn": "groupAnagramsSorted", "stages": [
+      { "n": 1, "title": "Empty map", "note": "A map from fingerprint to the list of words that share it." },
+      { "n": 2, "title": "Sort the letters", "note": "Sorting the letters of a word gives the same string for every anagram of it. That string is the key." },
+      { "n": 3, "title": "Drop in the bin", "note": "Create the bin if the key is new, then append the word to it." },
+      { "n": 4, "title": "Collect bins", "note": "Each bin is one group. Return all of them." }
+    ] },
+    { "id": "tally", "label": "Tally key", "tsFn": "groupAnagramsTally", "goFn": "groupAnagramsTally", "stages": [
+      { "n": 1, "title": "Empty map", "note": "A map from fingerprint to the list of words that share it." },
+      { "n": 2, "title": "Count the letters", "note": "Count each of the 26 letters. Anagrams have identical counts. The counts, joined into a string, are the key." },
+      { "n": 3, "title": "Drop in the bin", "note": "Create the bin if the key is new, then append the word to it." },
+      { "n": 4, "title": "Collect bins", "note": "Each bin is one group. Return all of them." }
+    ] }
+  ],
+  "goArgs": ["[]string"],
+  "goRet": "[][]string",
+  "compare": "sortedGroups",
+  "edges": [
+    { "title": "Empty string", "input": "[\"\"]", "output": "[[\"\"]]", "why": "An empty word has an empty fingerprint. It still gets its own bin." },
+    { "title": "One word", "input": "[\"a\"]", "output": "[[\"a\"]]", "why": "One word, one bin. Nothing to compare." },
+    { "title": "Nothing matches", "input": "[\"abc\", \"def\"]", "output": "[[\"abc\"], [\"def\"]]", "why": "Different fingerprints give separate groups of one." },
+    { "title": "Repeated word", "input": "[\"ab\", \"ba\", \"ab\"]", "output": "[[\"ab\", \"ba\", \"ab\"]]", "why": "Duplicates are kept. The bin is a list, not a set." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "A JS Map compares keys by reference for arrays and objects. Two equal-looking count arrays are two different keys. Join the counts into a string." },
+    { "lang": "TypeScript", "text": "Join counts with a separator. Without it the counts 1,11 and 11,1 both become \"111\" and wrongly collide." },
+    { "lang": "Go", "text": "A [26]int array is comparable, so it works as a map key. A []int slice is not allowed as a key and will not compile." },
+    { "lang": "Go", "text": "Map iteration order is random in Go. The groups can come back in any order, so compare after sorting." },
+    { "lang": "General", "text": "The answer has no required order, so a test that compares raw output is flaky. Sort groups and words first." }
+  ],
+  "recap": {
+    "pattern": "Hash map with a canonical key",
+    "key": "Anagrams share a fingerprint, so the fingerprint is the map key and each bin is a group.",
+    "complexity": "Time O(n·k log k) sorted, O(n·k) tally. Space O(n·k).",
+    "moves": ["Make a map: fingerprint to list of words", "Compute each word's fingerprint", "Append the word to its bin", "Return all the bins"]
+  }
+}

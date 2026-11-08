@@ -1,0 +1,10 @@
+[
+  {"name":"classic","input":[["eat","tea","tan","ate","nat","bat"]],"expected":[["bat"],["nat","tan"],["ate","eat","tea"]]},
+  {"name":"single empty string","input":[[""]],"expected":[[""]],"edge":true},
+  {"name":"single word","input":[["a"]],"expected":[["a"]],"edge":true},
+  {"name":"empty list","input":[[]],"expected":[],"edge":true},
+  {"name":"nothing groups","input":[["abc","def"]],"expected":[["abc"],["def"]],"edge":true},
+  {"name":"repeated words","input":[["ab","ba","ab"]],"expected":[["ab","ba","ab"]],"edge":true},
+  {"name":"empty strings group together","input":[["","","a"]],"expected":[["",""],["a"]],"edge":true},
+  {"name":"count keys need a separator","input":[["bccccccccccc","bbbbbbbbbbbc"]],"expected":[["bccccccccccc"],["bbbbbbbbbbbc"]],"edge":true}
+]

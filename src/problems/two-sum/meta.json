@@ -1,0 +1,72 @@
+{
+  "slug": "two-sum",
+  "title": "Two Sum",
+  "category": "Arrays & Hashing",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get a list of integers and a target number. Find the two different positions whose values add up to the target. Exactly one such pair exists. Return the two positions, in any order.",
+  "example": {
+    "caption": "2 and 7 add up to 9. They sit at positions 0 and 1.",
+    "input": [
+      { "kind": "array", "label": "nums", "items": [2, 7, 11, 15] },
+      { "kind": "array", "label": "target", "items": [9] }
+    ],
+    "output": [{ "kind": "array", "label": "nums", "items": [2, 7, 11, 15], "tones": ["hit", "hit", null, null], "pointers": [{ "name": "j", "at": 0, "tone": "hit" }, { "name": "i", "at": 1, "tone": "hit" }] }]
+  },
+  "idea": {
+    "sentence": "For each number, ask whether its partner (target minus the number) has already been seen. Keep every number you pass in a map for instant lookup.",
+    "demo": "complement",
+    "jargon": [
+      { "term": "complement", "plain": "The partner value that completes the sum: target minus the current number." },
+      { "term": "hash map", "plain": "A lookup table where finding a key takes about one step, however big the table is." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the list, then the target, e.g. [2,11,15,7], 9",
+    "presets": [
+      { "label": "Classic", "args": [[2, 11, 15, 7], 9] },
+      { "label": "Same value twice", "args": [[3, 3], 6] },
+      { "label": "Negatives", "args": [[-1, -2, -3, -4, -5], -8] },
+      { "label": "Zero index", "args": [[0, 4, 3, 0], 0] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of integers in the list" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Check every pair", "optimalLabel": "One pass with a map", "unit": "checks (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n²)", "space": "O(1)", "note": "Try every pair of positions." },
+      { "name": "Hash map, one pass", "time": "O(n)", "space": "O(n)", "note": "Each number costs one lookup and one insert. The map can hold up to n numbers." }
+    ],
+    "takeaway": "The map trades memory for time. Looking up a partner is one step instead of scanning the rest of the list."
+  },
+  "variants": [
+    { "id": "hashmap", "label": "Hash map", "tsFn": "twoSum", "goFn": "twoSum", "stages": [
+      { "n": 1, "title": "Empty memory", "note": "A map from value to index. It holds the numbers already passed." },
+      { "n": 2, "title": "Compute the partner", "note": "The partner is target minus the current number." },
+      { "n": 3, "title": "Partner seen? Done", "note": "If the partner is in the map, its stored index and the current index are the answer." },
+      { "n": 4, "title": "Remember", "note": "Otherwise store the current number and its index, then continue." }
+    ] }
+  ],
+  "goArgs": ["[]int", "int"],
+  "goRet": "[]int",
+  "compare": "sortedFlat",
+  "edges": [
+    { "title": "Same value twice", "input": "[3, 3], 6", "output": "[0, 1]", "why": "Two positions may hold equal values. The check runs before the insert, so a number never pairs with itself." },
+    { "title": "Pair uses index 0", "input": "[0, 4, 3, 0], 0", "output": "[0, 3]", "why": "Index 0 is a valid answer. Test for presence, not for a truthy index." },
+    { "title": "Negative numbers", "input": "[-1, -2, -3, -4, -5], -8", "output": "[2, 4]", "why": "The partner can be negative too. Nothing here assumes positive values." },
+    { "title": "Smallest input", "input": "[1, 2], 3", "output": "[0, 1]", "why": "Two numbers is the minimum. The second one finds the first in the map." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Writing if (seen.get(need)) is a bug. A stored index of 0 is falsy, so a pair at index 0 is missed. Compare with undefined, or use seen.has." },
+    { "lang": "TypeScript", "text": "JS numbers are doubles. Sums stay exact up to 2^53 − 1. Past that, use BigInt." },
+    { "lang": "Go", "text": "A missing key returns the zero value, which is 0 and looks like index 0. Use the two-value form: j, ok := seen[need]." },
+    { "lang": "Go", "text": "int is 64-bit on 64-bit machines but 32-bit on 32-bit ones. Use int64 if values can reach 2^31 and you care about portability." },
+    { "lang": "General", "text": "Insert after the lookup. Inserting first lets a number pair with itself, for example [3] with target 6." }
+  ],
+  "recap": {
+    "pattern": "Hash map: look back for the partner",
+    "key": "While scanning, ask if target minus this number was already seen. Store each number as you pass it.",
+    "complexity": "Time O(n). Space O(n).",
+    "moves": ["Make a map: value to index", "Compute the partner: target minus number", "If the partner is in the map, return both indexes", "Otherwise store this number and its index"]
+  }
+}

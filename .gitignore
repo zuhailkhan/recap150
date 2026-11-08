@@ -1,0 +1,7 @@
+node_modules
+dist
+.verify
+test-results
+playwright-report
+dev-dist
+screenshots

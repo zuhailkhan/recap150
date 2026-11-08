@@ -1,0 +1,13 @@
+[
+  {"name":"one pair","input":["()"],"expected":true},
+  {"name":"three kinds side by side","input":["()[]{}"],"expected":true},
+  {"name":"wrong kind","input":["(]"],"expected":false},
+  {"name":"nested","input":["([{}])"],"expected":true},
+  {"name":"crossed pairs","input":["([)]"],"expected":false,"edge":true},
+  {"name":"empty string","input":[""],"expected":true,"edge":true},
+  {"name":"lone opener","input":["("],"expected":false,"edge":true},
+  {"name":"lone closer","input":[")"],"expected":false,"edge":true},
+  {"name":"closer first","input":["){"],"expected":false,"edge":true},
+  {"name":"unclosed at the end","input":["(()"],"expected":false,"edge":true},
+  {"name":"deep nesting","input":["((((((((((()))))))))))"],"expected":true}
+]

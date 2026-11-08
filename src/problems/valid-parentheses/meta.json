@@ -1,0 +1,68 @@
+{
+  "slug": "valid-parentheses",
+  "title": "Valid Parentheses",
+  "category": "Stack",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "A string contains only the brackets ( ) [ ] and { }. Decide whether it is well formed: every opening bracket is closed by the same kind of bracket, and pairs nest properly without crossing.",
+  "example": {
+    "caption": "Each closer meets the most recent unclosed opener. Everything pairs up, so the answer is true.",
+    "input": [{ "kind": "array", "label": "s", "items": ["(", "[", "]", "{", "}", ")"] }],
+    "output": [{ "kind": "array", "label": "valid?", "items": ["true"], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "The last opener you saw must be the first one to close. A stack gives exactly that order.",
+    "demo": "match",
+    "jargon": [
+      { "term": "stack", "plain": "A pile where you only add or remove at the top: last in, first out." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a string of brackets, e.g. \"([]{})\"",
+    "presets": [
+      { "label": "Nested", "args": ["([]{})"] },
+      { "label": "Crossed", "args": ["([)]"] },
+      { "label": "Left open", "args": ["(("] },
+      { "label": "Wrong kind", "args": ["(]"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of the string" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Delete matching pairs again and again", "optimalLabel": "One pass with a stack", "unit": "character visits (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n²)", "space": "O(n)", "note": "Repeatedly remove adjacent pairs like () until nothing changes. Each sweep costs n and there can be n/2 sweeps." },
+      { "name": "Stack", "time": "O(n)", "space": "O(n)", "note": "Each character is pushed once and popped at most once. The stack can hold all n if they are all openers." }
+    ],
+    "takeaway": "A stack remembers openers in the exact order they need to close. That removes the repeated rescanning."
+  },
+  "variants": [
+    { "id": "stack", "label": "Stack", "tsFn": "isValid", "goFn": "isValid", "stages": [
+      { "n": 1, "title": "Pairs and stack", "note": "A lookup from each closer to its opener, and an empty stack for openers still waiting." },
+      { "n": 2, "title": "Push openers", "note": "An opener has no partner yet. Push it on the stack." },
+      { "n": 3, "title": "Match closers", "note": "Pop the top. It must be the opener for this closer. Empty stack or wrong kind means invalid." },
+      { "n": 4, "title": "Stack empty?", "note": "Leftover openers were never closed. Valid only if the stack is empty." }
+    ] }
+  ],
+  "goArgs": ["string"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty string", "input": "\"\"", "output": "true", "why": "Nothing is open, so nothing is wrong. The stack ends empty." },
+    { "title": "Only an opener", "input": "\"(\"", "output": "false", "why": "It is pushed and never closed. The final empty check catches it." },
+    { "title": "Closer first", "input": "\")\"", "output": "false", "why": "Popping an empty stack must count as a mismatch, not a crash." },
+    { "title": "Crossed pairs", "input": "\"([)]\"", "output": "false", "why": "Counts balance, but the order is wrong. ) meets [ on top, not (." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "stack.pop() on an empty array returns undefined. Compared with an opener it is simply not equal, so a lone closer fails correctly. Do not add a ! assertion." },
+    { "lang": "Go", "text": "stack[len(stack)-1] on an empty slice panics. Check len(stack) == 0 first." },
+    { "lang": "Go", "text": "Indexing a string gives a byte, ranging over it gives a rune. For ASCII brackets bytes are fine." },
+    { "lang": "General", "text": "Counting brackets of each kind is not enough. \"([)]\" has balanced counts but is invalid." },
+    { "lang": "General", "text": "Forgetting the final empty check wrongly accepts \"(((\"." }
+  ],
+  "recap": {
+    "pattern": "Stack: last opened, first closed",
+    "key": "Push openers. Each closer must match the top of the stack. At the end the stack must be empty.",
+    "complexity": "Time O(n). Space O(n).",
+    "moves": ["Map each closer to its opener", "Push every opener", "On a closer, pop and compare. Mismatch or empty means false", "Return whether the stack is empty"]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "recap150",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "verify:content": "tsx scripts/verify.ts",
+    "verify:e2e": "playwright test",
+    "verify": "npm run typecheck && npm run test && npm run verify:content && npm run verify:e2e",
+    "list:import": "node scripts/import-list.mjs",
+    "shots": "node scripts/shots.mjs"
+  },
+  "dependencies": {
+    "vue": "^3.5.45",
+    "vue-router": "^5.4.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^26.6.6",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.6",
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.1.0",
+    "vue-tsc": "^3.3.14"
+  }
+}
