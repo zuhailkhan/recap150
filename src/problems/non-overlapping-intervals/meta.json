@@ -1,0 +1,73 @@
+{
+  "slug": "non-overlapping-intervals",
+  "title": "Non Overlapping Intervals",
+  "category": "Intervals",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of intervals. Remove as few as possible so that no two of the remaining ones overlap, and return how many you removed. Intervals that only touch, such as [1, 2] and [2, 3], do not count as overlapping here.",
+  "example": {
+    "caption": "Dropping [1,3] leaves [1,2], [2,3] and [3,4], which only touch. One removal is the minimum.",
+    "input": [
+      { "kind": "intervals", "label": "input", "min": 0, "max": 5, "spans": [{ "start": 1, "end": 2 }, { "start": 2, "end": 3 }, { "start": 3, "end": 4 }, { "start": 1, "end": 3 }] }
+    ],
+    "output": [
+      { "kind": "intervals", "label": "kept (1 removed)", "min": 0, "max": 5, "spans": [{ "start": 1, "end": 2, "tone": "hit" }, { "start": 2, "end": 3, "tone": "hit" }, { "start": 3, "end": 4, "tone": "hit" }, { "start": 1, "end": 3, "tone": "miss" }] }
+    ]
+  },
+  "idea": {
+    "sentence": "Sort by end time and always keep the interval that finishes first: it leaves the most room for everything after it.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "greedy", "plain": "Make the best-looking choice right now and never undo it. It works here because finishing earliest can never hurt later choices." },
+      { "term": "kept end", "plain": "The end of the last interval we decided to keep. The next interval must start at or after it to be kept too." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of [start, end] pairs, e.g. [[1,2],[2,3],[3,4],[1,3]]",
+    "presets": [
+      { "label": "Classic", "args": [[[1, 2], [2, 3], [3, 4], [1, 3]]] },
+      { "label": "One long blocker", "args": [[[1, 6], [2, 3], [3, 4], [4, 5]]] },
+      { "label": "All identical", "args": [[[1, 2], [1, 2], [1, 2]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of intervals" }],
+    "compare": { "brute": "2n", "optimal": "nlogn", "bruteLabel": "Try every subset to keep", "optimalLabel": "Sort by end, one pass", "unit": "subsets or steps (rough)" },
+    "rows": [
+      { "name": "Try every subset", "time": "O(2^n)", "space": "O(n)", "note": "Check each subset for overlaps and keep the largest valid one." },
+      { "name": "Greedy by end", "time": "O(n log n)", "space": "O(n)", "note": "The sort dominates. The pass keeps one number: the end of the last kept interval." }
+    ],
+    "takeaway": "Minimum removals equals n minus the largest set you can keep. Earliest finish builds that largest set."
+  },
+  "variants": [
+    { "id": "greedy", "label": "Greedy by end", "tsFn": "eraseOverlapIntervals", "goFn": "eraseOverlapIntervals", "stages": [
+      { "n": 1, "title": "Sort by end", "note": "Sort a copy by end. The first interval is always kept, and its end is the line to beat." },
+      { "n": 2, "title": "Overlap test", "note": "Does the next interval start at or after the kept end? Touching is allowed here." },
+      { "n": 3, "title": "Keep it", "note": "No overlap: keep it and move the line to its end." },
+      { "n": 4, "title": "Remove it", "note": "Overlap: remove this one. The kept interval ends no later, so it is the better one to keep." },
+      { "n": 5, "title": "Return", "note": "The count of removals is the answer." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Touching is fine", "input": "[[1,2],[2,3],[3,4]]", "output": "0", "why": "Each next start equals the previous end. The test is start >= keptEnd, so every one is kept." },
+    { "title": "Empty list", "input": "[]", "output": "0", "why": "There is no first interval to keep. Return 0 before reading sorted[0]." },
+    { "title": "One long blocker", "input": "[[1,6],[2,3],[3,4],[4,5]]", "output": "1", "why": "Sorting by end drops only [1,6]. Sorting by start would keep it first and drop three." },
+    { "title": "All identical", "input": "[[1,2],[1,2],[1,2]]", "output": "2", "why": "Copies overlap each other, so keep one and remove the rest." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Sort by end, not by start. Sorting by start and keeping the first interval can keep a huge one that blocks many small ones." },
+    { "lang": "General", "text": "Touching is not overlapping in this problem: keep when start >= keptEnd. This is the opposite of merge-intervals, where touching merges." },
+    { "lang": "TypeScript", "text": "sort() with no comparator compares as strings and changes the array in place. Copy first and pass (a, b) => a[1] - b[1]." },
+    { "lang": "Go", "text": "sort.Slice reorders the caller's slice, because the outer slice shares memory. Copy it first with append([][]int(nil), intervals...)." },
+    { "lang": "Go", "text": "sort.Slice is not stable. Equal ends may come out in any order. The answer is unchanged, but do not rely on the order of ties." }
+  ],
+  "recap": {
+    "pattern": "Greedy intervals: earliest end first",
+    "key": "Sort by end. Keep an interval if it starts at or after the last kept end. Count the ones you cannot keep.",
+    "complexity": "Time O(n log n). Space O(n).",
+    "moves": ["Sort a copy by end", "Keep the first and remember its end", "If next start >= kept end, keep it and update the end", "Otherwise count one removal"]
+  }
+}

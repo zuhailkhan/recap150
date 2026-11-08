@@ -1,0 +1,13 @@
+[
+  {"name":"classic","input":[[[1,2],[3,4],[5,6],[7,8]],[4,5]],"expected":[[1,2],[3,6],[7,8]]},
+  {"name":"wider classic","input":[[[1,2],[3,5],[6,7],[8,10],[12,16]],[4,8]],"expected":[[1,2],[3,10],[12,16]]},
+  {"name":"touches the left side","input":[[[1,2],[5,6]],[2,3]],"expected":[[1,3],[5,6]],"edge":true},
+  {"name":"touches the right side","input":[[[1,2],[5,6]],[4,5]],"expected":[[1,2],[4,6]],"edge":true},
+  {"name":"empty list","input":[[],[5,7]],"expected":[[5,7]],"edge":true},
+  {"name":"goes at the front","input":[[[3,4],[6,7]],[0,1]],"expected":[[0,1],[3,4],[6,7]]},
+  {"name":"goes at the end","input":[[[3,4],[6,7]],[9,10]],"expected":[[3,4],[6,7],[9,10]]},
+  {"name":"swallows everything","input":[[[2,3],[5,6],[8,9]],[1,10]],"expected":[[1,10]]},
+  {"name":"fits in a gap","input":[[[1,2],[6,7]],[3,4]],"expected":[[1,2],[3,4],[6,7]]},
+  {"name":"inside one interval","input":[[[1,10]],[3,4]],"expected":[[1,10]],"edge":true},
+  {"name":"negatives","input":[[[-10,-6],[-3,-1],[2,4]],[-5,-2]],"expected":[[-10,-6],[-5,-1],[2,4]]}
+]

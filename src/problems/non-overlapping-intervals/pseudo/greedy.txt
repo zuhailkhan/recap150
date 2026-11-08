@@ -1,0 +1,11 @@
+function eraseOverlapIntervals(intervals)
+  if intervals is empty: return 0
+  sorted = copy of intervals sorted by end            # [1] earliest finish first
+  keptEnd = sorted[0].end                             # [1] keep the first
+  removed = 0
+  for each [start, end] in sorted after the first
+    if start >= keptEnd                               # [2] no overlap (touching is fine)
+      keptEnd = end                                   # [3] keep it
+    else
+      removed = removed + 1                           # [4] overlaps: drop it
+  return removed                                      # [5]

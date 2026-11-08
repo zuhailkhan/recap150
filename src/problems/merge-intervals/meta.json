@@ -1,0 +1,73 @@
+{
+  "slug": "merge-intervals",
+  "title": "Merge Intervals",
+  "category": "Intervals",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of intervals, each a pair [start, end], in no particular order. Join every group of intervals that overlap into one interval, and return the joined list. Two intervals that only touch at one point, like [1, 2] and [2, 3], count as overlapping.",
+  "example": {
+    "caption": "[1,3] and [2,4] overlap, so they become [1,4]. [5,6] stands alone.",
+    "input": [
+      { "kind": "intervals", "label": "input", "min": 1, "max": 6, "spans": [{ "start": 1, "end": 3 }, { "start": 5, "end": 6 }, { "start": 2, "end": 4 }] }
+    ],
+    "output": [
+      { "kind": "intervals", "label": "merged", "min": 1, "max": 6, "spans": [{ "start": 1, "end": 4, "tone": "hit" }, { "start": 5, "end": 6, "tone": "hit" }] }
+    ]
+  },
+  "idea": {
+    "sentence": "Sort by start, then each interval either overlaps the last merged one (its start is at or before that end) or begins a fresh one.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "overlap test", "plain": "Two sorted intervals overlap when the later start is at or before the earlier end. Here, equal counts too." },
+      { "term": "merged interval", "plain": "One interval that covers a whole chain of overlapping ones: smallest start, largest end." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of [start, end] pairs, e.g. [[1,3],[5,6],[2,4]]",
+    "presets": [
+      { "label": "Classic", "args": [[[1, 3], [5, 6], [2, 4]]] },
+      { "label": "Touching ends", "args": [[[1, 2], [2, 3], [5, 6]]] },
+      { "label": "One swallows others", "args": [[[1, 6], [2, 3], [4, 5]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of intervals" }],
+    "compare": { "brute": "n2", "optimal": "nlogn", "bruteLabel": "Compare every pair, repeat until stable", "optimalLabel": "Sort, then one pass", "unit": "comparisons (rough)" },
+    "rows": [
+      { "name": "Compare all pairs", "time": "O(n²)", "space": "O(n)", "note": "Merge any two that overlap and keep going until nothing changes." },
+      { "name": "Sort, then sweep", "time": "O(n log n)", "space": "O(n)", "note": "The sort dominates. The sweep is one pass and only looks at the last merged interval." }
+    ],
+    "takeaway": "Sorting turns a many-to-many question into a neighbour question: only the last merged interval can overlap the next one."
+  },
+  "variants": [
+    { "id": "sweep", "label": "Sort and sweep", "tsFn": "merge", "goFn": "merge", "stages": [
+      { "n": 1, "title": "Sort by start", "note": "Sort a copy, with a numeric comparator, so overlapping intervals end up side by side." },
+      { "n": 2, "title": "Overlap test", "note": "Is the next start at or before the end of the last merged interval? Touching counts." },
+      { "n": 3, "title": "Stretch", "note": "Overlap: set the last end to the larger of the two ends. A contained interval must not shrink it." },
+      { "n": 4, "title": "Start a new one", "note": "Gap: push a fresh copy of the interval as a new merged interval." },
+      { "n": 5, "title": "Return", "note": "Every interval has been folded in. The result list is the answer." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "[][]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Touching ends", "input": "[[1,2],[2,3]]", "output": "[[1,3]]", "why": "The test is start <= end, not start < end. Sharing the point 2 is enough to join them." },
+    { "title": "One swallows another", "input": "[[1,10],[2,3]]", "output": "[[1,10]]", "why": "The second end (3) is smaller than 10. Use max, never just assign the new end." },
+    { "title": "Unsorted input", "input": "[[10,12],[9,11],[2,3]]", "output": "[[2,3],[9,12]]", "why": "Without sorting, [10,12] would be checked before [9,11]. Sort first, and sort by number." },
+    { "title": "Empty list", "input": "[]", "output": "[]", "why": "There is no first interval to read. The loop never runs and the empty result is returned." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "arr.sort() with no comparator sorts as strings, so 10 comes before 9. Always pass (a, b) => a[0] - b[0]." },
+    { "lang": "TypeScript", "text": "sort() changes the array in place, which would reorder the caller's list. Copy first with [...intervals]. Also push [start, end] as a new array: pushing the input's own pair and then stretching it edits the input." },
+    { "lang": "Go", "text": "sort.Slice reorders the slice you pass in, and the caller shares that memory. Copy the outer slice first with append([][]int(nil), intervals...)." },
+    { "lang": "Go", "text": "append(res, cur) stores the input's own inner slice, so later res[i][1] = ... also edits the input. Append a new []int{start, end}. Start res as [][]int{} so an empty answer is [] and not null." },
+    { "lang": "General", "text": "Decide the touching rule first. Here [1,2] and [2,3] merge (<=). The same test with < would leave them apart." }
+  ],
+  "recap": {
+    "pattern": "Intervals: sort by start, sweep",
+    "key": "After sorting by start, the next interval either overlaps the last merged one (start <= its end) or starts a new one.",
+    "complexity": "Time O(n log n). Space O(n).",
+    "moves": ["Sort a copy by start (numeric comparator)", "If next start <= last end, set last end = max(last end, end)", "Otherwise push a new [start, end]", "Return the merged list"]
+  }
+}

@@ -1,0 +1,10 @@
+function minMeetingRooms(intervals)
+  starts = all start times, sorted ascending          # [1] sorted on their own
+  ends   = all end times, sorted ascending            # [1]
+  rooms = 0 ; e = 0                                   # ends[e] = earliest end not yet reused
+  for each s in starts
+    if s < ends[e]                                    # [2] strict: touching can reuse
+      rooms = rooms + 1                               # [3] nobody has left: open a room
+    else
+      e = e + 1                                       # [4] someone left: reuse their room
+  return rooms                                        # [5]

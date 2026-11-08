@@ -1,0 +1,10 @@
+function merge(intervals)
+  sorted = copy of intervals sorted by start          # [1] sort a copy, by start
+  result = empty list
+  for each [start, end] in sorted
+    last = last item of result, if any
+    if last exists and start <= last.end              # [2] overlap test (touching counts)
+      last.end = max(last.end, end)                   # [3] stretch, never shrink
+    else
+      append a new copy [start, end] to result        # [4] gap: new interval
+  return result                                       # [5]

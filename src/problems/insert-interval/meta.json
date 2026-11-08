@@ -1,0 +1,74 @@
+{
+  "slug": "insert-interval",
+  "title": "Insert Interval",
+  "category": "Intervals",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of intervals that is already sorted by start and has no overlaps, plus one new interval. Add the new interval, joining it with every interval it overlaps, and return the list, still sorted. Touching ends such as [1, 2] and [2, 3] count as overlapping.",
+  "example": {
+    "caption": "[4,5] touches [3,4] and [5,6], so the three melt into [3,6]. The rest are copied.",
+    "input": [
+      { "kind": "intervals", "label": "sorted input", "min": 1, "max": 8, "spans": [{ "start": 1, "end": 2 }, { "start": 3, "end": 4 }, { "start": 5, "end": 6 }, { "start": 7, "end": 8 }] },
+      { "kind": "intervals", "label": "new interval", "min": 1, "max": 8, "spans": [{ "start": 4, "end": 5, "tone": "focus" }] }
+    ],
+    "output": [
+      { "kind": "intervals", "label": "result", "min": 1, "max": 8, "spans": [{ "start": 1, "end": 2, "tone": "keep" }, { "start": 3, "end": 6, "tone": "hit" }, { "start": 7, "end": 8, "tone": "keep" }] }
+    ]
+  },
+  "idea": {
+    "sentence": "Because the input is sorted, it splits into three runs: intervals entirely before the new one, intervals that overlap it, and intervals entirely after.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "sorted, no overlaps", "plain": "The input intervals are in order and never share a point. That is what lets one pass with no sorting work." },
+      { "term": "absorb", "plain": "Swallow an overlapping interval into the new one by widening the new one: smaller start, larger end." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the sorted list, then the new interval, e.g. [[1,2],[3,4],[5,6],[7,8]], [4,5]",
+    "presets": [
+      { "label": "Classic", "args": [[[1, 2], [3, 4], [5, 6], [7, 8]], [4, 5]] },
+      { "label": "Touches on the left", "args": [[[1, 2], [5, 6]], [2, 3]] },
+      { "label": "Swallows all", "args": [[[2, 3], [5, 6], [8, 9]], [1, 10]] },
+      { "label": "Fits in a gap", "args": [[[1, 2], [6, 7]], [3, 4]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of intervals in the list" }],
+    "compare": { "brute": "nlogn", "optimal": "n", "bruteLabel": "Append, sort, then merge everything", "optimalLabel": "One pass, input already sorted", "unit": "steps (rough)" },
+    "rows": [
+      { "name": "Append, sort, merge", "time": "O(n log n)", "space": "O(n)", "note": "Works, and reuses the merge-intervals routine, but ignores that the input is sorted." },
+      { "name": "Three runs in one pass", "time": "O(n)", "space": "O(n)", "note": "Each interval is looked at once. The result list holds up to n + 1 intervals." }
+    ],
+    "takeaway": "Sorted input is a gift. Walk once, and the three groups fall out of two simple tests."
+  },
+  "variants": [
+    { "id": "threeparts", "label": "Three runs", "tsFn": "insert", "goFn": "insert", "stages": [
+      { "n": 1, "title": "Copy the left run", "note": "While an interval ends strictly before the new start, it cannot touch the new one. Copy it." },
+      { "n": 2, "title": "Absorb the overlaps", "note": "While an interval starts at or before the new end, widen the new one to cover it." },
+      { "n": 3, "title": "Place the new one", "note": "Add the widened new interval. It sits after the left run and before the right run." },
+      { "n": 4, "title": "Copy the right run", "note": "Everything left starts after the new end. Copy it, then return the list." }
+    ] }
+  ],
+  "goArgs": ["[][]int", "[]int"],
+  "goRet": "[][]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Touching on the left", "input": "[[1,2],[5,6]], [2,3]", "output": "[[1,3],[5,6]]", "why": "[1,2] ends at 2, exactly where the new one starts. The left-run test is end < start, so it is not copied; it is absorbed." },
+    { "title": "Empty list", "input": "[], [5,7]", "output": "[[5,7]]", "why": "Both loops are skipped. The new interval is simply placed." },
+    { "title": "Inside one interval", "input": "[[1,10]], [3,4]", "output": "[[1,10]]", "why": "The new interval is absorbed, but the end stays 10. Widen with max, never just assign the new end." },
+    { "title": "Goes at the front", "input": "[[3,4],[6,7]], [0,1]", "output": "[[0,1],[3,4],[6,7]]", "why": "The left run is empty and nothing overlaps. The new one lands first, then the right run is copied." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The two loop tests are not mirror images. Left run: end < newStart. Overlap run: start <= newEnd. Using <= in the first or < in the second splits touching intervals wrongly." },
+    { "lang": "TypeScript", "text": "Do not widen newInterval[0] and newInterval[1] directly. That edits the caller's array. Copy the two numbers into local variables, and push copies of the other pairs." },
+    { "lang": "TypeScript", "text": "res.push(intervals[i]) stores the input's own pair. It is safe only while nobody edits it later; pushing [...intervals[i]] removes the doubt." },
+    { "lang": "Go", "text": "append(res, intervals[i]) copies only the slice header, so res and the input share the same two ints. Append a new []int{a, b}. Start res as [][]int{} so an empty list is [] and not null." },
+    { "lang": "Go", "text": "min and max are built in since Go 1.21. On older Go versions you need your own helpers." }
+  ],
+  "recap": {
+    "pattern": "Intervals: three runs on sorted input",
+    "key": "Copy intervals that end before the new start, absorb those that start at or before the new end, then copy the rest.",
+    "complexity": "Time O(n). Space O(n).",
+    "moves": ["Copy while interval.end < newStart", "While interval.start <= newEnd, widen the new interval with min and max", "Append the widened interval", "Copy the remaining intervals"]
+  }
+}

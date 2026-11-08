@@ -1,0 +1,13 @@
+function minInterval(intervals, queries)
+  sorted = copy of intervals sorted by start               # [1]
+  order  = query positions 0..m-1 sorted by queries[pos]   # [1] smallest query first, positions kept
+  heap = min-heap of (size, end) ordered by size ; next = 0
+  for each pos in order
+    q = queries[pos]
+    while next < n and sorted[next].start <= q             # [2] it has started by q
+      push (end - start + 1, end) ; next = next + 1
+    while heap is not empty and heap.top.end < q           # [3] top ended before q: useless for good
+      pop
+    if heap is not empty: answer[pos] = heap.top.size      # [4] smallest interval covering q
+    else: answer[pos] = -1                                 # [4] nothing covers q
+  return answer                                            # [5] in the original query order

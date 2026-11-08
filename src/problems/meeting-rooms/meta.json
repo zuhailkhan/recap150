@@ -1,0 +1,70 @@
+{
+  "slug": "meeting-rooms",
+  "title": "Meeting Rooms",
+  "category": "Intervals",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "One person has a list of meetings, each with a start time and an end time. Decide whether they can attend all of them, which means no two meetings overlap in time. A meeting that starts exactly when another one ends does not clash with it. Return true or false.",
+  "example": {
+    "caption": "[3,5] and [4,6] overlap between 4 and 5, so the answer is false.",
+    "input": [
+      { "kind": "intervals", "label": "meetings", "min": 1, "max": 7, "spans": [{ "start": 6, "end": 7 }, { "start": 1, "end": 2 }, { "start": 3, "end": 5 }, { "start": 4, "end": 6 }] }
+    ],
+    "output": [
+      { "kind": "intervals", "label": "false: these two clash", "min": 1, "max": 7, "spans": [{ "start": 3, "end": 5, "tone": "miss" }, { "start": 4, "end": 6, "tone": "miss" }] }
+    ]
+  },
+  "idea": {
+    "sentence": "Sort the meetings by start time. If any two overlap, some neighbouring pair in that order overlaps, so only neighbours need checking.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "clash", "plain": "Two meetings clash when the later one starts strictly before the earlier one ends. Equal times do not clash." },
+      { "term": "neighbouring pair", "plain": "Two meetings next to each other after sorting by start." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of [start, end] pairs, e.g. [[6,7],[1,2],[2,3],[3,5],[4,6]]",
+    "presets": [
+      { "label": "Clash after touching", "args": [[[6, 7], [1, 2], [2, 3], [3, 5], [4, 6]]] },
+      { "label": "Back to back, fine", "args": [[[1, 2], [2, 3], [3, 4]]] },
+      { "label": "One inside another", "args": [[[1, 6], [3, 4]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of meetings" }],
+    "compare": { "brute": "n2", "optimal": "nlogn", "bruteLabel": "Compare every pair of meetings", "optimalLabel": "Sort, then compare neighbours", "unit": "comparisons (rough)" },
+    "rows": [
+      { "name": "Compare all pairs", "time": "O(n²)", "space": "O(1)", "note": "Check each pair for overlap. Simple, but slow for long lists." },
+      { "name": "Sort, then neighbours", "time": "O(n log n)", "space": "O(n)", "note": "The sort dominates. The copy costs O(n) space; sorting in place would not, but it edits the input." }
+    ],
+    "takeaway": "Sorting by start puts every possible clash next to each other, so one linear pass is enough."
+  },
+  "variants": [
+    { "id": "neighbours", "label": "Sort, check neighbours", "tsFn": "canAttendMeetings", "goFn": "canAttendMeetings", "stages": [
+      { "n": 1, "title": "Sort by start", "note": "Sort a copy by start with a numeric comparator." },
+      { "n": 2, "title": "Compare neighbours", "note": "Does this meeting start before the previous one ends? Strictly before: equal is fine." },
+      { "n": 3, "title": "Verdict", "note": "A clash returns false at once. If the loop finishes with none, return true." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Back to back", "input": "[[1,3],[3,5],[5,7]]", "output": "true", "why": "Each meeting starts at the exact time the last one ends. The test is start < end, so these do not clash." },
+    { "title": "Empty schedule", "input": "[]", "output": "true", "why": "No meetings, nothing to attend, nothing to clash. The loop never runs." },
+    { "title": "One inside another", "input": "[[1,10],[3,4]]", "output": "false", "why": "[3,4] starts before [1,10] ends. Only the start of the later one matters for this test." },
+    { "title": "Same slot twice", "input": "[[4,6],[4,6]]", "output": "false", "why": "Identical meetings overlap fully. 4 < 6, so the pair is a clash." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Touching is not a clash here: use start < prevEnd. Merge Intervals uses <= because it wants touching intervals joined. Same shape, opposite rule." },
+    { "lang": "TypeScript", "text": "intervals.sort() with no comparator sorts as strings, so [10,11] lands before [2,3]. Pass (a, b) => a[0] - b[0]." },
+    { "lang": "TypeScript", "text": "sort() edits the array in place, so the caller's list would end up reordered. Sort a copy: [...intervals]." },
+    { "lang": "Go", "text": "sort.Slice reorders the slice you give it, and the caller shares that memory. Copy first with append([][]int(nil), intervals...)." }
+  ],
+  "recap": {
+    "pattern": "Intervals: sort, check neighbours",
+    "key": "After sorting by start, a clash exists exactly when some meeting starts before the previous one ends.",
+    "complexity": "Time O(n log n). Space O(n).",
+    "moves": ["Sort a copy by start (numeric comparator)", "For each neighbouring pair, test next.start < prev.end", "Return false on the first clash", "Return true if none"]
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "slug": "meeting-rooms-ii",
+  "title": "Meeting Rooms II",
+  "category": "Intervals",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of meetings, each with a start time and an end time. Every meeting needs a room to itself while it runs. Return the smallest number of rooms that is enough. A meeting may start at the exact moment another ends and reuse its room.",
+  "example": {
+    "caption": "Three meetings are running at time 2 ([0,4], [1,3], [2,5]), so 3 rooms are needed.",
+    "input": [
+      { "kind": "intervals", "label": "meetings", "min": 0, "max": 6, "marks": [{ "at": 2, "label": "t = 2" }], "spans": [{ "start": 0, "end": 4 }, { "start": 1, "end": 3 }, { "start": 2, "end": 5 }, { "start": 4, "end": 6 }, { "start": 5, "end": 6 }] }
+    ],
+    "output": [{ "kind": "array", "label": "rooms needed", "items": [3], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "The answer is the most meetings running at once. Sort the starts and the ends separately and sweep: each start either finds a finished meeting to reuse or opens a room.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "sweep line", "plain": "An imaginary vertical line moved left to right across time. You react at each start and each end." },
+      { "term": "two pointers", "plain": "Two indexes moving forward through two sorted lists. Here one walks the starts, the other walks the ends." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of [start, end] pairs, e.g. [[0,4],[1,3],[2,5],[4,6],[5,6]]",
+    "presets": [
+      { "label": "Classic", "args": [[[0, 4], [1, 3], [2, 5], [4, 6], [5, 6]]] },
+      { "label": "Back to back", "args": [[[1, 2], [2, 3], [3, 4]]] },
+      { "label": "All overlap", "args": [[[1, 6], [2, 5], [3, 6], [4, 5]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of meetings" }],
+    "compare": { "brute": "n2", "optimal": "nlogn", "bruteLabel": "For each start, count the meetings running", "optimalLabel": "Sort starts and ends, then sweep", "unit": "comparisons (rough)" },
+    "rows": [
+      { "name": "Count at every start", "time": "O(n²)", "space": "O(1)", "note": "For each meeting start, count how many meetings contain that moment. Take the largest." },
+      { "name": "Sorted starts and ends", "time": "O(n log n)", "space": "O(n)", "note": "Two sorts dominate. The sweep is one pass with two indexes." },
+      { "name": "Min-heap of end times", "time": "O(n log n)", "space": "O(n)", "note": "Not shown. Sort by start, and keep the end times of busy rooms in a heap. Its size is the answer." }
+    ],
+    "takeaway": "You never need to know which meeting uses which room. Only the count of overlaps matters, and two sorted lists give it."
+  },
+  "variants": [
+    { "id": "sweep", "label": "Sorted starts and ends", "tsFn": "minMeetingRooms", "goFn": "minMeetingRooms", "stages": [
+      { "n": 1, "title": "Sort both lists", "note": "Collect all starts and all ends, and sort each list on its own with a numeric comparator." },
+      { "n": 2, "title": "Next start vs earliest end", "note": "Is this start strictly before the earliest end not yet reused? That decides whether anyone has left." },
+      { "n": 3, "title": "Open a room", "note": "Nobody has left yet, so this meeting needs a new room. The room count goes up." },
+      { "n": 4, "title": "Reuse a room", "note": "A meeting has ended, so its room is free. Move the end pointer on. The room count stays." },
+      { "n": 5, "title": "Return", "note": "The room count is the peak number of overlapping meetings." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Back to back", "input": "[[1,3],[3,5]]", "output": "1", "why": "The second starts at 3, when the first ends. The test is start < end, so 3 < 3 is false and the room is reused." },
+    { "title": "Empty schedule", "input": "[]", "output": "0", "why": "No meetings means no rooms. The loop never runs, so ends[e] is never read." },
+    { "title": "Same slot three times", "input": "[[2,4],[2,4],[2,4]]", "output": "3", "why": "Three meetings in the same slot are all running at once. Each needs its own room." },
+    { "title": "One long meeting", "input": "[[0,100],[1,2],[3,4],[5,6]]", "output": "2", "why": "The short ones never overlap each other, so they share the second room one after another." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Sort numbers with (a, b) => a - b. Plain sort() compares as strings, so [10, 9, 2] stays in that order, and the sweep then gives a wrong count." },
+    { "lang": "TypeScript", "text": "Building starts and ends with intervals.map(...) makes new arrays, so sorting them leaves the input alone. Calling intervals.sort() directly would reorder the caller's data." },
+    { "lang": "Go", "text": "sort.Ints sorts numerically, which is what you want here. Build starts and ends with make and a loop, so sorting does not touch the caller's slice of slices." },
+    { "lang": "General", "text": "Sorting starts and ends separately breaks the pairing on purpose. It is correct because the count of open meetings only depends on how many starts and ends came before a moment." },
+    { "lang": "General", "text": "Use start < end to open a room. With <=, back-to-back meetings would be counted as needing two rooms." }
+  ],
+  "recap": {
+    "pattern": "Intervals: sweep over sorted ends",
+    "key": "Sort starts and ends apart. A start before the earliest end opens a room; otherwise it reuses one.",
+    "complexity": "Time O(n log n). Space O(n).",
+    "moves": ["Sort all starts and all ends separately", "For each start, compare it with the earliest unused end", "If start < end, open a room (rooms + 1)", "Otherwise reuse a room (move the end pointer)"]
+  }
+}

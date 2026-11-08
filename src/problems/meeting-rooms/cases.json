@@ -1,0 +1,13 @@
+[
+  {"name":"clash","input":[[[7,9],[1,4],[3,6],[10,12]]],"expected":false},
+  {"name":"back to back","input":[[[1,2],[2,3],[3,4]]],"expected":true,"edge":true},
+  {"name":"one meeting","input":[[[2,9]]],"expected":true},
+  {"name":"empty","input":[[]],"expected":true,"edge":true},
+  {"name":"clash after touching","input":[[[6,7],[1,2],[2,3],[3,5],[4,6]]],"expected":false},
+  {"name":"clash after wider touching","input":[[[8,10],[1,3],[3,5],[5,7],[6,9]]],"expected":false},
+  {"name":"one inside another","input":[[[1,10],[3,4]]],"expected":false,"edge":true},
+  {"name":"far apart","input":[[[20,25],[1,2],[10,12]]],"expected":true},
+  {"name":"same slot twice","input":[[[4,6],[4,6]]],"expected":false,"edge":true},
+  {"name":"negatives","input":[[[-4,-1],[-1,2],[3,5]]],"expected":true},
+  {"name":"numeric sort needed","input":[[[10,11],[9,10],[2,3]]],"expected":true,"edge":true}
+]

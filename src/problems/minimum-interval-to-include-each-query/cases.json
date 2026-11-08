@@ -1,0 +1,16 @@
+[
+  {"name":"classic","input":[[[1,3],[2,3],[2,5],[4,6]],[4,2,6,3]],"expected":[3,2,3,2]},
+  {"name":"wider classic","input":[[[1,3],[2,3],[2,6],[5,8]],[5,2,7,3]],"expected":[4,2,4,2]},
+  {"name":"sorted queries","input":[[[1,4],[2,4],[3,6],[4,4]],[2,3,4,5]],"expected":[3,3,1,4]},
+  {"name":"point interval, out of order","input":[[[1,4],[2,4],[3,6],[4,4]],[5,2,4,3]],"expected":[4,3,1,3],"edge":true},
+  {"name":"nothing covers","input":[[[2,3],[5,6]],[1,4,7]],"expected":[-1,-1,-1],"edge":true},
+  {"name":"nested","input":[[[1,10],[3,5],[4,4]],[4,5,10,0]],"expected":[1,3,10,-1]},
+  {"name":"repeated query","input":[[[1,3],[2,5]],[3,3,6]],"expected":[3,3,-1]},
+  {"name":"single point","input":[[[5,5]],[5]],"expected":[1]},
+  {"name":"expiry needed","input":[[[1,2],[1,6],[4,5]],[1,2,3,4]],"expected":[2,2,6,2]},
+  {"name":"expiry, wider","input":[[[1,2],[1,9],[5,6]],[1,2,3,5,6,10]],"expected":[2,2,9,2,2,-1]},
+  {"name":"large coordinates","input":[[[1,1000000],[500000,500001]],[1,500000,1000000]],"expected":[1000000,2,1000000]},
+  {"name":"no queries","input":[[[1,2]],[]],"expected":[],"edge":true},
+  {"name":"duplicate intervals","input":[[[2,3],[2,3],[1,1]],[2,1,3]],"expected":[2,1,2],"edge":true},
+  {"name":"queries need numeric order","input":[[[2,3],[9,10],[10,11]],[10,9,2]],"expected":[2,2,2],"edge":true}
+]

@@ -1,0 +1,76 @@
+{
+  "slug": "minimum-interval-to-include-each-query",
+  "title": "Minimum Interval to Include Each Query",
+  "category": "Intervals",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "You get a list of intervals [start, end] and a list of query numbers. An interval covers a query if start <= query <= end, and its size is end - start + 1. For each query, find the size of the smallest interval that covers it, or -1 if none does. Return the answers in the order the queries were given.",
+  "example": {
+    "caption": "Query 4 is covered by [2,5] (size 4) and [4,6] (size 3). The smallest is 3.",
+    "input": [
+      { "kind": "intervals", "label": "intervals", "min": 1, "max": 6, "marks": [{ "at": 4, "label": "query 4" }], "spans": [{ "start": 1, "end": 3 }, { "start": 2, "end": 3 }, { "start": 2, "end": 5 }, { "start": 4, "end": 6 }] },
+      { "kind": "array", "label": "queries", "items": [4, 2, 6, 3] }
+    ],
+    "output": [{ "kind": "array", "label": "answers", "items": [3, 2, 3, 2], "tones": ["hit", "hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Answer the queries from smallest to largest. Push every interval that has started into a min-heap keyed by size, and pop those that already ended: the top is the answer.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "min-heap", "plain": "A container where the smallest item is always on top. Push and pop each cost about log of its size." },
+      { "term": "expired interval", "plain": "One whose end is before the current query. Later queries are not smaller, so it can never help again." },
+      { "term": "lazy removal", "plain": "Do not hunt for expired items. Only pop them when they reach the top and block the answer." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the intervals, then the queries, e.g. [[1,3],[2,3],[2,5],[4,6]], [4,2,6,3]",
+    "presets": [
+      { "label": "Queries out of order", "args": [[[1, 3], [2, 3], [2, 5], [4, 6]], [4, 2, 6, 3]] },
+      { "label": "Nothing covers", "args": [[[2, 3], [5, 6]], [1, 4, 7]] },
+      { "label": "Expiry needed", "args": [[[1, 2], [1, 6], [4, 5]], [1, 2, 3, 4]] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "number of intervals" },
+      { "sym": "m", "meaning": "number of queries" }
+    ],
+    "compare": { "brute": "nm", "optimal": "nlogn", "bruteLabel": "Scan every interval for every query", "optimalLabel": "Sort, then heap by size", "unit": "steps (rough, taking m about n)" },
+    "rows": [
+      { "name": "Scan all intervals per query", "time": "O(n * m)", "space": "O(1)", "note": "For each query, test every interval and keep the smallest that covers it." },
+      { "name": "Sorted sweep with a min-heap", "time": "O((n + m) log(n + m))", "space": "O(n + m)", "note": "Two sorts, then every interval is pushed once and popped at most once, each in log n." }
+    ],
+    "takeaway": "Sorting the queries makes expiry permanent: once an interval ends before a query, it ends before every later one too."
+  },
+  "variants": [
+    { "id": "heapq", "label": "Min-heap by size", "tsFn": "minInterval", "goFn": "minInterval", "stages": [
+      { "n": 1, "title": "Sort both", "note": "Sort a copy of the intervals by start. Sort the query positions by query value, so original positions survive." },
+      { "n": 2, "title": "Push started intervals", "note": "Push every interval that starts at or before the query, as (size, end), ordered by size." },
+      { "n": 3, "title": "Pop expired", "note": "While the smallest interval ends before the query, pop it. It is useless for all later queries too." },
+      { "n": 4, "title": "Read the answer", "note": "The top is the smallest interval still covering the query. Store its size at the query's original position, or -1." },
+      { "n": 5, "title": "Return", "note": "The answers array is already in the original query order." }
+    ] }
+  ],
+  "goArgs": ["[][]int", "[]int"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Queries out of order", "input": "[[1,3],[2,3],[2,5],[4,6]], [4,2,6,3]", "output": "[3,2,3,2]", "why": "Queries are served smallest first, but each answer is written to its own original slot." },
+    { "title": "Nothing covers it", "input": "[[2,3],[5,6]], [1,4,7]", "output": "[-1,-1,-1]", "why": "Query 4 falls in a gap and 1 and 7 are outside everything. An empty heap after popping means -1." },
+    { "title": "Size counts both ends", "input": "[[5,5]], [5]", "output": "[1]", "why": "Size is end - start + 1, because both ends are included. A single point has size 1, not 0." },
+    { "title": "No queries", "input": "[[1,2]], []", "output": "[]", "why": "The loop never runs. Return an empty list, not null." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Do not sort the queries array itself and return it. You would lose which answer belongs to which query. Sort a list of positions instead, and write answer[pos]." },
+    { "lang": "General", "text": "Pop expired intervals only from the top. An expired interval buried under a smaller live one is harmless, and it is popped later when it surfaces." },
+    { "lang": "TypeScript", "text": "Sorting numbers needs a comparator: (a, b) => queries[a] - queries[b]. Without it the default sort compares as strings and puts 10 before 9, which breaks the expiry logic." },
+    { "lang": "TypeScript", "text": "intervals.sort(...) reorders the caller's array. Sort a copy with [...intervals]. There is no built-in heap, so a small class is included." },
+    { "lang": "Go", "text": "sort.Slice reorders the caller's slice, which shares memory, so copy it first. With container/heap, call heap.Push(h, x) and heap.Pop(h), not the methods on h directly. Make the answer with make([]int, len(queries)) so it is [] and not nil for no queries." }
+  ],
+  "recap": {
+    "pattern": "Intervals: sweep queries with a min-heap",
+    "key": "Process queries smallest first. Push intervals as they start, pop those that ended, and the top (smallest size) answers the query.",
+    "complexity": "Time O((n + m) log(n + m)). Space O(n + m).",
+    "moves": ["Sort intervals by start; sort query positions by value", "Push each interval with start <= query as (size, end)", "Pop while the top ends before the query", "Answer is the top size, or -1; store at the original position"]
+  }
+}

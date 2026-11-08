@@ -1,0 +1,6 @@
+function canAttendMeetings(intervals)
+  sorted = copy of intervals sorted by start          # [1] sort a copy
+  for i from 1 to length(sorted) - 1
+    if sorted[i].start < sorted[i-1].end              # [2] strict: touching is fine
+      return false                                    # [3] two meetings clash
+  return true                                         # [3] no neighbouring clash
