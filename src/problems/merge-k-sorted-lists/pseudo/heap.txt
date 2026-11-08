@@ -1,0 +1,12 @@
+function mergeKLists(lists)
+  heap = min-heap ordered by node.val
+  for head in lists
+    if head is not null: push head      # [1] one candidate per list
+  dummy = new node ; tail = dummy
+  while heap is not empty
+    node = pop smallest from heap       # [2] smallest head overall
+    tail.next = node                    # [2] append to the answer
+    tail = node
+    if node.next is not null
+      push node.next                    # [3] its list's next node is the new candidate
+  return dummy.next                     # [4] skip the dummy

@@ -1,0 +1,17 @@
+function mergeTwoLists(list1, list2)
+  dummy = new node(0)            # [1] a fake head, so the first pick is not a special case
+  tail = dummy                   # [1] the last node of the merged list
+  while list1 is not null and list2 is not null
+    if list1.val <= list2.val    # [2] take the smaller front node
+      pick = list1
+      list1 = list1.next
+    else
+      pick = list2
+      list2 = list2.next
+    tail.next = pick             # [2] link it after tail
+    tail = pick                  # [3] tail is now the new last node
+  if list1 is not null           # [4] one list is empty. Hang the other one on as it is
+    tail.next = list1
+  else
+    tail.next = list2
+  return dummy.next              # [5] skip the fake head

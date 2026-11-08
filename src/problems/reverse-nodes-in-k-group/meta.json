@@ -1,0 +1,69 @@
+{
+  "slug": "reverse-nodes-in-k-group",
+  "title": "Reverse Nodes In K Group",
+  "category": "Linked List",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "You get a linked list and a number k. Cut the list into blocks of k nodes from the front and reverse each block in place. If the last block has fewer than k nodes, leave it as it is. Change the links, not the values stored in the nodes.",
+  "example": {
+    "caption": "k = 3. The first block 1,2,3 flips. The last block 4,5 is shorter than 3, so it stays.",
+    "input": [{ "kind": "list", "label": "head", "items": [1, 2, 3, 4, 5], "tones": ["focus", "focus", "focus", "dim", "dim"] }],
+    "output": [{ "kind": "list", "label": "result", "items": [3, 2, 1, 4, 5], "tones": ["hit", "hit", "hit", "dim", "dim"] }]
+  },
+  "idea": {
+    "sentence": "Find the block's last node first, so you know the block is complete, then reverse just that block and stitch it back between the finished part and the rest.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "dummy node", "plain": "A fake node placed before the head. It gives the first block a node to hang from, so the first block is handled like every other block." },
+      { "term": "stitch", "plain": "Reconnect the pieces: the finished part must point at the block's new first node, and the block's new last node must point at the rest." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the node values, then k, e.g. [1,2,3,4,5], 3",
+    "presets": [
+      { "label": "Two blocks and a tail", "args": [[1, 2, 3, 4, 5, 6, 7], 3] },
+      { "label": "k = 2", "args": [[1, 2, 3, 4, 5], 2] },
+      { "label": "k equals length", "args": [[1, 2, 3, 4], 4] },
+      { "label": "k = 1", "args": [[1, 2, 3], 1] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }],
+    "compare": { "brute": "n", "optimal": "1", "bruteLabel": "Copy values into an array and rewrite the nodes", "optimalLabel": "Relink pointers in place", "unit": "extra memory cells" },
+    "rows": [
+      { "name": "Array copy", "time": "O(n)", "space": "O(n)", "note": "Read the values, reverse each block in the array, write them back. It swaps values, not nodes, which the problem forbids." },
+      { "name": "Relink in place", "time": "O(n)", "space": "O(1)", "note": "Each node is visited about twice: once to find the block end, once to flip it. A few pointers are all you keep." }
+    ],
+    "takeaway": "Every node is touched a fixed number of times. Pointer surgery keeps the extra memory at zero."
+  },
+  "variants": [
+    { "id": "groups", "label": "Iterative blocks", "tsFn": "reverseKGroupDriver", "goFn": "reverseKGroupDriver", "stages": [
+      { "n": 1, "title": "Find the block", "note": "Walk k steps from groupPrev to find kth, the block's last node. If the list ends first, the tail is short: stop and leave it." },
+      { "n": 2, "title": "Reverse the block", "note": "Normal reversal, but prev starts at groupNext (the node after the block) and the loop stops at groupNext." },
+      { "n": 3, "title": "Stitch it in", "note": "groupPrev.next = kth connects the finished part to the block's new front. The old first node is now the block's last, so it becomes the next groupPrev." },
+      { "n": 4, "title": "Return the head", "note": "The head may have changed. dummy.next is always right." }
+    ] }
+  ],
+  "goArgs": ["[]int", "int"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "k = 1", "input": "[1,2,3], k=1", "output": "[1,2,3]", "why": "Every block is one node. Reversing one node changes nothing." },
+    { "title": "k equals the length", "input": "[1,2,3,4], k=4", "output": "[4,3,2,1]", "why": "One block, no tail. The result is the plain reversal of the whole list." },
+    { "title": "k longer than the list", "input": "[1,2], k=3", "output": "[1,2]", "why": "The walk to find kth runs off the end. The block is incomplete, so nothing changes." },
+    { "title": "Empty list", "input": "[], k=2", "output": "[]", "why": "dummy.next is null, so the first walk gives null and the loop stops straight away." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Check the block has k nodes before you reverse anything. Reversing first and undoing the short tail later is the common bug." },
+    { "lang": "General", "text": "Start prev at groupNext, not at null. Then the block's old first node ends up pointing at the rest of the list, and half the stitching is done for you." },
+    { "lang": "General", "text": "Save the old first node (groupPrev.next) before you point groupPrev at kth. After the stitch it is the block's last node and becomes the next groupPrev." },
+    { "lang": "TypeScript", "text": "Type the walker as ListNode | null, and annotate next as ListNode | null too. Otherwise TypeScript reports it as implicitly any inside the loop." },
+    { "lang": "Go", "text": "No parentheses around conditions, and kth := groupPrev gives a *ListNode that may become nil in the for loop. Compare with != nil before you read kth.Next." }
+  ],
+  "recap": {
+    "pattern": "Linked list: reverse in blocks",
+    "key": "For each block: find its last node, reverse the k nodes with prev starting at the node after the block, then stitch.",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": ["groupPrev = dummy", "Walk k steps to kth. If null, stop", "Reverse the block with prev = kth.next", "groupPrev.next = kth, groupPrev = old first node"]
+  }
+}

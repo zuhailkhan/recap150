@@ -1,0 +1,11 @@
+function removeNthFromEnd(head, n)
+  dummy = new node(0, next = head)  # [1] a fake head, so removing the real head is not special
+  slow = dummy                      # [1] slow will stop one node before the one to remove
+  fast = dummy                      # [1] fast runs ahead
+  repeat n times
+    fast = fast.next                # [2] open a gap of n nodes between slow and fast
+  while fast.next is not null
+    slow = slow.next                # [3] move both until fast is on the last node
+    fast = fast.next
+  slow.next = slow.next.next        # [4] skip over the node
+  return dummy.next                 # [5] the real head (it may have changed)

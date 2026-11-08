@@ -1,0 +1,9 @@
+[
+  {"name":"classic","input":[[[7,null],[13,0],[11,4],[10,2],[1,0]]],"expected":[[7,null],[13,0],[11,4],[10,2],[1,0]]},
+  {"name":"two nodes","input":[[[1,1],[2,1]]],"expected":[[1,1],[2,1]]},
+  {"name":"empty list","input":[[]],"expected":[],"edge":true},
+  {"name":"random to itself","input":[[[5,0]]],"expected":[[5,0]],"edge":true},
+  {"name":"no random pointers","input":[[[1,null],[2,null],[3,null]]],"expected":[[1,null],[2,null],[3,null]]},
+  {"name":"equal values","input":[[[3,null],[3,0],[3,2],[3,1]]],"expected":[[3,null],[3,0],[3,2],[3,1]],"edge":true},
+  {"name":"random points forward","input":[[[1,3],[2,null],[3,0],[4,2]]],"expected":[[1,3],[2,null],[3,0],[4,2]]}
+]

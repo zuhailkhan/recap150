@@ -1,0 +1,19 @@
+function reverseKGroup(head, k)
+  dummy = new node ; dummy.next = head
+  groupPrev = dummy                       # [1] node just before the next group
+  loop
+    kth = groupPrev                       # [1] walk k steps to the group's last node
+    repeat k times: kth = kth.next        # [1] stop early if it becomes null
+    if kth is null: stop                  # [1] short tail stays as it is
+    groupNext = kth.next                  # [2] node after the group
+    prev = groupNext                      # [2] first flipped node will point past the group
+    cur = groupPrev.next
+    while cur != groupNext                # [2] reverse just this group
+      next = cur.next
+      cur.next = prev
+      prev = cur
+      cur = next
+    front = groupPrev.next                # [3] old first node, now the group's last
+    groupPrev.next = kth                  # [3] stitch the block before to the new first node
+    groupPrev = front
+  return dummy.next                       # [4]

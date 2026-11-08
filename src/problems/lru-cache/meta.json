@@ -1,0 +1,71 @@
+{
+  "slug": "lru-cache",
+  "title": "LRU Cache",
+  "category": "Linked List",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Design a cache with a fixed capacity. get(key) returns the stored value or -1. put(key, value) stores a pair, and if the cache is then over capacity it throws out the key that was used least recently. Reading or writing a key counts as using it. Both operations must run in constant time.",
+  "example": {
+    "caption": "Capacity 2. put(1), put(2), get(1) makes 1 the newest. put(3) then evicts 2, the oldest.",
+    "input": [{ "kind": "list", "label": "after get(1). Newest on the left", "items": ["H", "1:1", "2:2", "T"], "doubly": true, "tones": ["dim", "hit", null, "dim"] }],
+    "output": [{ "kind": "list", "label": "after put(3, 3). Key 2 is gone", "items": ["H", "3:3", "1:1", "T"], "doubly": true, "tones": ["dim", "hit", null, "dim"] }]
+  },
+  "idea": {
+    "sentence": "A hash map finds a node in one step, and a doubly linked list lets you cut a node out and re-insert it at the front in one step, so both operations are constant time.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "LRU", "plain": "Least Recently Used. When full, drop the entry nobody has touched for the longest time." },
+      { "term": "dummy head and tail", "plain": "Two fake nodes at the ends of the list. Real nodes always have a neighbour on each side, so you never test for null while linking." },
+      { "term": "doubly linked list", "plain": "Each node points to the next and the previous node, so you can unlink a node you hold without searching for its neighbour." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then their arguments, e.g. [\"LRUCache\",\"put\",\"get\"], [[2],[1,1],[1]]",
+    "presets": [
+      { "label": "Classic", "args": [["LRUCache", "put", "put", "get", "put", "get", "put", "get", "get", "get"], [[2], [1, 1], [2, 2], [1], [3, 3], [2], [4, 4], [1], [3], [4]]] },
+      { "label": "Update a key", "args": [["LRUCache", "put", "put", "put", "put", "get", "get"], [[2], [1, 1], [2, 2], [1, 10], [3, 3], [2], [1]]] },
+      { "label": "Capacity one", "args": [["LRUCache", "put", "put", "get", "get"], [[1], [1, 1], [2, 2], [1], [2]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "capacity (number of stored keys)" }],
+    "compare": { "brute": "n", "optimal": "1", "bruteLabel": "Scan an array to find and reorder a key", "optimalLabel": "Map lookup, then relink a node", "unit": "steps per operation" },
+    "rows": [
+      { "name": "Array of keys in use order", "time": "O(n)", "space": "O(n)", "note": "Finding a key and moving it to the front both walk the array." },
+      { "name": "Map + doubly linked list", "time": "O(1)", "space": "O(n)", "note": "The map jumps to the node. Unlinking and relinking touch a fixed number of pointers." }
+    ],
+    "takeaway": "Neither structure is enough alone. The map cannot keep order, and the list cannot find a key. Together each covers the other's weakness."
+  },
+  "variants": [
+    { "id": "linked", "label": "Map + linked list", "tsFn": "run", "goFn": "run", "stages": [
+      { "n": 1, "title": "Dummy head and tail", "note": "Create the empty map and two dummy nodes linked to each other. Between them lives the order: newest next to head, oldest next to tail." },
+      { "n": 2, "title": "Find the node", "note": "Ask the map for the key. It returns the node itself, so nothing is searched. A missing key means a miss." },
+      { "n": 3, "title": "Move to front", "note": "Unlink the node from where it is, then link it right after the head. Reading or updating marks it as newest." },
+      { "n": 4, "title": "Insert a new key", "note": "Make a node, store it in the map, and link it at the front." },
+      { "n": 5, "title": "Evict the oldest", "note": "If the size is over capacity, the node just before the tail is the oldest. Unlink it and delete its key from the map too." }
+    ] }
+  ],
+  "goArgs": ["[]string", "[][]int"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "edges": [
+    { "title": "Capacity one", "input": "put(1), put(2), get(1)", "output": "-1", "why": "Every new key evicts the previous one. Insert first, then evict, and the list never holds two real nodes for long." },
+    { "title": "Miss on an empty cache", "input": "get(5) first", "output": "-1", "why": "The map has no key. Return at once and touch no pointers." },
+    { "title": "Stored value is 0", "input": "put(1, 0), get(1)", "output": "0", "why": "A hit that returns 0 is still a hit. Test whether the node exists, not whether its value is truthy." },
+    { "title": "Update at full capacity", "input": "cap 2: put(1), put(2), put(2, 20)", "output": "no eviction", "why": "An existing key replaces its value and moves to the front. The size does not grow, so nothing is evicted." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Evicting must delete from both places. Drop the node from the list but keep the key in the map, and the cache quietly returns stale nodes." },
+    { "lang": "General", "text": "Each node stores its key as well as its value. When you evict the node before the tail, the key is the only way to know which map entry to delete." },
+    { "lang": "TypeScript", "text": "if (!node) is right for a missing node. For the value never write if (!node.val): a stored 0 is falsy and would be reported as a miss." },
+    { "lang": "TypeScript", "text": "A JS Map also remembers insertion order, so delete and set again gives a shorter LRU. It is correct, but the interview wants the linked list shown." },
+    { "lang": "Go", "text": "A Go map has no order, so you must keep the list. Reading a missing key returns nil for a pointer map, so use the second value: node, ok := items[key]." },
+    { "lang": "Go", "text": "container/list exists, but its elements hold any, so you need type assertions. A small own node type is clearer here." }
+  ],
+  "recap": {
+    "pattern": "Design: map + doubly linked list",
+    "key": "Map gives the node in O(1). The list keeps use order. Move to the front on use. Evict the node next to the tail.",
+    "complexity": "get and put O(1). Space O(capacity).",
+    "moves": ["Dummy head and tail linked together", "get: map lookup, move node to front", "put: insert at front, update map", "Over capacity: unlink tail.prev, delete its key from the map"]
+  }
+}

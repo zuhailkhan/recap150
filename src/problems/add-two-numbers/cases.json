@@ -1,0 +1,11 @@
+[
+  {"name":"342 + 465","input":[[2,4,3],[5,6,4]],"expected":[7,0,8]},
+  {"name":"zero plus zero","input":[[0],[0]],"expected":[0],"edge":true},
+  {"name":"carry out of the last column","input":[[5],[5]],"expected":[0,1],"edge":true},
+  {"name":"carry ripples through nines","input":[[9,9,9,9,9,9,9],[9,9,9,9]],"expected":[8,9,9,9,0,0,0,1],"edge":true},
+  {"name":"different lengths","input":[[1],[9,9]],"expected":[0,0,1]},
+  {"name":"second list longer, no carry","input":[[1,2],[3,4,5,6]],"expected":[4,6,5,6]},
+  {"name":"one digit each, no carry","input":[[3],[4]],"expected":[7]},
+  {"name":"leading zeros in the number","input":[[0,0,1],[0]],"expected":[0,0,1]},
+  {"name":"carry used mid-list","input":[[8,1],[7,8]],"expected":[5,0,1]}
+]

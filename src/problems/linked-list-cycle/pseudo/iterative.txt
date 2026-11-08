@@ -1,0 +1,9 @@
+function hasCycle(head)
+  slow = head                    # [1] two runners start on the same node
+  fast = head
+  while fast is not null and fast.next is not null
+    slow = slow.next             # [2] slow walks 1 node
+    fast = fast.next.next        # [2] fast walks 2 nodes
+    if slow is the same node as fast   # [3] the same node, not just the same value
+      return true                # [4] they met, so there is a cycle
+  return false                   # [4] fast fell off the end, so the list ends

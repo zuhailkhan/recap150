@@ -1,0 +1,69 @@
+{
+  "slug": "find-the-duplicate-number",
+  "title": "Find The Duplicate Number",
+  "category": "Linked List",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "An array holds n + 1 integers, each between 1 and n. Exactly one value appears more than once. Find it. You may not change the array, and you may use only a constant amount of extra memory, so no set and no sorting.",
+  "example": {
+    "caption": "The value 2 sits at two indexes. Two different indexes both point at index 2.",
+    "input": [{ "kind": "array", "label": "nums", "items": [1, 3, 4, 2, 2] }],
+    "output": [{ "kind": "array", "label": "nums", "items": [1, 3, 4, 2, 2], "tones": [null, null, null, "hit", "hit"], "pointers": [{ "name": "i", "at": 3, "tone": "hit" }, { "name": "j", "at": 4, "tone": "hit" }] }]
+  },
+  "idea": {
+    "sentence": "Read each index as a pointer to nums[i]. The duplicate is a node with two arrows into it, so it is where the chain starts to loop, and Floyd's two walkers find that spot.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "Floyd's cycle detection", "plain": "Two walkers on one chain: a slow one (one step) and a fast one (two steps). If the chain loops, they must meet inside the loop." },
+      { "term": "loop entrance", "plain": "The first node of the loop, the one you reach from outside the loop." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the array, n + 1 numbers each from 1 to n, e.g. [1,3,4,2,2]",
+    "presets": [
+      { "label": "Classic", "args": [[1, 3, 4, 2, 2]] },
+      { "label": "Long tail before loop", "args": [[2, 5, 9, 6, 9, 3, 8, 9, 7, 1]] },
+      { "label": "Smallest array", "args": [[1, 1]] },
+      { "label": "Self loop", "args": [[2, 2, 2, 2, 2]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "the largest allowed value (the array has n + 1 numbers)" }],
+    "compare": { "brute": "n", "optimal": "1", "bruteLabel": "Remember every number in a set", "optimalLabel": "Two walkers, nothing stored", "unit": "extra memory cells" },
+    "rows": [
+      { "name": "Sort, then compare neighbours", "time": "O(n log n)", "space": "O(1)", "note": "Breaks the rule: it changes the array. A sorted copy would cost O(n) space." },
+      { "name": "Hash set", "time": "O(n)", "space": "O(n)", "note": "Simple and fast, but it stores up to n values." },
+      { "name": "Floyd's two walkers", "time": "O(n)", "space": "O(1)", "note": "Each walker is a single integer. The array is only read." }
+    ],
+    "takeaway": "The set is the obvious answer, and the constraint rules it out. Seeing the array as a linked list gives a loop to detect for free."
+  },
+  "variants": [
+    { "id": "floyd", "label": "Floyd's cycle", "tsFn": "findDuplicate", "goFn": "findDuplicate", "stages": [
+      { "n": 1, "title": "Start at index 0", "note": "Think of index i as a node whose single arrow goes to nums[i]. Index 0 is never pointed at, so it is the start of the chain." },
+      { "n": 2, "title": "Race: slow and fast", "note": "slow moves one step, fast moves two. Because the chain loops, they must meet somewhere inside the loop." },
+      { "n": 3, "title": "Restart slow, walk together", "note": "Put slow back at 0. Move both one step at a time. The distance maths makes them meet exactly at the loop entrance." },
+      { "n": 4, "title": "Return the entrance", "note": "The entrance has two arrows into it: one from the tail, one from the loop. Two indexes hold that value, so it is the duplicate." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Smallest array", "input": "[1, 1]", "output": "1", "why": "Index 0 points to 1, and 1 points to itself. A loop of length one. The walkers meet at once." },
+    { "title": "Same value everywhere", "input": "[3, 3, 3, 3, 3]", "output": "3", "why": "The duplicate may appear many times. Many arrows enter index 3, and the walkers still find it." },
+    { "title": "Duplicate is the last index", "input": "[1, 2, 3, 4, 4]", "output": "4", "why": "The loop can be tiny and far from the start. The second phase walks the long tail to reach it." },
+    { "title": "Long tail before the loop", "input": "[2, 5, 9, 6, 9, 3, 8, 9, 7, 1]", "output": "9", "why": "Most indexes sit in the tail, not in the loop. That is why slow restarts from 0 and walks to the entrance." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Both walkers start at index 0, so a plain while (slow != fast) would stop at once. Move first, then compare." },
+    { "lang": "General", "text": "Index 0 is the right start because no value is 0, so nothing points back to it and it stays out of the loop. Phase two relies on that." },
+    { "lang": "TypeScript", "text": "Use do { } while (slow !== fast) for the first phase. Do not sort the input to look for neighbours: nums.sort() also compares as strings by default and mutates the array." },
+    { "lang": "Go", "text": "Go has no do-while. Write for { move; if slow == fast { break } }. Sorting the slice would modify the caller's array too, because slices share memory." }
+  ],
+  "recap": {
+    "pattern": "Linked list: Floyd on an array",
+    "key": "Treat i -> nums[i] as a pointer chain. A duplicate means two arrows into one node, so the chain loops. Find the loop entrance.",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": ["slow = fast = 0. Move slow 1, fast 2 until they meet", "Put slow back at 0", "Move both 1 step until they meet", "That index is the duplicate"]
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "slug": "remove-nth-node-from-end-of-list",
+  "title": "Remove Nth Node From End of List",
+  "category": "Linked List",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get the first node of a singly linked list and a number n. Remove the n-th node counting from the end (n = 1 is the last node). Return the first node of the list afterwards. Try to do it in a single walk.",
+  "example": {
+    "caption": "n = 2 means the second node from the end. That is 4, so it is removed.",
+    "input": [
+      { "kind": "list", "label": "head", "items": [1, 2, 3, 4, 5] },
+      { "kind": "array", "label": "n", "items": [2] }
+    ],
+    "output": [{ "kind": "list", "label": "after removal", "items": [1, 2, 3, 5], "tones": ["hit", "hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Keep two pointers exactly n nodes apart and slide them together. When the front one is on the last node, the back one stands right before the node to remove.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "dummy node", "plain": "A throwaway node placed before the head. It means every node, even the head, has a node before it that you can relink." },
+      { "term": "gap", "plain": "The distance between slow and fast, counted in nodes. It stays fixed while both move." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the node values, then n, e.g. [1,2,3,4,5], 2",
+    "presets": [
+      { "label": "Second from the end", "args": [[1, 2, 3, 4, 5], 2] },
+      { "label": "Remove the head", "args": [[1, 2, 3], 3] },
+      { "label": "Single node", "args": [[7], 1] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "L", "meaning": "number of nodes" }],
+    "compare": { "brute": "n", "optimal": "n", "bruteLabel": "Pass 1 counts the length. Pass 2 walks to the node", "optimalLabel": "One pass with a gap", "unit": "node visits" },
+    "rows": [
+      { "name": "Count, then walk", "time": "O(L)", "space": "O(1)", "note": "Two passes: first the length L, then L - n steps to the node before the target." },
+      { "name": "Two pointers with a gap", "time": "O(L)", "space": "O(1)", "note": "One pass. The gap replaces the counting." }
+    ],
+    "takeaway": "Both are linear and use no extra memory. The gap trick saves the first counting pass and is the pattern to remember."
+  },
+  "variants": [
+    { "id": "iterative", "label": "Gap of n with dummy", "tsFn": "removeNthFromEndDriver", "goFn": "removeNthFromEndDriver", "stages": [
+      { "n": 1, "title": "Dummy and two pointers", "note": "Add a fake node before the head. slow and fast both start on it." },
+      { "n": 2, "title": "Open the gap", "note": "Move fast n nodes ahead. Now slow and fast are n apart." },
+      { "n": 3, "title": "Slide together", "note": "Move both one step at a time until fast is on the last node. The gap stays n." },
+      { "n": 4, "title": "Unlink", "note": "slow is just before the target. Set slow.next to the node after the target." },
+      { "n": 5, "title": "Return dummy.next", "note": "This is the real head. It changes when the head itself was removed." }
+    ] }
+  ],
+  "goArgs": ["[]int", "int"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Only node", "input": "[1], n = 1", "output": "[]", "why": "slow stays on the dummy. Unlinking makes dummy.next null, so the answer is empty." },
+    { "title": "Remove the head", "input": "[1,2], n = 2", "output": "[2]", "why": "The target is the first node, so slow must stand before it. Only the dummy is before it." },
+    { "title": "Remove the tail", "input": "[1,2], n = 1", "output": "[1]", "why": "fast moves one step, then the loop is skipped. slow is on 1 and cuts off 2." },
+    { "title": "n equals the length", "input": "[1,2,3], n = 3", "output": "[2,3]", "why": "Same as removing the head. fast lands on the last node right after the gap is made." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Start both pointers on the dummy, not on the head. Then slow ends one node before the target, which is where you need it to relink." },
+    { "lang": "General", "text": "Return dummy.next, not head. When the head is the node you removed, the old head is gone." },
+    { "lang": "TypeScript", "text": "fast.next has the type ListNode | null. Inside the gap loop you need fast.next! (safe when 1 <= n <= length). Without the promise from the problem, check for null instead." },
+    { "lang": "Go", "text": "If n is larger than the list, fast becomes nil and fast.Next panics with a nil pointer error. The problem guarantees n is valid, but real code should check." }
+  ],
+  "recap": {
+    "pattern": "Linked list: gap between two pointers",
+    "key": "Start both on a dummy. Move fast n steps. Move both until fast.next is null. Then slow.next is the node to remove.",
+    "complexity": "Time O(L). Space O(1).",
+    "moves": ["dummy.next = head, slow = fast = dummy", "Move fast n times", "Move both while fast.next exists", "slow.next = slow.next.next. Return dummy.next"]
+  }
+}

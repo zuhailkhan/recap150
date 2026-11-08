@@ -1,0 +1,14 @@
+function addTwoNumbers(l1, l2)
+  dummy = new node(0)                   # [1] a fake head for the answer
+  tail = dummy                          # [1] the last node of the answer
+  carry = 0                             # [1] what we carry to the next column
+  while l1 is not null or l2 is not null or carry > 0
+    sum = carry                         # [2] one column: digit + digit + carry
+    if l1 is not null: sum = sum + l1.val
+    if l2 is not null: sum = sum + l2.val
+    carry = sum div 10                  # [3] the tens part carries on
+    tail.next = new node(sum mod 10)    # [3] the ones part is the digit we keep
+    tail = tail.next
+    if l1 is not null: l1 = l1.next     # [4] move to the next column
+    if l2 is not null: l2 = l2.next
+  return dummy.next                     # [5] skip the fake head

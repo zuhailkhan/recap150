@@ -1,0 +1,77 @@
+{
+  "slug": "merge-k-sorted-lists",
+  "title": "Merge K Sorted Lists",
+  "category": "Linked List",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "You get k linked lists, each already sorted from small to large. Merge them all into one sorted linked list and return its head. Some lists may be empty, and k itself may be zero.",
+  "example": {
+    "caption": "Three sorted lists become one sorted list. Equal values (the two 1s, the two 4s) stay.",
+    "input": [
+      { "kind": "list", "label": "list 1", "items": [1, 4, 5] },
+      { "kind": "list", "label": "list 2", "items": [1, 3, 4] },
+      { "kind": "list", "label": "list 3", "items": [2, 6] }
+    ],
+    "output": [{ "kind": "list", "label": "merged", "items": [1, 1, 2, 3, 4, 4, 5, 6], "tones": ["hit", "hit", "hit", "hit", "hit", "hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "The next value of the answer is always the smallest current head among the k lists, and a min-heap hands you that smallest head in log k time.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "min-heap", "plain": "A container where the smallest item is always on top. Adding or removing one item costs about log of its size." },
+      { "term": "head", "plain": "The first node of a list that has not been used yet. It is the only node of that list that can be next." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of sorted arrays, e.g. [[1,4,5],[1,3,4],[2,6]]",
+    "presets": [
+      { "label": "Three lists", "args": [[[1, 4, 5], [1, 3, 4], [2, 6]]] },
+      { "label": "Empty lists mixed in", "args": [[[], [5], [], [1, 9]]] },
+      { "label": "One list", "args": [[[1, 2, 3]]] },
+      { "label": "Equal values", "args": [[[2, 2], [2]]] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "total number of nodes in all lists" },
+      { "sym": "m", "meaning": "number of lists (k in the problem)" }
+    ],
+    "compare": { "brute": "nm", "optimal": "nlogm", "bruteLabel": "Scan all m heads for the smallest each time", "optimalLabel": "Heap gives the smallest head", "unit": "comparisons" },
+    "rows": [
+      { "name": "Scan the heads each time", "time": "O(n * m)", "space": "O(1)", "note": "For each of the n output nodes, look at up to m heads." },
+      { "name": "Min-heap of heads", "time": "O(n log m)", "space": "O(m)", "note": "The heap never holds more than one node per list. Each push or pop costs log m." },
+      { "name": "Pairwise merge (divide and conquer)", "time": "O(n log m)", "space": "O(1)", "note": "Merge lists two at a time, round after round. Not shown here. It reuses the merge-two-lists routine." }
+    ],
+    "takeaway": "Only the k heads can be next, so the heap needs only k items. That is what turns a scan of m heads into a log m step."
+  },
+  "variants": [
+    { "id": "heap", "label": "Min-heap of heads", "tsFn": "mergeKListsDriver", "goFn": "mergeKListsDriver", "stages": [
+      { "n": 1, "title": "Heap of heads", "note": "Push the head of every non-empty list into a min-heap. Skip null heads." },
+      { "n": 2, "title": "Pop the smallest", "note": "The top is the smallest unused value overall. Pop it and append it to the answer with a tail pointer." },
+      { "n": 3, "title": "Push its successor", "note": "The popped node's next node is now the head of that list. Push it, unless the list is used up." },
+      { "n": 4, "title": "Return", "note": "When the heap is empty every node has been placed. Return dummy.next." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "No lists at all", "input": "[]", "output": "[]", "why": "The heap stays empty, the loop never runs, and dummy.next is null." },
+    { "title": "Only empty lists", "input": "[[], [], []]", "output": "[]", "why": "Every head is null, so nothing is pushed. Pushing a null would crash on the first comparison." },
+    { "title": "Equal values", "input": "[[2,2],[2],[2,2,2]]", "output": "[2,2,2,2,2,2]", "why": "Ties are fine in a heap. Any of the equal nodes may come out first." },
+    { "title": "Negative numbers", "input": "[[-5,-1,3],[-3,0],[-4,4,8]]", "output": "[-5,-4,-3,-1,0,3,4,8]", "why": "Only comparisons are used, so the sign does not matter. Do not use 0 as a 'no value' marker for an empty list." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Push a node's successor only after you pop it. Pushing all nodes up front works but makes the heap hold every node instead of k." },
+    { "lang": "General", "text": "Filter out null heads before pushing. An empty list in the input is common." },
+    { "lang": "TypeScript", "text": "There is no built-in heap. Do not fake one with array.sort() inside the loop, which costs O(m log m) per pop. If you ever sort numbers, remember the default sort compares as strings: [10, 9].sort() gives [10, 9]." },
+    { "lang": "Go", "text": "With container/heap, call heap.Push(h, x) and heap.Pop(h). Calling h.Push or h.Pop directly only appends or removes the last slice item and does not restore the heap order." },
+    { "lang": "Go", "text": "Push and Pop on nodeHeap need a pointer receiver because they change the slice length. Len, Less and Swap can use a value receiver." }
+  ],
+  "recap": {
+    "pattern": "Heap: k-way merge",
+    "key": "Keep one head per list in a min-heap. Pop the smallest, append it, push its next node.",
+    "complexity": "Time O(n log m). Space O(m).",
+    "moves": ["Push each non-empty head into a min-heap", "Pop the smallest and append it to the answer", "Push the popped node's next, if any", "Stop when the heap is empty. Return dummy.next"]
+  }
+}

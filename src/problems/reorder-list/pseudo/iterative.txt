@@ -1,0 +1,24 @@
+function reorderList(head)
+  if head is null or head.next is null: return
+  slow = head                    # [1] slow takes one step, fast takes two
+  fast = head.next               # [1] fast starts one ahead
+  while fast is not null and fast.next is not null
+    slow = slow.next             # [1] when fast hits the end, slow is at the middle
+    fast = fast.next.next
+  prev = null                    # [2] reverse the second half in place
+  cur = slow.next                # [2] second half starts after slow
+  slow.next = null               # [2] cut the list in two
+  while cur is not null
+    next = cur.next
+    cur.next = prev
+    prev = cur
+    cur = next
+  first = head                   # [3] weave: one from the front, one from the back
+  second = prev
+  while first is not null and second is not null
+    n1 = first.next
+    n2 = second.next
+    first.next = second          # [3] first -> second
+    second.next = n1             # [3] second -> the rest of the first half
+    first = n1
+    second = n2

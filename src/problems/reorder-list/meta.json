@@ -1,0 +1,67 @@
+{
+  "slug": "reorder-list",
+  "title": "Reorder List",
+  "category": "Linked List",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get the first node of a singly linked list L0, L1, ... Ln. Rearrange it in place into L0, Ln, L1, Ln-1, L2, ... so the ends take turns. Change the links only, not the values. The function returns nothing.",
+  "example": {
+    "caption": "Take from the front, then the back, then the front again.",
+    "input": [{ "kind": "list", "label": "head", "items": [1, 2, 3, 4, 5] }],
+    "output": [{ "kind": "list", "label": "head after reorder", "items": [1, 5, 2, 4, 3], "tones": ["focus", "hit", "focus", "hit", "focus"] }]
+  },
+  "idea": {
+    "sentence": "A list cannot be read from the back, so split it in the middle, reverse the second half, and weave the two halves one node at a time.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "slow and fast pointers", "plain": "Two pointers walking the same list. Slow moves one node per turn, fast moves two. When fast reaches the end, slow is at the middle." },
+      { "term": "in place", "plain": "You relink the existing nodes. You do not build a new list or copy values." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the node values in order, e.g. [1,2,3,4,5]",
+    "presets": [
+      { "label": "Five nodes (odd)", "args": [[1, 2, 3, 4, 5]] },
+      { "label": "Four nodes (even)", "args": [[1, 2, 3, 4]] },
+      { "label": "Six nodes", "args": [[1, 2, 3, 4, 5, 6]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }],
+    "compare": { "brute": "n", "optimal": "1", "bruteLabel": "Copy nodes into an array, then relink with two indexes", "optimalLabel": "Split, reverse, weave in place", "unit": "extra memory cells" },
+    "rows": [
+      { "name": "Array of nodes", "time": "O(n)", "space": "O(n)", "note": "Easy to write: indexes i and n-1-i. But it stores every node." },
+      { "name": "Middle, reverse, weave", "time": "O(n)", "space": "O(1)", "note": "Three passes, each linear. Only a handful of pointers." }
+    ],
+    "takeaway": "Both are linear in time. The three-step version saves the array by reusing the list itself as the way to reach the back."
+  },
+  "variants": [
+    { "id": "iterative", "label": "Middle, reverse, weave", "tsFn": "reorderListDriver", "goFn": "reorderListDriver", "stages": [
+      { "n": 1, "title": "Find the middle", "note": "slow moves one node, fast moves two. When fast cannot go further, slow is at the end of the first half." },
+      { "n": 2, "title": "Reverse the second half", "note": "Cut the list after slow. Flip the arrows of the second half so its old tail comes first." },
+      { "n": 3, "title": "Weave the halves", "note": "Link one node from the first half, then one from the reversed half, and so on until the second half is used up." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty list", "input": "[]", "output": "[]", "why": "The guard returns at once. There is no head to touch." },
+    { "title": "One or two nodes", "input": "[1, 2]", "output": "[1, 2]", "why": "Already in the right order. The guard handles one node. For two, the weave links 1 to 2 and nothing changes." },
+    { "title": "Odd length", "input": "[1, 2, 3]", "output": "[1, 3, 2]", "why": "The middle node stays in the first half and ends the answer. The halves are 2 nodes and 1 node." },
+    { "title": "Repeated values", "input": "[2, 2, 2, 1]", "output": "[2, 1, 2, 2]", "why": "Values do not matter. You move nodes by position only." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Cut the first half (slow.next = null) before you weave. Otherwise the last node of the first half still points into the second half and the list loops." },
+    { "lang": "General", "text": "Save both next pointers (n1 and n2) before you relink. After first.next = second you can no longer reach the rest of the first half." },
+    { "lang": "TypeScript", "text": "slow.next has the type ListNode | null, so slow = slow.next needs a ! or a check. It is safe here because fast stays ahead of slow." },
+    { "lang": "TypeScript", "text": "The function returns void. Tests need the head after the call, so check the same head object you passed in, not a return value." },
+    { "lang": "Go", "text": "reorderList(head *ListNode) changes nodes through pointers, so the caller sees the result. Do not reassign head inside and expect the caller to notice." }
+  ],
+  "recap": {
+    "pattern": "Linked list: split, reverse, weave",
+    "key": "Slow/fast finds the middle. Reverse the second half. Then alternate nodes from the two halves.",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": ["slow/fast to the middle", "Cut after slow", "Reverse the second half", "Weave: first.next = second, second.next = saved next"]
+  }
+}

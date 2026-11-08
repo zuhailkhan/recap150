@@ -1,0 +1,75 @@
+{
+  "slug": "add-two-numbers",
+  "title": "Add Two Numbers",
+  "category": "Linked List",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Two non-empty linked lists each hold the digits of a non-negative number, with the ones digit first. Add the two numbers and return the sum in the same format: a linked list of digits, ones digit first.",
+  "example": {
+    "caption": "342 + 465 = 807. The lists are written backwards, so 807 is stored as 7, 0, 8.",
+    "input": [
+      { "kind": "list", "label": "l1 (342)", "items": [2, 4, 3] },
+      { "kind": "list", "label": "l2 (465)", "items": [5, 6, 4] }
+    ],
+    "output": [{ "kind": "list", "label": "sum (807)", "items": [7, 0, 8], "tones": ["hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "The ones digit comes first, so walk both lists together and add column by column like on paper, passing the carry along.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "carry", "plain": "The tens part of a column sum (0 or 1 here). It is added into the next column." },
+      { "term": "dummy node", "plain": "A throwaway first node for the answer. It saves a special case for creating the first digit." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the digit lists, ones digit first, e.g. [2,4,3], [5,6,4]",
+    "presets": [
+      { "label": "342 + 465", "args": [[2, 4, 3], [5, 6, 4]] },
+      { "label": "Carry past the end", "args": [[9, 9], [1]] },
+      { "label": "Zero plus zero", "args": [[0], [0]] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "digits in l1" },
+      { "sym": "m", "meaning": "digits in l2" }
+    ],
+    "compare": { "brute": "n", "optimal": "n", "bruteLabel": "Convert both lists to numbers, add, convert back", "optimalLabel": "Add column by column", "unit": "digit visits" },
+    "rows": [
+      { "name": "Convert, add, convert back", "time": "O(n+m)", "space": "O(n+m)", "note": "Looks simple, but long lists overflow a normal integer. It breaks on 100-digit inputs." },
+      { "name": "Column by column", "time": "O(max(n,m))", "space": "O(1)", "note": "Never builds a big number. The answer list is the output, so it is not extra space." }
+    ],
+    "takeaway": "The digit-by-digit version is the same speed and never overflows, because a column sum is at most 19."
+  },
+  "variants": [
+    { "id": "iterative", "label": "Column by column", "tsFn": "addTwoNumbersDriver", "goFn": "addTwoNumbersDriver", "stages": [
+      { "n": 1, "title": "Fake head, tail, carry", "note": "Set up the answer list with a dummy node, a tail pointer and carry = 0." },
+      { "n": 2, "title": "Add one column", "note": "Add the current digit of l1 (or 0), the current digit of l2 (or 0) and the carry." },
+      { "n": 3, "title": "Keep digit, set carry", "note": "sum mod 10 becomes a new node. sum div 10 is the new carry." },
+      { "n": 4, "title": "Next column", "note": "Move l1 and l2 forward if they still have nodes." },
+      { "n": 5, "title": "Return dummy.next", "note": "Skip the fake node. The answer is already in ones-first order." }
+    ] }
+  ],
+  "goArgs": ["[]int", "[]int"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Zero plus zero", "input": "[0], [0]", "output": "[0]", "why": "One column gives 0. The answer must still have one node, not an empty list." },
+    { "title": "Carry out of the last column", "input": "[5], [5]", "output": "[0, 1]", "why": "Both lists end but carry is 1. The loop keeps going to write that last digit." },
+    { "title": "Different lengths", "input": "[1], [9, 9]", "output": "[0, 0, 1]", "why": "A missing digit counts as 0. The carry still ripples through the longer list." },
+    { "title": "A long chain of nines", "input": "[9,9,9,9,9,9,9], [9,9,9,9]", "output": "[8,9,9,9,0,0,0,1]", "why": "Every column carries. 7 digits sum to 8 digits, and no integer type is involved." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Keep looping while carry is non-zero, not only while a list has nodes. Otherwise 5 + 5 returns [0] instead of [0, 1]." },
+    { "lang": "General", "text": "Do not turn the lists into numbers. A 30-digit list does not fit in a 64-bit integer, and even a double loses precision after 15 digits." },
+    { "lang": "TypeScript", "text": "sum / 10 is a float division (15 / 10 is 1.5). Use Math.floor(sum / 10). Also l1?.val ?? 0 reads a missing node as 0 without crashing." },
+    { "lang": "Go", "text": "sum / 10 on ints already truncates, so no floor is needed. But Go has no optional chaining: test l1 != nil before every l1.Val and l1.Next." },
+    { "lang": "General", "text": "Create fresh nodes for the answer. Reusing nodes of l1 or l2 works but changes the inputs, which is surprising for callers." }
+  ],
+  "recap": {
+    "pattern": "Linked list: digit-by-digit with carry",
+    "key": "Loop while l1, l2 or carry exists. sum = digits + carry. New node sum % 10. carry = sum / 10.",
+    "complexity": "Time O(max(n, m)). Space O(1) besides the answer.",
+    "moves": ["dummy, tail, carry = 0", "sum = (l1 or 0) + (l2 or 0) + carry", "Append sum % 10. carry = sum / 10", "Advance l1 and l2. Return dummy.next"]
+  }
+}

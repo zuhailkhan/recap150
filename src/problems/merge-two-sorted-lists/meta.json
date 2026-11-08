@@ -1,0 +1,75 @@
+{
+  "slug": "merge-two-sorted-lists",
+  "title": "Merge Two Sorted Lists",
+  "category": "Linked List",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get the first nodes of two singly linked lists. Both are sorted from small to large. Join them into one sorted list by relinking the existing nodes, and return its first node. Either list may be empty.",
+  "example": {
+    "caption": "Two sorted lists become one. Equal values keep their order, list1 first.",
+    "input": [
+      { "kind": "list", "label": "list1", "items": [1, 2, 4] },
+      { "kind": "list", "label": "list2", "items": [1, 3, 4] }
+    ],
+    "output": [{ "kind": "list", "label": "merged", "items": [1, 1, 2, 3, 4, 4], "tones": ["hit", "hit", "hit", "hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Start the answer with a fake node, then keep linking the smaller front node of the two lists after the last node you linked.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "dummy node", "plain": "A throwaway node placed before the real list. It gives tail something to point at on the very first pick." },
+      { "term": "tail", "plain": "A pointer to the last node of the merged list so far. New nodes are linked after it." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the two sorted lists, e.g. [1,2,4], [1,3,4]",
+    "presets": [
+      { "label": "Interleaved", "args": [[1, 2, 4], [1, 3, 4]] },
+      { "label": "One list is empty", "args": [[], [0]] },
+      { "label": "List 1 ends first", "args": [[1, 2], [5, 6, 7]] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "nodes in list1" },
+      { "sym": "m", "meaning": "nodes in list2" }
+    ],
+    "compare": { "brute": "nlogn", "optimal": "n", "bruteLabel": "Collect all values, sort them, build a new list", "optimalLabel": "Relink nodes in one pass", "unit": "steps (n and m together)" },
+    "rows": [
+      { "name": "Collect and sort", "time": "O((n+m) log(n+m))", "space": "O(n+m)", "note": "Ignores that both lists are already sorted and allocates new nodes." },
+      { "name": "Dummy head and tail", "time": "O(n+m)", "space": "O(1)", "note": "Each node is linked once. The only extra node is the dummy." }
+    ],
+    "takeaway": "Both inputs are sorted, so the smallest remaining value is always one of two fronts. One pass is enough."
+  },
+  "variants": [
+    { "id": "iterative", "label": "Dummy head", "tsFn": "mergeTwoListsDriver", "goFn": "mergeTwoListsDriver", "stages": [
+      { "n": 1, "title": "Fake head and tail", "note": "Create a throwaway node. tail starts on it. The answer will be whatever hangs after it." },
+      { "n": 2, "title": "Pick the smaller front", "note": "Compare the two front nodes. Take the smaller one (list1 on a tie) and link it after tail." },
+      { "n": 3, "title": "Move tail", "note": "tail steps onto the node we just linked, ready for the next pick." },
+      { "n": 4, "title": "Attach the rest", "note": "When one list is empty, the other is already sorted. Link it on whole." },
+      { "n": 5, "title": "Return dummy.next", "note": "Skip the fake node. Its next is the real first node." }
+    ] }
+  ],
+  "goArgs": ["[]int", "[]int"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Both empty", "input": "[], []", "output": "[]", "why": "The loop never runs. dummy.next is still null, which is the right empty answer." },
+    { "title": "One empty", "input": "[], [0]", "output": "[0]", "why": "The loop is skipped and the leftover list is attached whole." },
+    { "title": "Equal values", "input": "[1,2], [1,3]", "output": "[1,1,2,3]", "why": "On a tie take list1. Either order gives the same values, but a fixed rule keeps it predictable." },
+    { "title": "One list far shorter", "input": "[3], [1,2,4,5,6]", "output": "[1,2,3,4,5,6]", "why": "list1 runs out early. The long tail of list2 is attached in one step, not copied." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Return dummy.next, not dummy. The dummy is only scaffolding." },
+    { "lang": "General", "text": "Do not forget the leftover. When the loop stops, one list can still have nodes. Link it after tail." },
+    { "lang": "TypeScript", "text": "tail.next has the type ListNode | null, so tail = tail.next will not type-check. Keep the chosen node in a variable (pick) and assign tail = pick." },
+    { "lang": "Go", "text": "Write dummy := &ListNode{} and tail := dummy. If you wrote dummy := ListNode{} then tail := dummy, tail would be a copy and the answer would be lost." },
+    { "lang": "Go", "text": "Go has no ternary and no ??. Use an if / else for the leftover, and compare against nil, not 0." }
+  ],
+  "recap": {
+    "pattern": "Linked list: dummy head",
+    "key": "A fake first node means every pick is the same line: tail.next = smaller. Return dummy.next.",
+    "complexity": "Time O(n+m). Space O(1).",
+    "moves": ["dummy = new node, tail = dummy", "While both lists have nodes, link the smaller front after tail", "Move tail onto it, then advance that list", "Attach the leftover list. Return dummy.next"]
+  }
+}

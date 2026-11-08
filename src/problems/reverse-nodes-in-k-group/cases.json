@@ -1,0 +1,11 @@
+[
+  {"name":"k=2, odd length","input":[[1,2,3,4,5],2],"expected":[2,1,4,3,5]},
+  {"name":"k=3, short tail","input":[[1,2,3,4,5],3],"expected":[3,2,1,4,5]},
+  {"name":"k=1 changes nothing","input":[[1,2,3],1],"expected":[1,2,3],"edge":true},
+  {"name":"k equals length","input":[[1,2,3,4],4],"expected":[4,3,2,1],"edge":true},
+  {"name":"k longer than list","input":[[1,2],3],"expected":[1,2],"edge":true},
+  {"name":"empty list","input":[[],2],"expected":[]},
+  {"name":"two full groups, no tail","input":[[1,2,3,4,5,6],3],"expected":[3,2,1,6,5,4]},
+  {"name":"seven nodes, k=3","input":[[1,2,3,4,5,6,7],3],"expected":[3,2,1,6,5,4,7]},
+  {"name":"repeated values","input":[[5,5,1,1],2],"expected":[5,5,1,1]}
+]

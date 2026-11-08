@@ -1,0 +1,12 @@
+function findDuplicate(nums)
+  slow = 0                      # [1] index i points to nums[i]. Start at index 0
+  fast = 0                      # [1]
+  repeat
+    slow = nums[slow]           # [2] one step
+    fast = nums[nums[fast]]     # [2] two steps
+  until slow == fast            # [2] they meet inside the loop
+  slow = 0                      # [3] restart slow. fast stays put
+  while slow != fast
+    slow = nums[slow]           # [3] one step each
+    fast = nums[fast]
+  return slow                   # [4] the loop entrance is the duplicate

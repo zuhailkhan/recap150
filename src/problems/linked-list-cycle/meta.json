@@ -1,0 +1,68 @@
+{
+  "slug": "linked-list-cycle",
+  "title": "Linked List Cycle",
+  "category": "Linked List",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get the first node of a singly linked list. Decide whether some node can be reached again by following next pointers, which means the tail links back into the list. Return true or false. Do not change the list.",
+  "example": {
+    "caption": "The last node points back to the node holding 2, so the walk never ends.",
+    "input": [{ "kind": "list", "label": "head", "items": [3, 2, 0, -4], "cycleTo": 1 }],
+    "output": [{ "kind": "array", "label": "has a cycle", "items": ["true"], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "Send a slow runner (1 step) and a fast runner (2 steps) along the list. If there is a loop they must meet. If the list ends, there is none.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "cycle", "plain": "A node whose next pointer leads back to an earlier node, so walking forward never reaches null." },
+      { "term": "tortoise and hare", "plain": "The nickname of the slow/fast pointer trick. The tortoise is slow, the hare is fast." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the values, then pos. The tail links to index pos. Use -1 for no cycle. e.g. [3,2,0,-4], 1",
+    "presets": [
+      { "label": "Cycle back to index 1", "args": [[3, 2, 0, -4], 1] },
+      { "label": "No cycle", "args": [[1, 2, 3, 4, 5], -1] },
+      { "label": "Node points at itself", "args": [[1], 0] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }],
+    "compare": { "brute": "n", "optimal": "1", "bruteLabel": "Remember every visited node in a set", "optimalLabel": "Slow and fast pointers", "unit": "extra memory cells" },
+    "rows": [
+      { "name": "Visited set", "time": "O(n)", "space": "O(n)", "note": "Stop with true when a node is seen twice. Simple, but it stores every node." },
+      { "name": "Slow and fast pointers", "time": "O(n)", "space": "O(1)", "note": "Two pointers. If there is a loop, fast closes the gap by 1 each turn, so they meet within a lap." }
+    ],
+    "takeaway": "Both are linear in time. The two-pointer version trades the set for two variables, which is why it is the one to learn."
+  },
+  "variants": [
+    { "id": "iterative", "label": "Slow and fast", "tsFn": "hasCycleDriver", "goFn": "hasCycleDriver", "stages": [
+      { "n": 1, "title": "Both start at head", "note": "slow and fast stand on the first node." },
+      { "n": 2, "title": "Move 1 and 2", "note": "slow takes one step, fast takes two, as long as fast still has nodes ahead." },
+      { "n": 3, "title": "Same node?", "note": "Compare the two nodes themselves (identity). If they are the same node, fast has lapped slow." },
+      { "n": 4, "title": "Decide", "note": "Meeting means true. Running off the end (null) means false." }
+    ] }
+  ],
+  "goArgs": ["[]int", "int"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty list", "input": "[]", "output": "false", "why": "head is null, so the loop never starts and we return false." },
+    { "title": "Node points at itself", "input": "[1], pos = 0", "output": "true", "why": "After one turn both pointers are on the same node." },
+    { "title": "Equal values, no cycle", "input": "[1,1,1,1], pos = -1", "output": "false", "why": "Values repeat, nodes do not. Comparing values would wrongly say true." },
+    { "title": "Cycle at the tail", "input": "[1,1,1,1], pos = 3", "output": "true", "why": "The loop is just the last node pointing at itself. Fast still catches slow." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Compare nodes, not values. Two different nodes can hold the same number." },
+    { "lang": "General", "text": "Check fast and fast.next before you move. Otherwise fast.next.next crashes at the end of a list with no cycle." },
+    { "lang": "TypeScript", "text": "slow and fast are ListNode | null, so slow.next needs a ! (it is safe: slow is behind fast). === compares object identity, which is what we want." },
+    { "lang": "Go", "text": "Compare pointers (slow == fast), not the structs they point to. *slow == *fast compares field values, so two different nodes holding the same data and the same next would look equal." },
+    { "lang": "TypeScript", "text": "Never JSON.stringify a list with a cycle to check it. It throws. The tracer and the tests here build lists through a driver for that reason." }
+  ],
+  "recap": {
+    "pattern": "Linked list: slow and fast pointers",
+    "key": "Slow moves 1, fast moves 2. If they land on the same node there is a cycle. If fast reaches null there is not.",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": ["slow = fast = head", "While fast and fast.next exist: slow 1 step, fast 2 steps", "If slow is fast, return true", "Return false when the loop ends"]
+  }
+}

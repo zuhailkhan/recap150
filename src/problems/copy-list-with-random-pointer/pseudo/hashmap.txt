@@ -1,0 +1,10 @@
+function copyRandomList(head)
+  copy = empty map                         # [1] old node -> new node
+  for n in head, n.next, ...
+    copy[n] = new Node(n.val)              # [1] one new node per old node
+  twin(x) = copy[x], or null if x is null  # [2] look up the twin
+  for n in head, n.next, ...
+    twin(n).next = twin(n.next)            # [2] twin's next is the twin of the old next
+  for n in head, n.next, ...
+    twin(n).random = twin(n.random)        # [3] same for random
+  return twin(head)                        # [4] the copy's head

@@ -1,0 +1,38 @@
+class LRUCache(capacity)
+  map = empty map                          # key -> node
+  head, tail = dummy nodes                 # [1] linked to each other
+  head.next = tail ; tail.prev = head      # [1] head.next is the most recent
+
+  get(key)
+    node = map[key]                        # [2] find the node in one step
+    if node is missing: return -1
+    moveToFront(node)                      # [3] reading counts as use
+    return node.val
+
+  put(key, value)
+    node = map[key]                        # [2]
+    if node exists
+      node.val = value
+      moveToFront(node)                    # [3] updating counts as use
+      return
+    node = new node(key, value)
+    map[key] = node                        # [4] new key: add and link at the front
+    insertFront(node)
+    if size(map) > capacity
+      lru = tail.prev                      # [5] the least recently used
+      unlink(lru)                          # [5]
+      delete map[lru.key]                  # [5] drop it from the map too
+
+  unlink(node)
+    node.prev.next = node.next             # [3] bypass the node
+    node.next.prev = node.prev
+
+  insertFront(node)
+    node.prev = head                       # [3] link right after head
+    node.next = head.next
+    head.next.prev = node
+    head.next = node
+
+  moveToFront(node)
+    unlink(node)
+    insertFront(node)
