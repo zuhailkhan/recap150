@@ -1,0 +1,70 @@
+{
+  "slug": "generate-parentheses",
+  "title": "Generate Parentheses",
+  "category": "Stack",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Given a number n, list every well-formed string made of exactly n pairs of round brackets. Well-formed means each closing bracket matches an earlier opening one. The strings may come back in any order.",
+  "example": {
+    "caption": "Two pairs give two strings: nested, or side by side.",
+    "input": [{ "kind": "array", "label": "n", "items": [2] }],
+    "output": [{ "kind": "array", "label": "strings", "items": ["(())", "()()"], "tones": ["hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Build the string one character at a time, adding a bracket only when it keeps the string valid, and undo the choice to try the other.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "backtracking", "plain": "Try a choice, explore everything that follows, then undo it and try the next choice." },
+      { "term": "recursion", "plain": "A function that calls itself for the smaller problem that is left." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the number of pairs n, e.g. 3 (keep it small)",
+    "presets": [
+      { "label": "Two pairs", "args": [2] },
+      { "label": "Three pairs", "args": [3] },
+      { "label": "One pair", "args": [1] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of pairs" }],
+    "compare": { "brute": "2n", "optimal": "2n", "bruteLabel": "Try all 2^(2n) strings, then check each", "optimalLabel": "Only extend valid prefixes", "unit": "strings looked at (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(4ⁿ · n)", "space": "O(n)", "note": "Make every string of 2n brackets and check each one. Most are invalid." },
+      { "name": "Backtracking", "time": "O(4ⁿ / √n)", "space": "O(n)", "note": "Roughly the count of valid strings (the Catalan number) times n to build each. Dead ends are never entered. Space is the recursion depth, not counting the output." }
+    ],
+    "takeaway": "Both are exponential, since the answer itself is huge. Backtracking never wastes time on strings that were already broken."
+  },
+  "variants": [
+    { "id": "backtrack", "label": "Backtracking", "tsFn": "generateParenthesis", "goFn": "generateParenthesis", "stages": [
+      { "n": 1, "title": "Start empty", "note": "path is the string built so far. It works like a stack: push a bracket, recurse, pop it." },
+      { "n": 2, "title": "Open if allowed", "note": "Add \"(\" while fewer than n have been opened." },
+      { "n": 3, "title": "Close if allowed", "note": "Add \")\" only when more are open than closed. That keeps every prefix valid." },
+      { "n": 4, "title": "Complete", "note": "When the string has 2n characters it is valid by construction. Save a copy." },
+      { "n": 5, "title": "Undo and return", "note": "Pop the bracket after exploring it so the other choice starts from the same string. Return all results." }
+    ] }
+  ],
+  "goArgs": ["int"],
+  "goRet": "[]string",
+  "compare": "sortedFlat",
+  "edges": [
+    { "title": "One pair", "input": "n = 1", "output": "[\"()\"]", "why": "Only one choice at each step: open, then close." },
+    { "title": "Two pairs", "input": "n = 2", "output": "[\"(())\", \"()()\"]", "why": "After the first \"(\" you may open again or close. Both branches are real." },
+    { "title": "Count grows fast", "input": "n = 8", "output": "1430 strings", "why": "The count is the Catalan number. The output itself is large, so no solution can be fast." },
+    { "title": "Never close first", "input": "path = \"\"", "output": "only \"(\" allowed", "why": "close < open is false when both are 0, so \")\" cannot start a string." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Push path.join(\"\") into the result, not path. Pushing the array stores a reference that later pops will empty." },
+    { "lang": "Go", "text": "Save string(path), which copies the bytes. Appending path itself would alias one shared backing array, and every saved result would change as the search continues." },
+    { "lang": "Go", "text": "Do not name a variable close. It hides the built-in close function and go vet may warn. The code uses opened and closed." },
+    { "lang": "General", "text": "Check close < open, not close < n. With close < n you build strings like \"())(\" that are invalid." },
+    { "lang": "General", "text": "Pop after the recursive call, in both branches. Forgetting one leaves stray characters in the next branch." },
+    { "lang": "General", "text": "The result order is up to you. Compare as a set, as the tests do." }
+  ],
+  "recap": {
+    "pattern": "Backtracking with two counters",
+    "key": "Open while opens < n. Close while closes < opens. Record at length 2n. Pop after each try.",
+    "complexity": "Time about O(4ⁿ / √n). Space O(n) for the recursion.",
+    "moves": ["Track how many are opened and closed", "Add \"(\" if opened < n", "Add \")\" if closed < opened", "At 2n characters save a copy, then pop to backtrack"]
+  }
+}

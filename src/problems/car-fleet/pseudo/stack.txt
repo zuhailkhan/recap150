@@ -1,0 +1,9 @@
+function carFleet(target, position, speed)
+  cars = pairs (position[i], (target - position[i]) / speed[i])   # [1] hours if the road is empty
+  sort cars by position, largest first                             # [1] closest to the target first
+  fleets = empty list                                              # [2] arrival time of each fleet
+  for each car in cars
+    if fleets is empty or car.time > last of fleets                # [3] slower than the fleet ahead
+      push car.time onto fleets                                    # [3] it never catches up: new fleet
+    # otherwise it catches up and slows to the fleet's pace        # [4] same fleet, push nothing
+  return length of fleets                                          # [5] one entry per fleet

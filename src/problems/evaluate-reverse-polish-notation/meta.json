@@ -1,0 +1,71 @@
+{
+  "slug": "evaluate-reverse-polish-notation",
+  "title": "Evaluate Reverse Polish Notation",
+  "category": "Stack",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of tokens in reverse Polish notation: each operator comes after its two operands. Tokens are integers or one of + - * /. Evaluate the expression. Division cuts the result toward zero. The input is always valid.",
+  "example": {
+    "caption": "Read left to right. 2 1 + gives 3. Then 3 3 * gives 9.",
+    "input": [{ "kind": "array", "label": "tokens", "items": ["2", "1", "+", "3", "*"] }],
+    "output": [{ "kind": "array", "label": "value", "items": [9], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "Push numbers on a stack. An operator pops the top two numbers, combines them, and pushes the result back.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "reverse Polish notation", "plain": "Operators written after their operands. 2 1 + means 2 + 1. No brackets are ever needed." },
+      { "term": "operand", "plain": "A number an operator works on." },
+      { "term": "truncate toward zero", "plain": "Drop the fraction. -3.5 becomes -3, not -4." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: tokens as strings, e.g. [\"2\",\"1\",\"+\",\"3\",\"*\"]",
+    "presets": [
+      { "label": "Add, multiply", "args": [["2", "1", "+", "3", "*"]] },
+      { "label": "Divide then add", "args": [["4", "13", "5", "/", "+"]] },
+      { "label": "Negative division", "args": [["7", "-2", "/", "3", "*"]] },
+      { "label": "Just a number", "args": [["42"]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of tokens" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Rescan for the first operator and splice the result in", "optimalLabel": "One pass with a stack", "unit": "token visits (rough)" },
+    "rows": [
+      { "name": "Rewrite the list", "time": "O(n²)", "space": "O(n)", "note": "Find the first operator, replace three tokens by one, repeat. Each rewrite shifts the list." },
+      { "name": "Stack", "time": "O(n)", "space": "O(n)", "note": "Every token is handled once. The stack holds at most the numbers seen before their operator." }
+    ],
+    "takeaway": "The notation is already in evaluation order. A stack holds the numbers that are still waiting for their operator."
+  },
+  "variants": [
+    { "id": "stack", "label": "Stack", "tsFn": "evalRPN", "goFn": "evalRPN", "stages": [
+      { "n": 1, "title": "Setup", "note": "An empty stack for waiting numbers, and the four operations. Division truncates toward zero." },
+      { "n": 2, "title": "Push numbers", "note": "A token that is not an operator is a number. Push it." },
+      { "n": 3, "title": "Pop two", "note": "An operator takes the top two numbers. The top one is the right operand, the one below is the left." },
+      { "n": 4, "title": "Push result", "note": "Apply the operator to left and right. The answer is a new number, so push it back." },
+      { "n": 5, "title": "Return", "note": "A valid expression leaves exactly one number. That is the value." }
+    ] }
+  ],
+  "goArgs": ["[]string"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One number", "input": "[\"42\"]", "output": "42", "why": "No operator ever runs. The stack holds the answer." },
+    { "title": "Negative number", "input": "[\"-7\"]", "output": "-7", "why": "The token -7 is a number, not the minus operator. Test for an operator by exact match." },
+    { "title": "Truncation", "input": "[\"7\", \"-2\", \"/\"]", "output": "-3", "why": "7 / -2 is -3.5. Cut toward zero gives -3. Floor would give -4." },
+    { "title": "Operand order", "input": "[\"3\", \"5\", \"-\"]", "output": "-2", "why": "Pop the right side first. Then 3 - 5 is the left minus the right, not the other way round." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Math.floor rounds -3.5 down to -4. Use Math.trunc to cut toward zero. Dividing with / never gives an integer, so you must truncate yourself." },
+    { "lang": "TypeScript", "text": "Math.trunc(-0.5) is -0. It prints as 0 and == 0, but Object.is(-0, 0) is false. Harmless here, but know it exists." },
+    { "lang": "Go", "text": "Integer division on ints already truncates toward zero, so -7 / 2 is -3. Do not add a correction, and do not convert to float." },
+    { "lang": "General", "text": "Pop the right operand first. For - and / the order matters: a - b, with a popped second." },
+    { "lang": "General", "text": "Do not detect numbers by checking for a leading digit. -11 starts with a minus sign. Check for the four operator strings instead." }
+  ],
+  "recap": {
+    "pattern": "Stack: operands wait for operators",
+    "key": "Push each number. On an operator pop right then left, apply it, push the result. Division truncates toward zero.",
+    "complexity": "Time O(n). Space O(n).",
+    "moves": ["Push numbers as they come", "On an operator, pop b then a", "Push a op b (trunc for /)", "The last remaining number is the answer"]
+  }
+}

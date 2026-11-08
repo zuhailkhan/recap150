@@ -1,0 +1,9 @@
+function dailyTemperatures(temps)
+  answer = list of zeros, same length as temps   # [1] 0 = no warmer day ahead
+  stack = empty list                             # [1] days still waiting for a warmer day
+  for i from 0 to length(temps) - 1
+    while stack is not empty and temps[i] > temps[top of stack]
+      j = pop stack                              # [2] today is warmer than day j
+      answer[j] = i - j                          # [2] day j waited i - j days
+    push i onto stack                            # [3] today waits for a warmer day
+  return answer                                  # [4] days left on the stack keep 0

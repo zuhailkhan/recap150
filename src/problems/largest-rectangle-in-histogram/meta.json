@@ -1,0 +1,71 @@
+{
+  "slug": "largest-rectangle-in-histogram",
+  "title": "Largest Rectangle In Histogram",
+  "category": "Stack",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "You get the heights of bars in a histogram. Every bar is 1 wide and bars touch. Find the area of the largest rectangle that fits inside the histogram. The rectangle must be built from whole bars next to each other.",
+  "example": {
+    "caption": "The best rectangle uses the bars of height 5 and 6. Its height is 5 and its width is 2, so the area is 10.",
+    "input": [{ "kind": "array", "label": "heights", "items": [2, 1, 5, 6, 2, 3], "tones": [null, null, "hit", "hit", null, null] }],
+    "output": [{ "kind": "array", "label": "largest area", "items": [10], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "A bar's best rectangle stretches until the first shorter bar on each side. A stack of rising bars finds both limits at the moment a shorter bar pops it.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "histogram", "plain": "A row of touching bars. Each bar has a height and the same width of 1." },
+      { "term": "monotonic stack", "plain": "A stack kept in one order, here rising heights. A shorter bar pops the taller ones first." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: bar heights, e.g. [2,1,5,6,2,3]",
+    "presets": [
+      { "label": "Classic six bars", "args": [[2, 1, 5, 6, 2, 3]] },
+      { "label": "Two bars", "args": [[2, 4]] },
+      { "label": "Falling bars", "args": [[5, 4, 3, 2, 1]] },
+      { "label": "A zero splits", "args": [[2, 0, 2]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of bars" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Try every pair of left and right edges", "optimalLabel": "One pass with a stack", "unit": "rectangles checked (rough)" },
+    "rows": [
+      { "name": "Every pair of edges", "time": "O(n²)", "space": "O(1)", "note": "For each left edge extend right, tracking the lowest bar. Simple, but too slow for large input." },
+      { "name": "Monotonic stack", "time": "O(n)", "space": "O(n)", "note": "Each bar is pushed once and popped once. All the width work happens at the pop." }
+    ],
+    "takeaway": "Do not try every rectangle. Each bar owns one candidate, the widest one at its own height, and the stack finds it when the bar leaves."
+  },
+  "variants": [
+    { "id": "stack", "label": "Monotonic stack", "tsFn": "largestRectangleArea", "goFn": "largestRectangleArea", "stages": [
+      { "n": 1, "title": "Setup", "note": "A stack of bar indices with rising heights, and best = 0. A height-0 bar past the end flushes the stack." },
+      { "n": 2, "title": "Shorter bar pops", "note": "While the new bar is shorter than the bar on top, that top bar can no longer grow to the right. Pop it." },
+      { "n": 3, "title": "Measure the rectangle", "note": "Left limit is the bar now on top of the stack, or the start. Right limit is just before the new bar. Area is height times width." },
+      { "n": 4, "title": "Push the bar", "note": "The new bar can still grow right. Push its index. Heights on the stack still rise." },
+      { "n": 5, "title": "Return", "note": "Every bar has been popped and measured. best is the answer." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One bar", "input": "[1]", "output": "1", "why": "It has no neighbours. The end marker pops it with width 1." },
+    { "title": "A zero bar", "input": "[2, 0, 2]", "output": "2", "why": "The zero is shorter than everything, so it pops all and no rectangle can cross it." },
+    { "title": "Equal heights", "input": "[3, 3, 3, 3]", "output": "12", "why": "Equal bars are not popped by each other. The last pop sees the full width. Using < not <= is still correct." },
+    { "title": "Tall and narrow wins", "input": "[1, 1, 1, 9]", "output": "9", "why": "Wide is not always bigger. The single bar of 9 beats the 1 x 4 rectangle." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Width is i - left - 1, where left is the new top of the stack after popping, or -1 if empty. Using i - popped index gives the wrong width." },
+    { "lang": "General", "text": "Forgetting the end flush leaves rising bars on the stack unmeasured. Looping to i == n with a height of 0 fixes that." },
+    { "lang": "General", "text": "Pop in a while loop. One short bar can end the rectangles of many bars at once." },
+    { "lang": "TypeScript", "text": "heights[stack.pop()!] reads the height of the bar you popped. Reading heights[stack[stack.length - 1]] after the pop would give the next bar instead." },
+    { "lang": "Go", "text": "The built-in max needs Go 1.21 or later. On older versions write the comparison by hand." },
+    { "lang": "Go", "text": "stack[len(stack)-1] panics on an empty slice. Always test len(stack) > 0 first, both in the loop condition and when finding left." }
+  ],
+  "recap": {
+    "pattern": "Monotonic stack of rising bars",
+    "key": "Keep indices of rising bars. A shorter bar pops the top and measures its rectangle between the new top and itself.",
+    "complexity": "Time O(n). Space O(n).",
+    "moves": ["Loop i from 0 to n, with height 0 at i = n", "While the new bar is shorter than the top, pop it", "Width is i - newTop - 1 (or i when empty). Update best", "Push i. Return best at the end"]
+  }
+}

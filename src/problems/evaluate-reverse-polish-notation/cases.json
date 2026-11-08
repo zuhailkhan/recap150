@@ -1,0 +1,14 @@
+[
+  {"name":"add then multiply","input":[["2","1","+","3","*"]],"expected":9},
+  {"name":"divide then add","input":[["4","13","5","/","+"]],"expected":6},
+  {"name":"long expression","input":[["10","6","9","3","+","-11","*","/","*","17","+","5","+"]],"expected":22},
+  {"name":"subtract order","input":[["5","3","-"]],"expected":2},
+  {"name":"subtract order reversed","input":[["3","5","-"]],"expected":-2},
+  {"name":"single number","input":[["42"]],"expected":42,"edge":true},
+  {"name":"single negative number","input":[["-7"]],"expected":-7,"edge":true},
+  {"name":"negative result truncates toward zero","input":[["7","-2","/"]],"expected":-3,"edge":true},
+  {"name":"negative left side truncates toward zero","input":[["-7","2","/"]],"expected":-3,"edge":true},
+  {"name":"tiny negative quotient is zero","input":[["1","-2","/"]],"expected":0,"edge":true},
+  {"name":"two negatives","input":[["-5","-3","*"]],"expected":15},
+  {"name":"divide uses the right operand","input":[["12","4","/","3","/"]],"expected":1}
+]

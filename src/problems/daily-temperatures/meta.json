@@ -1,0 +1,70 @@
+{
+  "slug": "daily-temperatures",
+  "title": "Daily Temperatures",
+  "category": "Stack",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of daily temperatures. For each day, report how many days you must wait until a strictly warmer day. If no warmer day ever comes, report 0 for that day.",
+  "example": {
+    "caption": "Day 0 is 73. The next day is 74, so it waits 1. Day 2 is 75 and waits 4 days for 76.",
+    "input": [{ "kind": "array", "label": "temperature", "items": [73, 74, 75, 71, 69, 72, 76, 73] }],
+    "output": [{ "kind": "array", "label": "days to wait", "items": [1, 1, 4, 2, 1, 1, 0, 0], "tones": ["hit", "hit", "hit", "hit", "hit", "hit", "miss", "miss"] }]
+  },
+  "idea": {
+    "sentence": "Keep a stack of days that are still waiting. When a warmer day arrives, it ends the wait of every colder day on top of the stack.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "monotonic stack", "plain": "A stack whose items stay in one order, here falling temperature from bottom to top. Items that break the order are popped first." },
+      { "term": "index", "plain": "A day's position in the list. The stack stores positions, so the wait is a simple subtraction." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of temperatures, e.g. [73,74,75,71,69,72,76,73]",
+    "presets": [
+      { "label": "A mixed week", "args": [[73, 74, 75, 71, 69, 72, 76, 73]] },
+      { "label": "Always rising", "args": [[30, 40, 50, 60]] },
+      { "label": "Always falling", "args": [[90, 80, 70, 60]] },
+      { "label": "Equal is not warmer", "args": [[70, 70, 71]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of days" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "For each day scan ahead for a warmer one", "optimalLabel": "One pass with a stack", "unit": "comparisons (worst case)" },
+    "rows": [
+      { "name": "Scan ahead", "time": "O(n²)", "space": "O(1)", "note": "A falling list makes every day scan to the end and find nothing." },
+      { "name": "Monotonic stack", "time": "O(n)", "space": "O(n)", "note": "Each day is pushed once and popped at most once, so the while loop costs n in total." }
+    ],
+    "takeaway": "Do not search ahead. Let each day wait on the stack, and let the warmer day that arrives settle all of them at once."
+  },
+  "variants": [
+    { "id": "stack", "label": "Monotonic stack", "tsFn": "dailyTemperatures", "goFn": "dailyTemperatures", "stages": [
+      { "n": 1, "title": "Setup", "note": "answer is all zeros. The stack holds the days that have not found a warmer day yet." },
+      { "n": 2, "title": "Warmer day pops", "note": "While today is warmer than the day on top, pop that day. Its wait is today minus its index." },
+      { "n": 3, "title": "Push today", "note": "Today is not settled yet. It joins the stack and waits for something warmer." },
+      { "n": 4, "title": "Leftovers", "note": "Days still on the stack never found a warmer day. They keep 0." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One day", "input": "[50]", "output": "[0]", "why": "Nothing comes after it. It is pushed and never popped." },
+    { "title": "Always falling", "input": "[90, 80, 70, 60]", "output": "[0, 0, 0, 0]", "why": "No day is warmer than the top, so nothing ever pops. The stack grows to n." },
+    { "title": "Equal temperatures", "input": "[70, 70, 71]", "output": "[2, 1, 0]", "why": "Equal is not warmer. The first 70 keeps waiting until 71 shows up." },
+    { "title": "Many settled at once", "input": "[75, 74, 73, 80]", "output": "[3, 2, 1, 0]", "why": "The 80 pops three days in one go. That is why the loop inside is a while, not an if." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Use > not >=. Equal days must stay on the stack." },
+    { "lang": "General", "text": "Push the index, not the temperature. The answer needs the distance in days, and the temperature is one lookup away." },
+    { "lang": "General", "text": "The inner loop must be a while. An if settles only one day and leaves colder ones stuck under today." },
+    { "lang": "TypeScript", "text": "new Array(n).fill(0) gives numbers. new Array(n) alone is sparse and holds empty slots, not zeros." },
+    { "lang": "Go", "text": "make([]int, n) is already zero filled, which is exactly the default answer. Do not loop to fill it." },
+    { "lang": "TypeScript", "text": "stack.pop() returns number | undefined. Inside the while the stack is not empty, so a ! assertion is safe there." }
+  ],
+  "recap": {
+    "pattern": "Monotonic stack of indices",
+    "key": "Days wait on a stack. A warmer day pops every colder day it beats and answers them with its index distance.",
+    "complexity": "Time O(n). Space O(n).",
+    "moves": ["Answer starts as zeros, stack is empty", "While today beats the top day, pop it and set its answer", "Push today's index", "Days left on the stack keep 0"]
+  }
+}

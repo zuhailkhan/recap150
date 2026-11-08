@@ -1,0 +1,18 @@
+class MinStack
+  vals = empty list                          # [1] the normal stack
+  mins = empty list                          # [1] mins[i] = smallest of vals[0..i]
+
+  push(x)
+    low = x if mins is empty, else min(x, last of mins)
+    append x to vals                         # [2] store the value
+    append low to mins                       # [2] and the smallest so far
+
+  pop()
+    remove last of vals                      # [3] both stacks shrink together
+    remove last of mins
+
+  top()
+    return last of vals                      # [4] newest value
+
+  getMin()
+    return last of mins                      # [5] already stored, no search

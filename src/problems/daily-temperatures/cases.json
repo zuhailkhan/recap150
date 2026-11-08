@@ -1,0 +1,11 @@
+[
+  {"name":"mixed week","input":[[73,74,75,71,69,72,76,73]],"expected":[1,1,4,2,1,1,0,0]},
+  {"name":"always rising","input":[[30,40,50,60]],"expected":[1,1,1,0]},
+  {"name":"rising by thirty","input":[[30,60,90]],"expected":[1,1,0]},
+  {"name":"valley then a peak","input":[[89,62,70,58,47,47,46,76,100,70]],"expected":[8,1,5,4,3,2,1,1,0,0]},
+  {"name":"single day","input":[[50]],"expected":[0],"edge":true},
+  {"name":"always falling","input":[[90,80,70,60]],"expected":[0,0,0,0],"edge":true},
+  {"name":"all equal","input":[[70,70,70]],"expected":[0,0,0],"edge":true},
+  {"name":"equal is not warmer","input":[[70,70,71]],"expected":[2,1,0],"edge":true},
+  {"name":"equal peak at both ends","input":[[100,30,31,99,100]],"expected":[0,1,1,1,0]}
+]

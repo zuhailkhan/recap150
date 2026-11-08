@@ -1,0 +1,15 @@
+[
+  {"name":"classic","input":[[2,1,5,6,2,3]],"expected":10},
+  {"name":"two bars","input":[[2,4]],"expected":4},
+  {"name":"small bar between two taller","input":[[2,1,2]],"expected":3},
+  {"name":"rising","input":[[1,2,3,4,5]],"expected":9},
+  {"name":"falling","input":[[5,4,3,2,1]],"expected":9},
+  {"name":"all equal","input":[[3,3,3,3]],"expected":12},
+  {"name":"peaks with a late wide area","input":[[6,2,5,4,5,1,6]],"expected":12},
+  {"name":"single bar","input":[[1]],"expected":1,"edge":true},
+  {"name":"single zero bar","input":[[0]],"expected":0,"edge":true},
+  {"name":"zero splits the bars","input":[[2,0,2]],"expected":2,"edge":true},
+  {"name":"all zeros","input":[[0,0,0]],"expected":0,"edge":true},
+  {"name":"tall bar alone beats the wide base","input":[[1,1,1,9]],"expected":9,"edge":true},
+  {"name":"twenty tall bars","input":[[10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000]],"expected":200000,"edge":true}
+]

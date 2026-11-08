@@ -1,0 +1,11 @@
+[
+  {"name":"classic","input":[["MinStack","push","push","push","getMin","pop","top","getMin"],[[],[-2],[0],[-3],[],[],[],[]]],"expected":[null,null,null,null,-3,null,0,-2]},
+  {"name":"increasing pushes","input":[["MinStack","push","push","push","getMin","pop","getMin"],[[],[1],[2],[3],[],[],[]]],"expected":[null,null,null,null,1,null,1]},
+  {"name":"decreasing pushes","input":[["MinStack","push","push","push","getMin","pop","getMin","pop","getMin"],[[],[3],[2],[1],[],[],[],[],[]]],"expected":[null,null,null,null,1,null,2,null,3]},
+  {"name":"single value","input":[["MinStack","push","getMin","top"],[[],[5],[],[]]],"expected":[null,null,5,5]},
+  {"name":"minimum pushed twice","input":[["MinStack","push","push","push","pop","getMin","pop","getMin"],[[],[2],[1],[1],[],[],[],[]]],"expected":[null,null,null,null,null,1,null,2],"edge":true},
+  {"name":"all equal","input":[["MinStack","push","push","push","pop","pop","getMin","top"],[[],[4],[4],[4],[],[],[],[]]],"expected":[null,null,null,null,null,null,4,4],"edge":true},
+  {"name":"negative extremes","input":[["MinStack","push","push","push","getMin","pop","getMin","pop","getMin"],[[],[2147483647],[-2147483648],[0],[],[],[],[],[]]],"expected":[null,null,null,null,-2147483648,null,-2147483648,null,2147483647],"edge":true},
+  {"name":"older min returns, new push","input":[["MinStack","push","push","pop","push","getMin","top"],[[],[0],[-1],[],[7],[],[]]],"expected":[null,null,null,null,null,0,7]},
+  {"name":"push, pop, push again","input":[["MinStack","push","pop","push","getMin"],[[],[-9],[],[3],[]]],"expected":[null,null,null,null,3],"edge":true}
+]

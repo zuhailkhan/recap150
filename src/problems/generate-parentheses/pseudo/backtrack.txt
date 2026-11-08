@@ -1,0 +1,19 @@
+function generateParenthesis(n)
+  out = empty list
+  path = empty list of characters            # [1] the string built so far
+
+  function build(open, close)
+    if length of path == 2 * n               # [4] every pair is used
+      add join(path) to out
+      return
+    if open < n                              # [2] may open while openers are left
+      push "(" onto path
+      build(open + 1, close)
+      pop path                               # [5] undo, then try the other choice
+    if close < open                          # [3] may close only an open one
+      push ")" onto path
+      build(open, close + 1)
+      pop path                               # [5] undo
+
+  build(0, 0)
+  return out                                 # [5] all complete strings

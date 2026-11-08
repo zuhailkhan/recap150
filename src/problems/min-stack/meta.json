@@ -1,0 +1,75 @@
+{
+  "slug": "min-stack",
+  "title": "Min Stack",
+  "category": "Stack",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Build a stack that supports push, pop, top and getMin. The first three work as usual. getMin returns the smallest value currently in the stack. Every method must run in constant time.",
+  "example": {
+    "caption": "After pushing -2, 0, -3 the minimum is -3. Pop removes -3, and the minimum goes back to -2.",
+    "input": [
+      { "kind": "stack", "label": "values", "items": [-2, 0, -3], "tones": [null, null, "focus"] },
+      { "kind": "stack", "label": "min so far", "items": [-2, -2, -3], "tones": [null, null, "keep"] }
+    ],
+    "output": [
+      { "kind": "stack", "label": "values after pop", "items": [-2, 0] },
+      { "kind": "stack", "label": "min so far after pop", "items": [-2, -2], "tones": [null, "hit"] }
+    ]
+  },
+  "idea": {
+    "sentence": "Keep a second stack that stores the smallest value at every level, so popping simply reveals the older minimum.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "stack", "plain": "A pile where you only add or remove at the top: last in, first out." },
+      { "term": "O(1)", "plain": "Constant time. The cost does not grow with the number of items." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: method names, then their arguments. e.g. [\"MinStack\",\"push\",\"getMin\"] and [[],[4],[]]",
+    "presets": [
+      { "label": "Min comes back", "args": [["MinStack", "push", "push", "push", "getMin", "pop", "top", "getMin"], [[], [-2], [0], [-3], [], [], [], []]] },
+      { "label": "Minimum twice", "args": [["MinStack", "push", "push", "push", "pop", "getMin", "pop", "getMin"], [[], [2], [1], [1], [], [], [], []]] },
+      { "label": "Rising values", "args": [["MinStack", "push", "push", "push", "getMin", "pop", "pop", "getMin"], [[], [1], [2], [3], [], [], [], []]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of values in the stack" }],
+    "compare": { "brute": "n", "optimal": "1", "bruteLabel": "getMin scans the whole stack", "optimalLabel": "getMin reads the top of the min stack", "unit": "steps for one getMin" },
+    "rows": [
+      { "name": "Scan on getMin", "time": "O(n) for getMin", "space": "O(n)", "note": "Push, pop and top are O(1), but finding the smallest means looking at every value." },
+      { "name": "Two stacks", "time": "O(1) for every method", "space": "O(n)", "note": "The second stack is exactly as tall as the first. The price is one extra number per value." }
+    ],
+    "takeaway": "Store the answer to getMin at every level when you push. Then pop undoes it for free, with no search."
+  },
+  "variants": [
+    { "id": "stack", "label": "Two stacks", "tsFn": "run", "goFn": "run", "stages": [
+      { "n": 1, "title": "Two stacks", "note": "vals holds the values. mins holds, at each level, the smallest value at or below that level." },
+      { "n": 2, "title": "Push both", "note": "Push the value. Push the smaller of the value and the current minimum on the min stack." },
+      { "n": 3, "title": "Pop both", "note": "Remove the top of each stack. The older minimum is now on top of the min stack." },
+      { "n": 4, "title": "Top", "note": "Read the last value of the normal stack." },
+      { "n": 5, "title": "Get min", "note": "Read the last value of the min stack. Nothing to search." }
+    ] }
+  ],
+  "goArgs": ["[]string", "[][]int"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "edges": [
+    { "title": "One value", "input": "push(5), getMin()", "output": "5", "why": "The first value is its own minimum. The stack is empty, so there is nothing to compare with." },
+    { "title": "Same minimum twice", "input": "push 2, 1, 1, then pop", "output": "getMin() = 1", "why": "Each push gets its own min entry. If only strictly smaller values were stored, this pop would erase the last 1." },
+    { "title": "Pop to the older min", "input": "push 0, -1, then pop", "output": "getMin() = 0", "why": "The min stack remembers what the minimum was before -1 arrived." },
+    { "title": "Extreme values", "input": "push 2147483647, -2147483648", "output": "min = -2147483648", "why": "Only comparisons are used, no subtraction, so there is no overflow." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "A single min variable is not enough. After popping the minimum you would have to rescan the stack to find the next one." },
+    { "lang": "General", "text": "Push to the min stack on every push, not only when the value is smaller. Otherwise duplicates of the minimum break on pop." },
+    { "lang": "TypeScript", "text": "Math.min(...stack) works, but it scans the whole array on each call and can overflow the call stack for very large arrays. It is the slow solution in disguise." },
+    { "lang": "Go", "text": "Use a pointer receiver on Push and Pop. With a value receiver the method changes a copy and the stack never grows." },
+    { "lang": "Go", "text": "s.vals[len(s.vals)-1] panics on an empty slice. The problem promises top and getMin are only called on a non-empty stack, so a check is optional here, but real code needs one." }
+  ],
+  "recap": {
+    "pattern": "Stack + parallel min stack",
+    "key": "Every push also records the smallest value so far. Every pop removes both. getMin reads the top of the second stack.",
+    "complexity": "Time O(1) per call. Space O(n).",
+    "moves": ["Keep vals and mins, always the same height", "On push, add min(value, current min) to mins", "On pop, remove from both", "getMin returns the top of mins"]
+  }
+}

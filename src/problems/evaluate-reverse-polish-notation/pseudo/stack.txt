@@ -1,0 +1,11 @@
+function evalRPN(tokens)
+  stack = empty list                         # [1] numbers waiting for an operator
+  for each token in tokens
+    if token is a number
+      push number(token) onto stack          # [2] a number: push it
+      continue
+    b = pop stack                            # [3] an operator: top is the right operand
+    a = pop stack                            # [3] next one is the left operand
+    result = a (token) b                     # [1] "/" cuts toward zero
+    push result onto stack                   # [4] the answer is a new number
+  return the only number in stack            # [5] one number remains

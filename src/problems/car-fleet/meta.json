@@ -1,0 +1,73 @@
+{
+  "slug": "car-fleet",
+  "title": "Car Fleet",
+  "category": "Stack",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Cars drive on a one-lane road toward a target. Each car has a start position and a constant speed. A car cannot pass: if it catches a slower car ahead, it slows down and drives with it as a fleet. Count the fleets that reach the target.",
+  "example": {
+    "caption": "Target 12. The cars at 10 and 8 meet and travel together. The cars at 5 and 3 do too. The car at 0 is alone.",
+    "input": [
+      { "kind": "array", "label": "position", "items": [10, 8, 0, 5, 3] },
+      { "kind": "array", "label": "speed", "items": [2, 4, 1, 1, 3] }
+    ],
+    "output": [{ "kind": "array", "label": "fleets", "items": [3], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "Sort cars from the target backwards and compute each car's arrival time. A car that would arrive sooner than the fleet ahead joins it. Otherwise it starts a new fleet.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "fleet", "plain": "Cars that end up driving together at the speed of the slowest one ahead. They reach the target at the same moment." },
+      { "term": "arrival time", "plain": "Hours to reach the target if the road were empty: (target - position) / speed." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Three arguments: target, positions, speeds, e.g. 12, [10,8,0,5,3], [2,4,1,1,3]",
+    "presets": [
+      { "label": "Five cars", "args": [12, [10, 8, 0, 5, 3], [2, 4, 1, 1, 3]] },
+      { "label": "Everyone merges", "args": [100, [0, 2, 4], [4, 2, 1]] },
+      { "label": "Never merge", "args": [10, [1, 2, 3], [1, 1, 1]] },
+      { "label": "Arrive together", "args": [12, [8, 4], [2, 4]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of cars" }],
+    "compare": { "brute": "n2", "optimal": "nlogn", "bruteLabel": "Simulate the road and merge cars again and again", "optimalLabel": "Sort once, then one pass", "unit": "operations (rough)" },
+    "rows": [
+      { "name": "Simulate", "time": "O(n²) or worse", "space": "O(n)", "note": "Move time forward, find collisions, merge cars. Hard to get right and slow." },
+      { "name": "Sort + stack", "time": "O(n log n)", "space": "O(n)", "note": "Sorting costs n log n. The pass after it is O(n). A car's fate depends only on the fleet directly ahead." }
+    ],
+    "takeaway": "You never need to simulate the crash. Compare arrival times of neighbours, nearest car first."
+  },
+  "variants": [
+    { "id": "stack", "label": "Sort + stack", "tsFn": "carFleet", "goFn": "carFleet", "stages": [
+      { "n": 1, "title": "Arrival times, sorted", "note": "Pair each position with its hours to the target, then sort the cars closest to the target first." },
+      { "n": 2, "title": "Fleet stack", "note": "Holds the arrival time of each fleet. The top is the fleet right ahead of the next car." },
+      { "n": 3, "title": "Slower: new fleet", "note": "If this car needs longer than the fleet ahead, it cannot catch up. Push its time." },
+      { "n": 4, "title": "Faster: join", "note": "If it needs less or equal time, it catches the fleet and slows down. Push nothing." },
+      { "n": 5, "title": "Count fleets", "note": "Each stack entry is one fleet. The answer is the stack size." }
+    ] }
+  ],
+  "goArgs": ["int", "[]int", "[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One car", "input": "target 10, [3], [3]", "output": "1", "why": "Nothing is ahead, so it forms a fleet by itself." },
+    { "title": "Arrive at the same time", "input": "target 12, [8, 4], [2, 4]", "output": "1", "why": "Both need 2 hours. Meeting exactly at the target counts as one fleet, so compare with strictly greater." },
+    { "title": "Input not sorted", "input": "target 12, [10, 8, 0, 5, 3]", "output": "3", "why": "Positions arrive in any order. Sort by position first, and keep each speed attached to its car." },
+    { "title": "Huge numbers", "input": "target 1000000, [999999, 0], [1, 1000000]", "output": "1", "why": "Times are 1 and 1 exactly. Both languages divide correctly rounded, so equal fractions give equal times." }
+  ],
+  "gotchas": [
+    { "lang": "Go", "text": "(target - pos) / speed with ints truncates. 7 / 2 is 3, so two different cars can look tied. Convert to float64 before dividing." },
+    { "lang": "TypeScript", "text": "Array.sort with no comparator sorts as strings, so 10 comes before 2. Pass (a, b) => b.pos - a.pos." },
+    { "lang": "General", "text": "Sort positions and speeds together. If you sort only positions, each speed ends up on the wrong car." },
+    { "lang": "General", "text": "Use time > top, not >=. A car with exactly the same arrival time is part of that fleet." },
+    { "lang": "General", "text": "A faster car behind a slower one does not pass it. It slows to the fleet speed, which is why only the arrival time of the fleet ahead matters." }
+  ],
+  "recap": {
+    "pattern": "Sort, then stack of arrival times",
+    "key": "Go from the car nearest the target. A car arriving later than the fleet ahead starts a new fleet. Otherwise it joins.",
+    "complexity": "Time O(n log n). Space O(n).",
+    "moves": ["time = (target - position) / speed, as a float", "Sort cars by position, closest first", "Push time if it is strictly greater than the top", "Answer is the stack size"]
+  }
+}
