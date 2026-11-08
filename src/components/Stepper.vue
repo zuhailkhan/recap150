@@ -78,7 +78,7 @@ watch(() => props.run, () => pick(0))
     </div>
 
     <div class="say-area" aria-live="polite">
-      <p class="say"><span class="badge">{{ frame.stage }}</span><span>{{ frame.say }}</span></p>
+      <p class="say" :class="{ long: frame.say.length > 150 }"><span class="badge">{{ frame.stage }}</span><span>{{ frame.say }}</span></p>
       <p v-if="atEnd && resultText" class="result"><span class="muted small">returns</span> <code>{{ resultText }}</code></p>
       <p v-if="atEnd && trace.truncated" class="warn small">The run was cut off to keep this readable. Try a smaller input.</p>
       <p v-if="trace.error" class="warn small" role="alert">{{ trace.error }}</p>
@@ -135,6 +135,7 @@ watch(() => props.run, () => pick(0))
 .say-area { grid-row: 2; padding: 16px 18px; border-top: 1px solid var(--line); min-width: 0; display: grid; gap: 10px; align-content: start; }
 .say { display: flex; gap: 12px; align-items: flex-start; font: 500 clamp(1.05rem, .95rem + .5vw, 1.25rem)/1.4 var(--font-ui); letter-spacing: -0.01em; margin: 0; min-height: 3.6em; }
 .say .badge { margin-top: 3px; }
+.say.long { font-size: 1rem; line-height: 1.45; }
 .result { margin: 0; min-width: 0; }
 .result code { display: inline-block; max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; background: var(--hit-bg); color: var(--hit-fg); }
 .warn { color: var(--miss-fg); margin: 0; }

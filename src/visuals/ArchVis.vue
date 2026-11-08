@@ -26,7 +26,7 @@ const labelOf = (n: ArchNode) => n.label
 </script>
 
 <template>
-  <svg :viewBox="`0 0 ${W} ${H}`" style="width: 100%; min-width: 600px; max-width: 860px; height: auto" role="img" aria-label="architecture diagram">
+  <svg :viewBox="`0 0 ${W} ${H}`" style="width: 100%; min-width: 500px; max-width: 860px; height: auto" role="img" aria-label="architecture diagram">
     <defs>
       <marker id="ar-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="context-stroke" stroke-width="1.7" /></marker>
     </defs>

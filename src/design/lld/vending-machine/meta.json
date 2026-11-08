@@ -1,0 +1,426 @@
+{
+  "slug": "vending-machine",
+  "title": "Vending Machine",
+  "group": "State machines",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the software inside a vending machine. A customer inserts coins, picks a slot, gets the item and any change, or asks for the money back. The machine behaves differently depending on what is going on: waiting, holding money, or sold out. Staff can refill the shelves.",
+  "requirements": {
+    "functional": [
+      "Insert a coin of any positive value in cents. The machine keeps a running balance.",
+      "Select a slot by code. If it is in stock and the balance covers the price, hand over the item.",
+      "If the balance is higher than the price, put the difference in a change tray that the customer collects.",
+      "If the balance is too low, or the slot is unknown or empty, refuse and keep the money.",
+      "Refund returns the whole balance and clears it.",
+      "When every slot is empty the machine is sold out and refuses coins. Restocking brings it back.",
+      "Selecting before paying does nothing."
+    ],
+    "outOfScope": [
+      "Coin denominations and making change from limited coins",
+      "Card payments",
+      "Hardware faults and a stuck item"
+    ]
+  },
+  "idea": {
+    "sentence": "Give each state its own class that answers every operation, and let the machine do nothing but forward calls to the current one.",
+    "jargon": [
+      {
+        "term": "State pattern",
+        "plain": "An object hands its behaviour to a separate object for each state. Changing state means swapping which object it forwards to."
+      },
+      {
+        "term": "context",
+        "plain": "The object that holds the current state and forwards calls to it. Here that is VendingMachine."
+      },
+      {
+        "term": "integer cents",
+        "plain": "Store money as whole cents (150 means 1.50). Floating point cannot represent most decimal amounts exactly."
+      }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      {
+        "name": "VendingMachine",
+        "fields": [
+          "balance: cents",
+          "tray: cents",
+          "state: State",
+          "inventory: Inventory"
+        ],
+        "methods": [
+          "insertCoin(c) -> state.insertCoin(c)",
+          "selectItem(code) -> state.selectItem(code)",
+          "refund(), restock(code, n)",
+          "collectChange()",
+          "setState(s)"
+        ],
+        "x": 2,
+        "y": 0
+      },
+      {
+        "name": "Inventory",
+        "fields": [
+          "slots: Map<code, Slot>"
+        ],
+        "methods": [
+          "peek(code): Item | null",
+          "take(code)",
+          "add(code, n): qty | -1",
+          "total(): number"
+        ],
+        "x": 0,
+        "y": 0
+      },
+      {
+        "name": "State",
+        "kind": "interface",
+        "methods": [
+          "insertCoin(c): balance | -1",
+          "selectItem(code): name | null",
+          "refund(): cents",
+          "restock(code, n): qty | -1"
+        ],
+        "x": 2,
+        "y": 1
+      },
+      {
+        "name": "Idle",
+        "methods": [
+          "coin: balance = c, go HasMoney",
+          "select: refused",
+          "refund: 0"
+        ],
+        "x": 1,
+        "y": 2
+      },
+      {
+        "name": "HasMoney",
+        "methods": [
+          "coin: balance += c",
+          "select: sell, tray += change",
+          "refund: all, go Idle"
+        ],
+        "x": 2,
+        "y": 2
+      },
+      {
+        "name": "SoldOut",
+        "methods": [
+          "coin: refused (-1)",
+          "select: refused",
+          "restock: go Idle"
+        ],
+        "x": 3,
+        "y": 2
+      },
+      {
+        "name": "Slot",
+        "fields": [
+          "item: Item",
+          "qty"
+        ],
+        "x": 0,
+        "y": 1
+      },
+      {
+        "name": "Item",
+        "fields": [
+          "name",
+          "price: cents"
+        ],
+        "x": 0,
+        "y": 2
+      }
+    ],
+    "relations": [
+      {
+        "from": "VendingMachine",
+        "to": "State",
+        "kind": "uses",
+        "label": "forwards to"
+      },
+      {
+        "from": "VendingMachine",
+        "to": "Inventory",
+        "kind": "has",
+        "label": "owns"
+      },
+      {
+        "from": "Idle",
+        "to": "State",
+        "kind": "implements"
+      },
+      {
+        "from": "HasMoney",
+        "to": "State",
+        "kind": "implements"
+      },
+      {
+        "from": "SoldOut",
+        "to": "State",
+        "kind": "implements"
+      },
+      {
+        "from": "Inventory",
+        "to": "Slot",
+        "kind": "has"
+      },
+      {
+        "from": "Slot",
+        "to": "Item",
+        "kind": "has"
+      }
+    ]
+  },
+  "patterns": [
+    {
+      "name": "State",
+      "where": "The State interface with Idle, HasMoney and SoldOut. VendingMachine forwards all four operations to the current one.",
+      "why": "Each state is a small class that only knows its own rules. A new state means a new class, and the machine does not grow an if/else per operation."
+    },
+    {
+      "name": "Encapsulation of data",
+      "where": "Inventory hides the slot map. States call peek, take, add and total only.",
+      "why": "Stock rules (never below zero, reject unknown codes) live in one place, away from the money rules."
+    }
+  ],
+  "decisions": [
+    {
+      "question": "Where does the behaviour per state live?",
+      "choice": "In one class per state behind a State interface",
+      "because": "There are four operations and three states, so twelve answers. Each class holds its own four, and the machine stays a thin forwarder. Adding a state touches no existing state.",
+      "instead": "An enum plus if/else or switch inside every method. Every new state edits every method."
+    },
+    {
+      "question": "What if the customer pays too little or asks for a slot that is empty?",
+      "choice": "Refuse, return -1, keep the money and stay in HasMoney",
+      "because": "The customer can add a coin, choose something else or refund. Silently taking money, or ejecting it, would be a surprise.",
+      "instead": "Refund automatically on any failed select, which makes the customer start over."
+    },
+    {
+      "question": "Is there a Dispensing state?",
+      "choice": "No. Selling is one step inside HasMoney.selectItem",
+      "because": "In this software the item drops and the state changes in the same call, so no caller can ever see a Dispensing state. Add it only if hardware takes time and operations can arrive during it.",
+      "instead": "A transient Dispensing state that rejects every call, which nothing can observe."
+    },
+    {
+      "question": "How is change returned?",
+      "choice": "Put the price difference, in cents, in a tray that collectChange empties",
+      "because": "It is one integer. Coin denominations are a separate problem (greedy or DP over limited coins) and would hide the State pattern.",
+      "instead": "Return an object with both the item and a list of coins from selectItem."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two people press buttons at the same moment. What goes wrong?",
+      "answer": "A physical machine has one customer, but a networked one or a test harness can race. Both calls read the same state and balance, then both sell the last item. Put one mutex around every public method on VendingMachine (sync.Mutex in Go). Keep the states lock free because they are only called under the machine's lock."
+    },
+    {
+      "ask": "Add a Maintenance (out of service) state.",
+      "answer": "Write a new class that refuses coins and selects and answers restock by returning to Idle or SoldOut. Add one setState call from whatever triggers it. No existing state changes, which is the point of the pattern."
+    },
+    {
+      "ask": "Return real coins, with a limited supply of each.",
+      "answer": "Keep a count per denomination in a CoinBox. Making change is a coin problem: greedy works for standard denominations, otherwise it is dynamic programming. If you cannot make exact change, refuse the sale up front in HasMoney.selectItem, before taking the item."
+    },
+    {
+      "ask": "Many states and many operations. Does this class count explode?",
+      "answer": "Yes: states times operations answers. If many states share behaviour, put the shared answers in a base class or a helper. If the machine is only a table of (state, event) to (next state, action), a data-driven transition table is shorter. Pick classes when states also carry behaviour or data."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. The constructor takes one argument, the slots as [code, name, price in cents, quantity]. Example: [\"VendingMachine\",\"insertCoin\",\"selectItem\"], [[[[\"A1\",\"Cola\",150,2]]],[200],[\"A1\"]]",
+    "presets": [
+      {
+        "label": "Overpay, get change",
+        "args": [
+          [
+            "VendingMachine",
+            "selectItem",
+            "insertCoin",
+            "insertCoin",
+            "selectItem",
+            "collectChange"
+          ],
+          [
+            [
+              [
+                [
+                  "A1",
+                  "Cola",
+                  150,
+                  2
+                ],
+                [
+                  "A2",
+                  "Chips",
+                  100,
+                  1
+                ]
+              ]
+            ],
+            [
+              "A1"
+            ],
+            [
+              100
+            ],
+            [
+              100
+            ],
+            [
+              "A1"
+            ],
+            []
+          ]
+        ]
+      },
+      {
+        "label": "Too little, then refund",
+        "args": [
+          [
+            "VendingMachine",
+            "insertCoin",
+            "selectItem",
+            "refund"
+          ],
+          [
+            [
+              [
+                [
+                  "A1",
+                  "Cola",
+                  150,
+                  2
+                ]
+              ]
+            ],
+            [
+              100
+            ],
+            [
+              "A1"
+            ],
+            []
+          ]
+        ]
+      },
+      {
+        "label": "Sold out, then restock",
+        "args": [
+          [
+            "VendingMachine",
+            "insertCoin",
+            "selectItem",
+            "insertCoin",
+            "restock",
+            "insertCoin"
+          ],
+          [
+            [
+              [
+                [
+                  "A1",
+                  "Cola",
+                  150,
+                  1
+                ]
+              ]
+            ],
+            [
+              150
+            ],
+            [
+              "A1"
+            ],
+            [
+              100
+            ],
+            [
+              "A1",
+              2
+            ],
+            [
+              150
+            ]
+          ]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "state",
+      "label": "State pattern",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        {
+          "n": 1,
+          "title": "Build the machine",
+          "note": "The machine owns the shelves and one object per state. It starts Idle, or SoldOut if there is no stock."
+        },
+        {
+          "n": 2,
+          "title": "Forward to the state",
+          "note": "Every public method is one line: hand the call to the current state. No branching on state here."
+        },
+        {
+          "n": 3,
+          "title": "The state decides",
+          "note": "Each state answers in its own way. It may accept, refuse, or accept and move the machine on."
+        },
+        {
+          "n": 4,
+          "title": "Sell and make change",
+          "note": "HasMoney asks the inventory, takes the item, puts the price difference in the tray and clears the balance."
+        },
+        {
+          "n": 5,
+          "title": "Switch state",
+          "note": "The state tells the machine which state comes next. The machine swaps the one object it forwards to."
+        }
+      ]
+    }
+  ],
+  "goArgs": [
+    "[]string",
+    "[][]any"
+  ],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    {
+      "lang": "General",
+      "text": "Never store money as a float. 0.1 + 0.2 is not 0.3. Keep integer cents everywhere and format only at the screen."
+    },
+    {
+      "lang": "General",
+      "text": "Check before you change. HasMoney peeks at the slot and the price first and takes the item only when the sale will go through. Taking first and undoing later leaves a half-finished sale if anything fails in between."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "A class that implements State may declare fewer parameters than the interface: selectItem() with none is legal. It is handy for states that ignore the argument, but it hides a typo in the name if you also drop the type annotation."
+    },
+    {
+      "lang": "Go",
+      "text": "The state objects hold a pointer back to the machine, and the machine holds the states: a cycle. That is fine in Go with a garbage collector, but build the machine first, then assign the states, as NewVendingMachine does."
+    },
+    {
+      "lang": "Go",
+      "text": "Return (string, bool) instead of an empty string for no sale. An empty name could be a real item, and callers forget to check."
+    }
+  ],
+  "recap": {
+    "pattern": "State: one class per state, the context forwards",
+    "key": "The machine forwards every call to the current state object. Each state knows its own rules and names the next state.",
+    "moves": [
+      "List the states and the operations (a table of state by operation)",
+      "Put the operations in a State interface and write one class per state",
+      "Keep the machine to data plus forwarding, with setState to switch",
+      "Choose and state what each state does on an invalid call"
+    ]
+  }
+}

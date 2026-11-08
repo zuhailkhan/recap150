@@ -13,7 +13,7 @@ const labelX = (m: SeqPanel['messages'][number]) => (m.from === m.to ? cx(m.from
 </script>
 
 <template>
-  <svg :width="width" :height="height" :viewBox="`0 0 ${width} ${height}`" style="max-width: 100%; height: auto" role="img" aria-label="sequence diagram">
+  <svg :width="width" :height="height" :viewBox="`0 0 ${width} ${height}`" :style="{ maxWidth: '100%', minWidth: Math.min(width, 480) + 'px', height: 'auto' }" role="img" aria-label="sequence diagram">
     <defs>
       <marker id="sq-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="context-stroke" stroke-width="1.6" /></marker>
     </defs>

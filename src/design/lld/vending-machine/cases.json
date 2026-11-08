@@ -1,0 +1,16 @@
+[
+  {"name":"exact money buys the item","input":[["VendingMachine","insertCoin","insertCoin","selectItem","collectChange"],[[[["A1","Cola",150,2],["A2","Chips",100,1]]],[100],[50],["A1"],[]]],"expected":[null,100,150,"Cola",0]},
+  {"name":"overpay returns change","input":[["VendingMachine","insertCoin","selectItem","collectChange","collectChange"],[[[["A1","Cola",150,2]]],[200],["A1"],[],[]]],"expected":[null,200,"Cola",50,0]},
+  {"name":"not enough money keeps the coins","input":[["VendingMachine","insertCoin","selectItem","refund"],[[[["A1","Cola",150,2]]],[100],["A1"],[]]],"expected":[null,100,-1,100],"edge":true},
+  {"name":"select before paying","input":[["VendingMachine","selectItem","insertCoin"],[[[["A1","Cola",150,2]]],["A1"],[150]]],"expected":[null,-1,150],"edge":true},
+  {"name":"refund clears the money","input":[["VendingMachine","insertCoin","insertCoin","refund","refund"],[[[["A1","Cola",150,2]]],[100],[25],[],[]]],"expected":[null,100,125,125,0]},
+  {"name":"refund after a sale has nothing left to return","input":[["VendingMachine","insertCoin","selectItem","refund","collectChange"],[[[["A1","Cola",150,2],["A2","Chips",100,1]]],[200],["A2"],[],[]]],"expected":[null,200,"Chips",0,100]},
+  {"name":"coin when sold out is refused","input":[["VendingMachine","insertCoin","selectItem","insertCoin"],[[[["A1","Cola",150,1]]],[150],["A1"],[100]]],"expected":[null,150,"Cola",-1],"edge":true},
+  {"name":"restock after sold out brings it back to Idle","input":[["VendingMachine","insertCoin","selectItem","insertCoin","restock","insertCoin","selectItem"],[[[["A1","Cola",150,1]]],[150],["A1"],[100],["A1",2],[150],["A1"]]],"expected":[null,150,"Cola",-1,2,150,"Cola"]},
+  {"name":"unknown slot keeps the money","input":[["VendingMachine","insertCoin","selectItem","refund"],[[[["A1","Cola",150,2]]],[100],["Z9"],[]]],"expected":[null,100,-1,100],"edge":true},
+  {"name":"empty slot fails but others still sell","input":[["VendingMachine","insertCoin","selectItem","collectChange","insertCoin","selectItem","selectItem","collectChange"],[[[["A1","Cola",150,2],["A2","Chips",100,1]]],[100],["A2"],[],[200],["A2"],["A1"],[]]],"expected":[null,100,"Chips",0,200,-1,"Cola",50]},
+  {"name":"machine with empty shelves starts sold out","input":[["VendingMachine","insertCoin","restock","insertCoin","selectItem"],[[[["A1","Cola",150,0]]],[150],["A1",1],[150],["A1"]]],"expected":[null,-1,1,150,"Cola"],"edge":true},
+  {"name":"a coin below one cent is refused","input":[["VendingMachine","insertCoin","insertCoin","refund"],[[[["A1","Cola",150,2]]],[0],[-5],[]]],"expected":[null,-1,-1,0],"edge":true},
+  {"name":"stock counts down to sold out","input":[["VendingMachine","insertCoin","selectItem","insertCoin","selectItem","insertCoin"],[[[["A1","Cola",150,2]]],[150],["A1"],[150],["A1"],[150]]],"expected":[null,150,"Cola",150,"Cola",-1]},
+  {"name":"restock of an unknown slot or zero units fails","input":[["VendingMachine","restock","restock","restock"],[[[["A1","Cola",150,1]]],["Z9",3],["A1",0],["A1",4]]],"expected":[null,-1,-1,5]}
+]

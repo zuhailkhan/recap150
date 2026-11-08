@@ -1,0 +1,163 @@
+{
+  "slug": "notification-system",
+  "title": "Notification System",
+  "group": "Events and messaging",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the in-process core of a notification system. Producers publish events on topics such as \"order.shipped\". Users subscribe to topics and choose how they want to be reached: email, SMS or push. Publishing an event must reach every subscriber through each channel they chose, and one broken channel must not stop the rest.",
+  "requirements": {
+    "functional": [
+      "Users subscribe to and unsubscribe from named topics.",
+      "Subscribing twice to the same topic counts once.",
+      "Publishing on a topic notifies every subscriber, in subscription order.",
+      "Each user picks channels (email, SMS, push), and is notified on each of them, always in the order email, sms, push.",
+      "A muted user stays subscribed but receives nothing.",
+      "If one channel fails for a user, the other channels and the other users are still served, and the failure is recorded.",
+      "Publishing on a topic with no subscribers does nothing."
+    ],
+    "outOfScope": ["Real email, SMS or push providers", "Retries and queues", "Templates and localisation", "Persisting subscriptions"]
+  },
+  "idea": {
+    "sentence": "The service only coordinates: it finds who follows a topic, then hands each message to a small Channel interface, so adding a channel never touches the service.",
+    "jargon": [
+      { "term": "Observer pattern", "plain": "Objects register interest in something, and the thing that changes tells all of them. Here the topic's subscribers are the observers." },
+      { "term": "Strategy pattern", "plain": "Put one way of doing a job behind an interface so you can swap or add ways without changing the caller. Each Channel is a strategy for delivery." },
+      { "term": "value object", "plain": "A small immutable record compared by what it holds, not by identity. A Notification is made once and never changed." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "User", "fields": ["id", "channels: ChannelName[]", "muted: boolean"], "x": 0, "y": 0 },
+      { "name": "NotificationService", "fields": ["users: Map<id, User>", "subs: Subscriptions", "channels: Map<name, Channel>", "failures: string[]"], "methods": ["subscribe(user, topic)", "unsubscribe(user, topic)", "publish(topic, body): string[]"], "x": 1, "y": 0 },
+      { "name": "Subscriptions", "fields": ["byTopic: Map<topic, Set<id>>"], "methods": ["add(topic, id)", "remove(topic, id)", "of(topic): id[]"], "x": 2, "y": 0 },
+      { "name": "Channel", "kind": "interface", "methods": ["send(userId, n): void  (throws on failure)"], "x": 1, "y": 1 },
+      { "name": "Notification", "fields": ["topic", "body"], "x": 2, "y": 1 },
+      { "name": "RecordingChannel", "fields": ["sent: string[]", "failing: boolean"], "methods": ["send(userId, n)"], "x": 1, "y": 2 },
+      { "name": "EmailChannel", "x": 0, "y": 3 },
+      { "name": "SmsChannel", "x": 1, "y": 3 },
+      { "name": "PushChannel", "x": 2, "y": 3 }
+    ],
+    "relations": [
+      { "from": "NotificationService", "to": "User", "kind": "uses", "label": "looks up" },
+      { "from": "NotificationService", "to": "Subscriptions", "kind": "has", "label": "owns" },
+      { "from": "NotificationService", "to": "Channel", "kind": "uses", "label": "sends via" },
+      { "from": "Channel", "to": "Notification", "kind": "uses" },
+      { "from": "RecordingChannel", "to": "Channel", "kind": "implements" },
+      { "from": "EmailChannel", "to": "RecordingChannel", "kind": "inherits" },
+      { "from": "SmsChannel", "to": "RecordingChannel", "kind": "inherits" },
+      { "from": "PushChannel", "to": "RecordingChannel", "kind": "inherits" }
+    ]
+  },
+  "patterns": [
+    { "name": "Observer", "where": "Subscriptions holds the observers of each topic. NotificationService.publish walks them.", "why": "Producers know only a topic name. They never know who listens, so subscribers come and go without touching producers." },
+    { "name": "Strategy", "where": "The Channel interface, with Email, Sms and Push implementations.", "why": "Delivery differs per channel, but the service treats them the same. A new channel is one new class and one entry in the order list." },
+    { "name": "Value object", "where": "Notification is built once per publish and passed to every channel.", "why": "Many channels share it, so it must not change under them. Read-only fields make that a compile-time rule." }
+  ],
+  "decisions": [
+    {
+      "question": "How are subscribers held?",
+      "choice": "A map from topic to a set of user ids, wrapped in a Subscriptions class",
+      "because": "Lookup by topic is one map read, and a set makes a double subscribe a no-op. Keeping the order of insertion gives a stable delivery order. Wrapping it lets tests spy on it and lets storage change later.",
+      "instead": "Each User holding a list of topics, which forces a scan of every user on each publish."
+    },
+    {
+      "question": "Why does delivery go through an interface?",
+      "choice": "A Channel interface with one implementation per channel",
+      "because": "Email, SMS and push fail differently and need different providers. The service stays the same when one is added or replaced, and tests plug in a recording fake that stores what it was asked to send.",
+      "instead": "A switch on channel name inside publish, which grows with every channel and cannot be tested without the real senders."
+    },
+    {
+      "question": "What happens when one channel fails?",
+      "choice": "Catch the error per send, record it in failures, and carry on",
+      "because": "A user's SMS outage must not hide an email, and one user's failure must not starve the next. The failure is data the caller can read, not an exception that aborts the loop.",
+      "instead": "Letting the first error escape, so later channels and users silently miss the event."
+    },
+    {
+      "question": "How is the order of delivery fixed?",
+      "choice": "Users in subscription order, channels in a fixed list: email, sms, push",
+      "because": "The same input always gives the same output, which makes tests exact and logs comparable. The cost is that email always goes first.",
+      "instead": "Iterating a map of channels, whose order is undefined in Go and easy to rely on by accident elsewhere."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two threads publish and subscribe at the same time. What goes wrong?",
+      "answer": "A set or map written while another thread reads it is a data race. In Go it can crash the program. Put a sync.RWMutex in Subscriptions: a write lock in Add and Remove, a read lock in Of. Of already returns a copy, so delivery runs without the lock and a slow channel never blocks subscribers."
+    },
+    {
+      "ask": "Sending is slow. How do you stop publish from blocking the producer?",
+      "answer": "Publish only enqueues work, and a pool of workers does the sends. Keep one queue per channel so a slow SMS provider cannot delay email. The Channel interface does not change, only who calls it."
+    },
+    {
+      "ask": "Add retries for a failed channel.",
+      "answer": "Wrap a Channel in a retrying Channel that calls the inner one a few times with a delay, then gives up and throws. The service is unchanged, because it only knows the interface. This is the decorator pattern."
+    },
+    {
+      "ask": "Add quiet hours instead of a single mute flag.",
+      "answer": "Give User a pair of hours, and pass the current hour into publish. Replace the muted check with a small function: is this hour inside the quiet range? Handle ranges that wrap past midnight, such as 22 to 7, by testing hour >= start or hour < end."
+    },
+    {
+      "ask": "A user must not get the same event twice if the producer retries.",
+      "answer": "Give each event an id and keep a set of (event id, user, channel) already delivered. Check it before sending and add to it after a success. At scale that set lives in a store with a time-to-live, so it does not grow forever."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Start with NotificationService taking [users, failing channels], where a user is [id, channels, muted 0 or 1]. Then subscribe(user, topic), unsubscribe(user, topic), mute(user, 0 or 1), publish(topic, body) and failures. Example: [\"NotificationService\",\"subscribe\",\"publish\"], [[[[\"ana\",[\"email\"],0]],[]],[\"ana\",\"t\"],[\"t\",\"hi\"]]",
+    "presets": [
+      {
+        "label": "Order shipped, one muted",
+        "args": [
+          ["NotificationService", "subscribe", "subscribe", "subscribe", "unsubscribe", "publish"],
+          [[[["ana", ["email", "push"], 0], ["bo", ["sms"], 0], ["cy", ["email", "sms"], 1], ["di", ["push"], 0]], []], ["ana", "order.shipped"], ["cy", "order.shipped"], ["bo", "order.shipped"], ["bo", "order.shipped"], ["order.shipped", "Your parcel left the depot"]]
+        ]
+      },
+      {
+        "label": "SMS is down",
+        "args": [
+          ["NotificationService", "subscribe", "subscribe", "publish", "failures"],
+          [[[["ana", ["email", "sms", "push"], 0], ["bo", ["sms", "email"], 0]], ["sms"]], ["ana", "order.shipped"], ["bo", "order.shipped"], ["order.shipped", "Out for delivery"], []]
+        ]
+      },
+      {
+        "label": "Double subscribe, then none",
+        "args": [
+          ["NotificationService", "subscribe", "subscribe", "publish", "unsubscribe", "publish"],
+          [[[["ana", ["email", "push"], 0]], []], ["ana", "price.drop"], ["ana", "price.drop"], ["price.drop", "Sale"], ["ana", "price.drop"], ["price.drop", "Sale again"]]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Observer and Strategy",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Subscribe", "note": "The service checks the user exists, then Subscriptions adds the id to the topic's set. A second add changes nothing." },
+        { "n": 2, "title": "Unsubscribe", "note": "Subscriptions removes the id from the topic's set, so later events skip that user." },
+        { "n": 3, "title": "Look up subscribers", "note": "Publish asks Subscriptions for the ids on the topic. It gets a copy, in subscription order." },
+        { "n": 4, "title": "Skip muted users", "note": "A muted user stays subscribed but no channel is called for them." },
+        { "n": 5, "title": "Send per channel", "note": "Channels run in the fixed order. Each send is wrapped, so a failure is recorded and the loop goes on." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "Iterating a hash map gives no promised order. Delivery order here comes from the slice (Go) or the insertion-ordered Set (TypeScript), plus a fixed channel list. Never iterate a map of channels to decide who goes first." },
+    { "lang": "General", "text": "Unsubscribing or subscribing while publish loops can corrupt the loop or skip users. Of returns a copy for this reason." },
+    { "lang": "TypeScript", "text": "A try block catches only what is thrown inside it. Wrap each channel.send on its own, not the whole loop, or the first error ends the loop and the other channels never run." },
+    { "lang": "TypeScript", "text": "A JavaScript Set keeps insertion order, and delete then add moves a value to the end. That is why a user who unsubscribes and re-subscribes goes last." },
+    { "lang": "Go", "text": "A map iterates in random order. Keep a slice per topic for subscription order, and check slices.Contains before append to get set behaviour." },
+    { "lang": "Go", "text": "Failures are values, not exceptions: Send returns an error and the caller must check it. Ignoring it is silent, so test it with a channel that fails." },
+    { "lang": "Go", "text": "A nil slice and an empty slice both encode as nothing useful to callers expecting a list. Start Publish with []string{} so it never returns nil." }
+  ],
+  "recap": {
+    "pattern": "Observer plus Strategy: who to tell, and how to tell them",
+    "key": "Subscriptions answers who follows a topic. Channel implementations answer how to reach them. The service only loops and isolates failures.",
+    "moves": ["Hold subscribers as topic to a set of user ids", "Put each delivery method behind a Channel interface", "Fix the order: users as subscribed, channels email, sms, push", "Catch each send on its own and record the failure"]
+  }
+}

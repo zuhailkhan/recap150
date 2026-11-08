@@ -44,7 +44,7 @@ const markerEnd = (k: string) => (k === 'inherits' || k === 'implements' ? 'url(
 </script>
 
 <template>
-  <svg :width="layout.width" :height="layout.height" :viewBox="`0 0 ${layout.width} ${layout.height}`" style="max-width: 100%; height: auto" role="img" aria-label="class diagram">
+  <svg :width="layout.width" :height="layout.height" :viewBox="`0 0 ${layout.width} ${layout.height}`" :style="{ maxWidth: '100%', minWidth: Math.min(layout.width, 560) + 'px', height: 'auto' }" role="img" aria-label="class diagram">
     <defs>
       <marker id="cl-tri" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="11" markerHeight="11" orient="auto"><path d="M1 1 L11 6 L1 11 z" class="hollow" /></marker>
       <marker id="cl-open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" class="openarrow" /></marker>

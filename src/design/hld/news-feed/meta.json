@@ -1,0 +1,168 @@
+{
+  "slug": "news-feed",
+  "title": "News Feed",
+  "group": "Feeds and social",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the home feed of a social app: a list of recent posts from the people you follow, newest first. People open it many times a day, so it must load fast. Some accounts have millions of followers, and one post from them must not melt the system.",
+  "requirements": {
+    "functional": [
+      "Publish a post with text and optional images.",
+      "Follow and unfollow other people.",
+      "Open a home feed of recent posts from people you follow.",
+      "Scroll back through older posts, a page at a time.",
+      "A deleted post disappears from every feed."
+    ],
+    "nonFunctional": [
+      { "name": "Read latency", "target": "The first page of the feed loads in under 200 ms at the 99th percentile" },
+      { "name": "Freshness", "target": "A new post shows up in followers' feeds within 10 seconds" },
+      { "name": "Availability", "target": "The feed loads 99.95% of the time, even if it is slightly stale" },
+      { "name": "Durability", "target": "A published post is never lost" }
+    ],
+    "outOfScope": ["Likes, comments and notifications", "Search and trending topics"]
+  },
+  "estimate": {
+    "note": "Reads dominate, and each post is copied into many feeds. The copy count (posts per second times followers) is the number that shapes the design. Assume 1 KB per stored post and one year of posts.",
+    "inputs": [
+      { "id": "dau", "label": "Daily active users", "value": 100000000, "min": 1000000, "max": 1000000000, "log": true },
+      { "id": "postsPerUser", "label": "Posts per user per day", "value": 1, "min": 0.1, "max": 10, "log": true },
+      { "id": "avgFollowers", "label": "Average followers", "value": 200, "min": 10, "max": 5000, "log": true },
+      { "id": "opensPerUser", "label": "Feed opens per user per day", "value": 5, "min": 1, "max": 30, "step": 1 },
+      { "id": "feedLen", "label": "Feed entries kept per user", "value": 500, "min": 100, "max": 2000, "step": 100, "unit": "entries" },
+      { "id": "entryBytes", "label": "Bytes per feed entry", "value": 16, "min": 8, "max": 64, "step": 8, "unit": "B", "note": "A post id and a timestamp." }
+    ],
+    "outputs": [
+      { "id": "postQps", "label": "Posts per second", "expr": "dau * postsPerUser / 86400", "unit": "per s" },
+      { "id": "fanQps", "label": "Fan-out writes per second", "expr": "postQps * avgFollowers", "unit": "per s", "note": "Each post is pushed into every follower's feed list." },
+      { "id": "celebFan", "label": "Writes for one celebrity post", "expr": "1e7", "unit": "writes", "note": "A celebrity with 10M followers: one post, 10M list updates." },
+      { "id": "celebTimes", "label": "That post, in typical posts", "expr": "1e7 / avgFollowers", "unit": "x", "note": "Why celebrities are handled differently." },
+      { "id": "readQps", "label": "Feed reads per second", "expr": "dau * opensPerUser / 86400", "unit": "per s", "note": "Peak is often 2 to 3 times this." },
+      { "id": "cacheGb", "label": "Feed cache memory", "expr": "dau * feedLen * entryBytes / 1e9", "unit": "GB", "note": "Upper bound: one list for every active user." },
+      { "id": "storageTb", "label": "Post storage, one year", "expr": "dau * postsPerUser * 365 * 1000 / 1e12", "unit": "TB", "note": "Text and metadata only. Images go to blob storage." }
+    ]
+  },
+  "api": [
+    { "call": "POST /posts  { text, mediaIds? }", "does": "Stores a post and starts the fan-out. Returns the post id." },
+    { "call": "DELETE /posts/{id}", "does": "Marks the post deleted. Feeds drop it when they are read." },
+    { "call": "GET /feed?cursor=", "does": "Returns the next page of post cards for the caller, newest first, plus a cursor." },
+    { "call": "POST /follow/{userId}", "does": "Adds a follow edge. Unfollow is the matching DELETE." },
+    { "call": "POST /media", "does": "Returns an upload URL. The image goes straight to blob storage." }
+  ],
+  "data": [
+    { "entity": "Post", "fields": "postId, authorId, text, mediaIds, createdAt, deleted", "store": "Sharded key-value store by postId.", "why": "Reads are by id, so one lookup per post. Time-ordered ids help." },
+    { "entity": "Follow", "fields": "followerId, followeeId, createdAt", "store": "Follow store, two indexes.", "why": "Both questions are common: who do I follow, and who follows me." },
+    { "entity": "FeedList", "fields": "userId, [postId, timestamp] x N", "store": "In-memory cache, a list per user.", "why": "The feed is precomputed. Opening it is one list read, trimmed to the newest N." },
+    { "entity": "Celebrity recent posts", "fields": "authorId, [postId, timestamp]", "store": "In-memory cache.", "why": "Small list per celebrity, read at feed time instead of fanned out." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Client", "kind": "client", "x": 7, "y": 50, "since": 0 },
+    { "id": "app", "label": "App service", "kind": "service", "x": 30, "y": 50, "sub": "posts and feeds", "since": 0 },
+    { "id": "postdb", "label": "Post store", "kind": "db", "x": 30, "y": 88, "sub": "posts by id", "since": 0 },
+    { "id": "cache", "label": "Feed cache", "kind": "cache", "x": 56, "y": 12, "sub": "id list per user", "since": 1 },
+    { "id": "queue", "label": "Fan-out queue", "kind": "queue", "x": 56, "y": 36, "sub": "new post events", "since": 2 },
+    { "id": "worker", "label": "Fan-out workers", "kind": "worker", "x": 80, "y": 36, "since": 2 },
+    { "id": "follow", "label": "Follow store", "kind": "db", "x": 80, "y": 62, "sub": "who follows whom", "since": 3 },
+    { "id": "blob", "label": "Blob storage", "kind": "blob", "x": 80, "y": 88, "sub": "images", "since": 4 },
+    { "id": "cdn", "label": "CDN", "kind": "cdn", "x": 55, "y": 88, "sub": "image cache", "since": 4 },
+    { "id": "hot", "label": "Celebrity posts", "kind": "cache", "x": 30, "y": 12, "sub": "pulled at read time", "since": 5 }
+  ],
+  "edges": [
+    { "from": "client", "to": "app", "since": 0 },
+    { "from": "app", "to": "postdb", "since": 0 },
+    { "from": "app", "to": "cache", "since": 1 },
+    { "from": "app", "to": "queue", "label": "new post", "since": 2 },
+    { "from": "queue", "to": "worker", "since": 2 },
+    { "from": "worker", "to": "cache", "label": "push id", "since": 2 },
+    { "from": "worker", "to": "postdb", "label": "followers", "dashed": true, "since": 2, "until": 3 },
+    { "from": "app", "to": "follow", "since": 3 },
+    { "from": "worker", "to": "follow", "label": "followers", "since": 3 },
+    { "from": "app", "to": "blob", "label": "upload", "since": 4 },
+    { "from": "blob", "to": "cdn", "since": 4 },
+    { "from": "cdn", "to": "client", "since": 4 },
+    { "from": "app", "to": "hot", "label": "celebrity", "dashed": true, "since": 5 }
+  ],
+  "evolution": [
+    { "title": "One server, one query", "problem": "Start with what works: one server and one database holding posts and follows.", "change": "To build a feed, join the follows table to the posts table, sort by time and take the newest 20." },
+    { "title": "Precomputed feed cache", "problem": "Feeds are read about five times a day per user, and the join touches every person you follow. It gets slow as follows grow.", "change": "Keep a list of post ids per user in a cache. Opening the feed becomes one list read, then a lookup of those posts.", "numbers": "the estimator shows the cache is hundreds of GB" },
+    { "title": "Fan-out on write", "problem": "Who fills the lists? Doing it inside the publish request makes posting slow and fragile.", "change": "A post is saved, then an event goes on a queue. Workers push the post id into each follower's list. This is fan-out on write: pay once at write time so reads stay cheap.", "numbers": "fan-out writes per second = posts per second times followers" },
+    { "title": "A real follow store", "problem": "Workers need the follower list of an author at once, and the posts database also serves post reads.", "change": "Move follows into their own store, indexed both ways. Workers read followers from it. The post store stays focused on posts." },
+    { "title": "Media off to blob and CDN", "problem": "Images are far larger than text. Serving them through the app wastes servers and is slow far away.", "change": "Upload images to blob storage. A CDN, a cache of copies near the user, serves them. Posts only store media ids." },
+    { "title": "Hybrid for celebrities", "problem": "One post from an account with 10 million followers means 10 million list writes and a huge queue spike.", "change": "Do not fan out celebrities. Keep their recent posts in a small cache. When a feed is read, merge the ordinary list with the celebrity posts of the people you follow.", "numbers": "the celebrity line in the estimator" }
+  ],
+  "flows": [
+    {
+      "name": "Publish a post",
+      "steps": [
+        { "say": "The client sends the text and any image ids.", "nodes": ["client", "app"], "edges": [["client", "app"]] },
+        { "say": "The service saves the post in the post store. From here it is durable.", "nodes": ["app", "postdb"], "edges": [["app", "postdb"]] },
+        { "say": "It puts a new-post event on the queue and answers the client. It does not wait for fan-out.", "nodes": ["app", "queue"], "edges": [["app", "queue"]] },
+        { "say": "A worker takes the event.", "nodes": ["queue", "worker"], "edges": [["queue", "worker"]] },
+        { "say": "The worker reads the author's followers. If the author is a celebrity it stops here.", "nodes": ["worker", "follow"], "edges": [["worker", "follow"]] },
+        { "say": "For everyone else it pushes the post id onto each follower's list, trims the list, and skips inactive users.", "nodes": ["worker", "cache"], "edges": [["worker", "cache"]] },
+        { "say": "A celebrity post instead goes into the small celebrity list. Nothing is copied.", "nodes": ["app", "hot"], "edges": [["app", "hot"]] }
+      ]
+    },
+    {
+      "name": "Open the feed",
+      "steps": [
+        { "say": "The client asks for page one of the feed.", "nodes": ["client", "app"], "edges": [["client", "app"]] },
+        { "say": "The service reads the user's id list from the feed cache. One lookup.", "nodes": ["app", "cache"], "edges": [["app", "cache"]] },
+        { "say": "It also reads recent posts from the celebrities this user follows.", "nodes": ["app", "hot"], "edges": [["app", "hot"]] },
+        { "say": "It merges both lists by time and keeps the newest page.", "nodes": ["app"], "edges": [] },
+        { "say": "It hydrates the ids: fetches the post bodies and drops deleted ones.", "nodes": ["app", "postdb"], "edges": [["app", "postdb"]] },
+        { "say": "The page goes back. Images load separately from the CDN.", "nodes": ["cdn", "client"], "edges": [["cdn", "client"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Fan-out on write, read or hybrid",
+      "question": "When do we build each person's feed: when a post is written, or when the feed is opened?",
+      "options": [
+        { "name": "Fan-out on write (push)", "pros": "Reads are one list lookup. Fast and cheap for the common case.", "cons": "A post by a celebrity costs millions of writes. Work is wasted on users who never come back." },
+        { "name": "Fan-out on read (pull)", "pros": "Posting is one write. Nothing is wasted on inactive users.", "cons": "Every open queries everyone you follow and merges. Slow, and reads are the heavy side." },
+        { "name": "Hybrid", "pros": "Push for normal authors, pull only for celebrities. Both sides stay cheap.", "cons": "Two paths to build and test. Needs a rule for who counts as a celebrity." }
+      ],
+      "pick": "Hybrid",
+      "because": "Reads vastly outnumber posts, so push by default. Few accounts have huge followings, so pulling just those at read time is a small merge. Pick the cutoff by follower count, for example 100K."
+    },
+    {
+      "title": "Chronological or ranked",
+      "question": "Do we show posts newest first, or in the order a model thinks you will like?",
+      "options": [
+        { "name": "Chronological", "pros": "Simple, predictable, cheap. The list is already in order.", "cons": "Busy follows bury the posts you care about." },
+        { "name": "Ranked in the fan-out", "pros": "Lists arrive pre-sorted by score.", "cons": "Scores go stale, and changing the model means rewriting every list." },
+        { "name": "Ranked as a separate stage", "pros": "Fetch candidates cheaply, then score the top few hundred at read time. Models change without touching storage.", "cons": "Adds latency and a ranking service to run." }
+      ],
+      "pick": "Ranked as a separate stage",
+      "because": "Keep storage chronological and dumb. Candidate generation is the fan-out and merge. Ranking is a stage after it. You can ship, test or turn it off without rebuilding feeds."
+    },
+    {
+      "title": "Inactive users and cache size",
+      "question": "Keeping a list for every user is expensive. Who deserves one?",
+      "options": [
+        { "name": "A list for every account", "pros": "Every open is fast, even after a long absence.", "cons": "Most memory and writes go to people who never look." },
+        { "name": "Lists only for active users", "pros": "Memory and fan-out shrink a lot. Workers skip users not seen for 30 days.", "cons": "The first open after a long gap is slow." },
+        { "name": "Short lists with eviction", "pros": "Bounded size. Old entries drop off the end.", "cons": "Scrolling past the list needs a fallback to the post store." }
+      ],
+      "pick": "Active users only, short lists",
+      "because": "Skip fan-out for anyone who has not logged in for 30 days. On their next open, rebuild the list from the post store, then keep it warm. Trim each list to a few hundred entries, and read deeper pages from the post store."
+    }
+  ],
+  "failures": [
+    { "what": "Fan-out workers fall behind", "impact": "New posts reach feeds late. Followers see stale feeds.", "fix": "Scale workers with queue depth. Spread work by follower id, so no single worker owns a huge list. Alert on queue age, not just size." },
+    { "what": "The feed cache is lost", "impact": "Every list is gone. Opens would fall back to slow joins.", "fix": "Rebuild a user's list on demand from the post store and follow store, newest first. Limit how many rebuilds run at once and warm the most active users first." },
+    { "what": "A celebrity posts at peak time", "impact": "A burst of reads hits the same small celebrity list, and any fan-out would flood the queue.", "fix": "Celebrities are never fanned out. Replicate their hot list and cache the merged result for a few seconds." },
+    { "what": "A deleted post is still in feeds", "impact": "People see content that was removed, which can be harmful.", "fix": "Do not chase every list. Mark the post deleted. When hydrating, drop deleted posts and fix the list lazily." }
+  ],
+  "scaling": [
+    { "limit": "Feed cache memory grows with users", "lever": "Shard lists by user id with consistent hashing, keep lists short, and evict inactive users." },
+    { "limit": "Fan-out writes per second", "lever": "Add workers, batch list updates per cache node, and lower the celebrity cutoff." },
+    { "limit": "Users spread across the world", "lever": "Run regional feed caches and replicate posts. Serve images from the CDN nearest the user." }
+  ],
+  "recap": {
+    "key": "Reads outnumber posts, so precompute each feed. Push post ids to followers on write, but pull celebrities at read time.",
+    "numbers": "About 1K posts and 230K fan-out writes per second, 6K feed reads per second, and a few hundred GB of feed lists. One celebrity post is 10M writes.",
+    "moves": ["Estimate first: fan-out is posts per second times followers", "Keep a cached id list per user, filled by queue workers", "Hybrid: skip fan-out for celebrities and merge them on read", "Rank in a separate stage, and filter deleted posts when hydrating"]
+  }
+}

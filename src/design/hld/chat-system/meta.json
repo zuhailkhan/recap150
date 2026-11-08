@@ -1,0 +1,191 @@
+{
+  "slug": "chat-system",
+  "title": "Chat System",
+  "group": "Messaging and real time",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a chat service for one-to-one and group messages. A message must reach the other person in well under a second if they are online, and wait safely if they are not. Messages must arrive in order, never get lost, and history must be there when you open the app.",
+  "requirements": {
+    "functional": [
+      "Send a message to one person or to a group.",
+      "Deliver it live if the recipient is online.",
+      "Hold it and notify the recipient if they are offline.",
+      "Load the history of a conversation, newest first.",
+      "Show sent, delivered and read receipts.",
+      "Show whether a contact is online."
+    ],
+    "nonFunctional": [
+      { "name": "Latency", "target": "Online delivery under 200 ms at the 99th percentile" },
+      { "name": "Ordering", "target": "Everyone sees a conversation in the same order" },
+      { "name": "Durability", "target": "A message that was acknowledged is never lost" },
+      { "name": "Delivery", "target": "At least once, with duplicates hidden from the user" },
+      { "name": "Availability", "target": "Sending works 99.99% of the time" }
+    ],
+    "outOfScope": ["End-to-end encryption", "Voice and video calls", "Media upload and storage", "Search inside messages"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts: peak is about 3 times the average, and a message with its metadata is a few hundred bytes. Connections, not requests, set the size of the gateway fleet.",
+    "inputs": [
+      { "id": "dau", "label": "Daily active users", "value": 100000000, "min": 1000000, "max": 1000000000, "log": true },
+      { "id": "msgsPerUser", "label": "Messages sent per user per day", "value": 40, "min": 5, "max": 200, "step": 5 },
+      { "id": "onlinePct", "label": "Share of users online at peak", "value": 10, "min": 1, "max": 30, "step": 1, "unit": "%" },
+      { "id": "connsPerGw", "label": "Connections one gateway holds", "value": 100000, "min": 10000, "max": 1000000, "log": true },
+      { "id": "msgBytes", "label": "Average message size", "value": 200, "min": 50, "max": 2000, "step": 50, "unit": "B" },
+      { "id": "years", "label": "Keep history for", "value": 5, "min": 1, "max": 10, "step": 1, "unit": "years" }
+    ],
+    "outputs": [
+      { "id": "avgQps", "label": "Messages per second, average", "expr": "dau * msgsPerUser / 86400", "unit": "per s" },
+      { "id": "peakQps", "label": "Messages per second at peak", "expr": "avgQps * 3", "unit": "per s" },
+      { "id": "conns", "label": "Concurrent connections", "expr": "dau * onlinePct / 100", "unit": "conns", "note": "Each online user holds one open socket." },
+      { "id": "gateways", "label": "Gateways needed", "expr": "ceil(conns / connsPerGw)", "unit": "servers", "note": "Add headroom for a zone failing." },
+      { "id": "storageYearTb", "label": "Storage per year", "expr": "dau * msgsPerUser * 365 * msgBytes / 1e12", "unit": "TB", "note": "One copy. Multiply by the replication factor." },
+      { "id": "storageTotalTb", "label": "Storage over the retention", "expr": "storageYearTb * years", "unit": "TB" },
+      { "id": "bandwidthMbps", "label": "Message bandwidth at peak", "expr": "peakQps * msgBytes * 8 / 1e6", "unit": "Mbit/s", "note": "One direction, one recipient each." }
+    ]
+  },
+  "api": [
+    { "call": "WS connect /chat?userId&lastSeq", "does": "Opens a socket. The server replays what was missed since lastSeq." },
+    { "call": "send { convId, msgId, text }", "does": "Sends a message. msgId comes from the client, so a retry is safe." },
+    { "call": "ack { convId, seq }", "does": "Tells the server this device has received up to seq." },
+    { "call": "GET /conversations/{id}/messages?before=seq&limit=50", "does": "Pages history backward from a sequence number." },
+    { "call": "read { convId, seq }", "does": "Marks messages as read and informs the sender." },
+    { "call": "POST /devices  { userId, pushToken }", "does": "Registers a phone for push notifications." }
+  ],
+  "data": [
+    { "entity": "Message", "fields": "convId, seq, msgId, senderId, text, sentAt", "store": "Wide-column store, partition key convId, sorted by seq.", "why": "History is always one conversation, newest first. One partition read, no joins, and it scales out." },
+    { "entity": "Conversation", "fields": "convId, type, memberIds, lastSeq", "store": "Key-value store keyed by convId.", "why": "Small rows. lastSeq is the counter that gives the next sequence number." },
+    { "entity": "Connection", "fields": "userId, deviceId, gatewayId, expiresAt", "store": "In-memory store with TTL.", "why": "Changes constantly and is cheap to rebuild. Entries expire if a gateway dies." },
+    { "entity": "Device", "fields": "userId, deviceId, pushToken, platform", "store": "Key-value store.", "why": "Looked up by user when we need to push." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Client apps", "kind": "client", "x": 6, "y": 50, "since": 0 },
+    { "id": "lb", "label": "Load balancer", "kind": "lb", "x": 24, "y": 50, "sub": "sticky sockets", "since": 1 },
+    { "id": "gw", "label": "Gateway A", "kind": "service", "x": 44, "y": 26, "sub": "holds sockets", "since": 1 },
+    { "id": "gw2", "label": "Gateway B", "kind": "service", "x": 44, "y": 74, "sub": "holds sockets", "since": 3 },
+    { "id": "msg", "label": "Message service", "kind": "service", "x": 66, "y": 50, "sub": "ids, order, ack", "since": 0 },
+    { "id": "db", "label": "Message store", "kind": "db", "x": 90, "y": 62, "sub": "by conversation", "since": 2 },
+    { "id": "registry", "label": "Connection registry", "kind": "cache", "x": 66, "y": 10, "sub": "user to gateway", "since": 3 },
+    { "id": "bus", "label": "Pub-sub bus", "kind": "queue", "x": 66, "y": 90, "sub": "one topic per gateway", "since": 4 },
+    { "id": "push", "label": "Push service", "kind": "worker", "x": 90, "y": 36, "sub": "offline users", "since": 5 },
+    { "id": "apns", "label": "Phone push provider", "kind": "external", "x": 90, "y": 10, "sub": "APNs or FCM", "since": 5 },
+    { "id": "presence", "label": "Presence service", "kind": "service", "x": 24, "y": 88, "sub": "heartbeats", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "msg", "label": "poll", "since": 0, "until": 1 },
+    { "from": "client", "to": "lb", "since": 1 },
+    { "from": "lb", "to": "gw", "since": 1 },
+    { "from": "gw", "to": "msg", "since": 1 },
+    { "from": "msg", "to": "db", "since": 2 },
+    { "from": "lb", "to": "gw2", "since": 3 },
+    { "from": "gw2", "to": "msg", "since": 3 },
+    { "from": "gw", "to": "registry", "dashed": true, "since": 3 },
+    { "from": "gw2", "to": "registry", "dashed": true, "since": 3 },
+    { "from": "msg", "to": "registry", "label": "find user", "since": 3 },
+    { "from": "msg", "to": "bus", "label": "publish", "since": 4 },
+    { "from": "bus", "to": "gw", "since": 4 },
+    { "from": "bus", "to": "gw2", "since": 4 },
+    { "from": "msg", "to": "push", "label": "offline", "since": 5 },
+    { "from": "push", "to": "apns", "since": 5 },
+    { "from": "gw", "to": "presence", "dashed": true, "since": 6 },
+    { "from": "gw2", "to": "presence", "dashed": true, "since": 6 }
+  ],
+  "evolution": [
+    { "title": "Poll an HTTP API", "problem": "Start with the simplest thing that works: the app asks one server for new messages every few seconds.", "change": "One message service keeps messages in memory. Clients send with a request and poll to receive." },
+    { "title": "WebSocket gateways", "problem": "With 10M users polling every 2 seconds, that is 5M requests per second, nearly all of them empty. Messages also arrive up to 2 seconds late.", "change": "Clients keep one open WebSocket to a gateway. The gateway pushes messages the moment they exist. The load balancer only picks a gateway once, at connect time.", "numbers": "5M empty polls per second become 0 requests" },
+    { "title": "A durable message store", "problem": "A restart loses every message in memory, and there is no history to load.", "change": "The message service gives each message a per-conversation sequence number and writes it to a store partitioned by conversation id before it acknowledges. Partitioning by conversation keeps history one read away." },
+    { "title": "Many gateways and a registry", "problem": "One gateway holds about 100K sockets. Ten million online users need 100 gateways, and the sender and recipient are on different ones.", "change": "Every gateway records which users it holds in a connection registry, with a short expiry. The message service looks the recipient up to find their gateway.", "numbers": "the estimator shows how many gateways" },
+    { "title": "Route through pub-sub", "problem": "The message service should not know every gateway address or keep thousands of connections open to them.", "change": "Each gateway subscribes to its own topic on a pub-sub bus. The message service publishes to the topic the registry names, and that gateway forwards the message down the socket." },
+    { "title": "Offline delivery and push", "problem": "About 90% of users are offline at any moment. They need the message, and a nudge to open the app.", "change": "If the registry has no entry, the message stays in the store and the push service sends a notification through the phone provider. On reconnect the client asks for everything after its last sequence number." },
+    { "title": "Presence off the hot path", "problem": "Showing online status means a heartbeat from every socket. At millions of sockets that would swamp the message path.", "change": "Gateways batch heartbeats into a separate presence service. Messages never wait for it, and status is allowed to be a few seconds stale." }
+  ],
+  "flows": [
+    {
+      "name": "Send to an online user",
+      "steps": [
+        { "say": "The sender's app writes the message to its open socket, with a message id it made itself.", "nodes": ["client", "lb"], "edges": [["client", "lb"]] },
+        { "say": "The socket is already pinned to a gateway, so the traffic arrives at Gateway A.", "nodes": ["lb", "gw"], "edges": [["lb", "gw"]] },
+        { "say": "The gateway hands it to the message service. That service takes the next sequence number for this conversation.", "nodes": ["gw", "msg"], "edges": [["gw", "msg"]] },
+        { "say": "It writes the message to the store, keyed by conversation and sequence. A repeated message id is ignored. Only now is the sender told 'sent'.", "nodes": ["msg", "db"], "edges": [["msg", "db"]] },
+        { "say": "It asks the registry which gateway holds the recipient. The answer is Gateway B.", "nodes": ["msg", "registry"], "edges": [["msg", "registry"]] },
+        { "say": "It publishes the message to Gateway B's topic on the bus.", "nodes": ["msg", "bus"], "edges": [["msg", "bus"]] },
+        { "say": "The bus delivers it to Gateway B.", "nodes": ["bus", "gw2"], "edges": [["bus", "gw2"]] },
+        { "say": "Gateway B writes it to the recipient's socket.", "nodes": ["gw2", "lb", "client"], "edges": [["lb", "gw2"]] },
+        { "say": "The recipient's app acknowledges the sequence number. The service records 'delivered' and tells the sender.", "nodes": ["gw2", "msg"], "edges": [["gw2", "msg"]] }
+      ]
+    },
+    {
+      "name": "Send to an offline user",
+      "steps": [
+        { "say": "The message reaches the message service the same way as before.", "nodes": ["client", "lb", "gw", "msg"], "edges": [["client", "lb"], ["lb", "gw"], ["gw", "msg"]] },
+        { "say": "It is stored first. From this point the message cannot be lost.", "nodes": ["msg", "db"], "edges": [["msg", "db"]] },
+        { "say": "The registry has no entry for the recipient, or the entry expired. They are offline.", "nodes": ["msg", "registry"], "edges": [["msg", "registry"]] },
+        { "say": "The message service hands the push service a short alert, not the full text.", "nodes": ["msg", "push"], "edges": [["msg", "push"]] },
+        { "say": "The push service sends it to the phone provider, which wakes the phone.", "nodes": ["push", "apns"], "edges": [["push", "apns"]] },
+        { "say": "The user opens the app. It connects and says 'my last seen sequence is 41'.", "nodes": ["client", "lb", "gw2"], "edges": [["client", "lb"], ["lb", "gw2"]] },
+        { "say": "The message service reads sequences 42 and up from the store.", "nodes": ["gw2", "msg", "db"], "edges": [["gw2", "msg"], ["msg", "db"]] },
+        { "say": "It sends them down the socket. The app acknowledges the highest one, and the sender sees 'delivered'.", "nodes": ["msg", "gw2", "lb", "client"], "edges": [["lb", "gw2"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Polling, long polling or WebSocket",
+      "question": "How does a message get from the server to a phone quickly?",
+      "options": [
+        { "name": "Short polling", "pros": "Plain HTTP. Works through every proxy and is easy to build.", "cons": "Most requests return nothing. Delay is up to the poll interval. Costly at scale." },
+        { "name": "Long polling", "pros": "Still plain HTTP, and near-instant delivery. Few empty replies.", "cons": "Each message costs a new request and a reconnect. Headers are repeated. Servers still hold a request per user." },
+        { "name": "WebSocket", "pros": "One connection, both directions, tiny frames. Server can push at any time.", "cons": "Stateful: a gateway holds the user. Needs heartbeats, reconnect logic and a registry." }
+      ],
+      "pick": "WebSocket, with long polling as a fallback",
+      "because": "Chat is two-way and frequent, so one open connection is the cheapest. The cost is state, which the registry and reconnect-with-resume handle."
+    },
+    {
+      "title": "Ordering and ids",
+      "question": "How do we make every device show the same order, and make retries safe?",
+      "options": [
+        { "name": "Wall-clock timestamps", "pros": "Trivial, and no coordination.", "cons": "Device clocks drift and servers disagree by milliseconds. Two messages can tie or swap." },
+        { "name": "One global counter", "pros": "A total order across everything.", "cons": "A single bottleneck and failure point, and nobody needs order between unrelated chats." },
+        { "name": "Per-conversation sequence plus a client msgId", "pros": "Order only where it matters. The counter lives with the conversation's partition. msgId makes writes idempotent.", "cons": "Needs one writer per conversation at a time. Order across conversations is undefined." }
+      ],
+      "pick": "Per-conversation sequence, with client msgId",
+      "because": "Users only care that one conversation is in order. A counter per conversation scales with partitions. Time-sortable ids can still be used as the msgId, but the sequence decides the order."
+    },
+    {
+      "title": "Where messages live",
+      "question": "Which store holds billions of messages, and how is history paged?",
+      "options": [
+        { "name": "Relational database", "pros": "Familiar. Rich queries and transactions.", "cons": "One table of trillions of rows. Sharding by hand is painful, and hot chats bring hot rows." },
+        { "name": "Wide-column or log-structured store", "pros": "Partition by conversation, sorted by sequence. Appends are cheap and a page of history is one range read.", "cons": "Few joins and weak ad hoc queries. Need to design around the access pattern." }
+      ],
+      "pick": "Wide-column store, partition key convId, sort key seq",
+      "because": "Every query is 'the last 50 in this conversation' or 'everything after seq N'. Both are range reads. Page with a cursor: pass the oldest seq you have and ask for the 50 before it. Offsets drift when new messages arrive."
+    },
+    {
+      "title": "Group fan-out",
+      "question": "When someone posts to a group, who does the work?",
+      "options": [
+        { "name": "Fan out on send", "pros": "Each online member gets a push right away.", "cons": "A 100K-member channel means 100K deliveries per message." },
+        { "name": "Members pull from the log", "pros": "One write. Members read the conversation when they open it.", "cons": "Nothing is pushed live, so it feels slow without a nudge." }
+      ],
+      "pick": "Fan out for small groups, pull for big channels",
+      "because": "Cap fan-out, say at a few hundred members. Above that, store once, tell online members 'new messages in convId' and let them fetch."
+    }
+  ],
+  "failures": [
+    { "what": "A gateway crashes", "impact": "Every socket it held drops, maybe 100K users, and they all reconnect at once.", "fix": "Clients reconnect with jittered backoff and send lastSeq, and the new gateway replays what was missed. Registry entries expire by TTL. Limit connect rate per gateway." },
+    { "what": "Registry entry is stale", "impact": "A message is published to a gateway that no longer holds the user, so it goes nowhere.", "fix": "Never treat the registry as truth for delivery. The store has the message anyway, so the user catches up on reconnect. Refresh entries with heartbeats and a short TTL." },
+    { "what": "Duplicate delivery", "impact": "A retry or a lost ack makes the same message arrive twice.", "fix": "Delivery is at least once by design. The client msgId makes the write idempotent, and the app drops any msgId it has already shown." },
+    { "what": "A slow consumer", "impact": "A phone on a bad network lets its socket buffer fill, and the gateway's memory grows.", "fix": "Bound each socket's send buffer. When it is full, stop pushing, drop to offline mode and close the socket. The client catches up by sequence." },
+    { "what": "Message store partition is hot", "impact": "A huge busy conversation overloads one partition.", "fix": "Bucket a conversation's partition by time, for example convId plus month. Cache the latest page. Rate limit senders." }
+  ],
+  "scaling": [
+    { "limit": "Gateways are limited by memory and file descriptors per machine", "lever": "Tune per-connection memory, then add more gateways. The registry and bus are the only shared parts." },
+    { "limit": "The registry holds every online user", "lever": "Shard it by user id with consistent hashing. Entries are small, so 10M users fit in a few GB." },
+    { "limit": "Users in many regions", "lever": "Run gateway clusters per region. Route cross-region messages over the bus, and keep each conversation's writer in one home region." }
+  ],
+  "recap": {
+    "key": "Keep long-lived sockets on a gateway fleet, store every message by conversation with a sequence number, and treat delivery as at-least-once with idempotent writes.",
+    "numbers": "About 50K messages per second on average and 150K at peak for 100M daily users. Around 10M sockets, so 100 gateways at 100K each. Hundreds of TB per year.",
+    "moves": ["Replace polling with WebSocket gateways", "Order per conversation by sequence number, never by clock", "Find the recipient via the registry and route over pub-sub", "Store first, then push or deliver, and resume from the last seen sequence"]
+  }
+}
