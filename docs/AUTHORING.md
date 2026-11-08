@@ -17,7 +17,7 @@ src/problems/<slug>/
   Demo.vue                  only when idea.demo is "custom"
   ts/<variant>.ts           the traced reference solution. This is also the TypeScript shown on the page
   ts/<variant>.driver.ts    OPTIONAL. Test/trace adapter. Never shown
-  go/<variant>.go           Go solution, shown on the page, `package <slug_with_underscores>`
+  go/<variant>.go           Go solution, shown on the page, `package <name>` where name is the slug with `-` replaced by `_`, prefixed with `p_` when the slug starts with a digit (`3sum` becomes `p_3sum`)
   go/<variant>.driver.go    OPTIONAL. Go adapter. Never shown
   pseudo/<variant>.txt      pseudocode, shown on the page
 ```

@@ -35,7 +35,7 @@ for (const size of sizes) {
         const errors = watchConsole(page)
         await page.goto(`./#/p/${slug}`)
         await expect(page.locator('h1')).toBeVisible()
-        await expect(page.getByRole('button', { name: 'Next' })).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeVisible()
 
         // step to the end
         const next = page.getByRole('button', { name: 'Next', exact: true })

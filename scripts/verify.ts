@@ -20,6 +20,8 @@ const eq = (a: number[], b: number[]) => a.join() === b.join()
 const readyForGo: { meta: ReadyMeta; pkg: string }[] = []
 const status = new Map<string, 'ready' | 'draft'>()
 
+/** Go package name: the slug with - as _, and a p_ prefix when it starts with a digit (3sum -> p_3sum). */
+const pkgOf = (slug: string) => (/^[0-9]/.test(slug) ? 'p_' : '') + slug.replaceAll('-', '_')
 const argv = process.argv.slice(2)
 const onlyArg = argv.find((a) => a.startsWith('--only='))?.slice(7)
 const only = onlyArg ? new Set(onlyArg.split(',').filter(Boolean)) : null
@@ -71,7 +73,7 @@ for (const slug of slugs) {
     const tsRaw = readFileSync(paths.ts, 'utf8')
     for (const l of badTraceLines(tsRaw)) fail(slug, `${v.id}: tracer call must be one complete line: ${l.trim().slice(0, 60)}`)
     const goRaw = readFileSync(paths.go, 'utf8')
-    const pkg = slug.replaceAll('-', '_')
+    const pkg = pkgOf(slug)
     if (!goRaw.startsWith(`package ${pkg}\n`)) fail(slug, `${v.id}: Go file must start with "package ${pkg}"`)
     const got = {
       pseudo: stagesIn(readFileSync(paths.pseudo, 'utf8')),
@@ -123,7 +125,7 @@ for (const slug of slugs) {
       }
     }
   }
-  readyForGo.push({ meta, pkg: slug.replaceAll('-', '_') })
+  readyForGo.push({ meta, pkg: pkgOf(slug) })
 }
 
 // ---- Go: copy sources, generate tests from cases.json, gofmt, vet, test
@@ -144,13 +146,13 @@ for (const { meta, pkg } of readyForGo) {
     if (existsSync(gd)) writeFileSync(join(out, `${v.id}.driver.go`), readFileSync(gd))
   }
   const tests = meta.variants.map((v) => {
-    const decls = meta.goArgs.map((t, i) => `\t\t\tvar a${i} ${t}\n\t\t\tdecode(t, c.Input[${i}], &a${i})`).join('\n')
+    const decls = meta.goArgs.map((t, i) => `\t\t\tvar a${i} ${t}\n\t\t\trcDecode(t, c.Input[${i}], &a${i})`).join('\n')
     const args = meta.goArgs.map((_, i) => `a${i}`).join(', ')
     return `func Test${cap(v.goFn)}(t *testing.T) {
-	for _, c := range loadCases(t) {
+	for _, c := range rcLoadCases(t) {
 		t.Run(c.Name, func(t *testing.T) {
 ${decls}
-			check(t, ${v.goFn}(${args}), c.Expected)
+			rcCheck(t, ${v.goFn}(${args}), c.Expected)
 		})
 	}
 }
@@ -168,36 +170,36 @@ import (
 	"testing"
 )
 
-const mode = "${meta.compare}"
+const rcMode = "${meta.compare}"
 
-type testCase struct {
+type rcCase struct {
 	Name     string            \`json:"name"\`
 	Input    []json.RawMessage \`json:"input"\`
 	Expected json.RawMessage   \`json:"expected"\`
 }
 
-func loadCases(t *testing.T) []testCase {
+func rcLoadCases(t *testing.T) []rcCase {
 	t.Helper()
 	raw, err := os.ReadFile("cases.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var cases []testCase
+	var cases []rcCase
 	if err := json.Unmarshal(raw, &cases); err != nil {
 		t.Fatal(err)
 	}
 	return cases
 }
 
-func decode(t *testing.T, raw json.RawMessage, into any) {
+func rcDecode(t *testing.T, raw json.RawMessage, into any) {
 	t.Helper()
 	if err := json.Unmarshal(raw, into); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// generic turns any Go value into plain JSON data. A nil slice and an empty slice both become [].
-func generic(t *testing.T, v any) any {
+// rcGeneric turns any Go value into plain JSON data. A nil slice and an empty slice both become [].
+func rcGeneric(t *testing.T, v any) any {
 	t.Helper()
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -207,63 +209,63 @@ func generic(t *testing.T, v any) any {
 	if err := json.Unmarshal(b, &out); err != nil {
 		t.Fatal(err)
 	}
-	return fixNil(out)
+	return rcFixNil(out)
 }
 
-func fixNil(v any) any {
+func rcFixNil(v any) any {
 	switch x := v.(type) {
 	case nil:
 		return []any{}
 	case []any:
 		for i := range x {
-			x[i] = fixNil(x[i])
+			x[i] = rcFixNil(x[i])
 		}
 	}
 	return v
 }
 
-func key(v any) string {
+func rcKey(v any) string {
 	b, _ := json.Marshal(v)
 	return string(b)
 }
 
-func less(a, b any) bool {
+func rcLess(a, b any) bool {
 	if x, ok := a.(float64); ok {
 		return x < b.(float64)
 	}
 	return a.(string) < b.(string)
 }
 
-func normalize(v any) any {
-	switch mode {
+func rcNormalize(v any) any {
+	switch rcMode {
 	case "sortedFlat":
 		xs := v.([]any)
-		sort.Slice(xs, func(i, j int) bool { return less(xs[i], xs[j]) })
+		sort.Slice(xs, func(i, j int) bool { return rcLess(xs[i], xs[j]) })
 	case "sortedGroups":
 		gs := v.([]any)
 		for _, g := range gs {
 			inner := g.([]any)
-			sort.Slice(inner, func(i, j int) bool { return less(inner[i], inner[j]) })
+			sort.Slice(inner, func(i, j int) bool { return rcLess(inner[i], inner[j]) })
 		}
-		sort.Slice(gs, func(i, j int) bool { return key(gs[i]) < key(gs[j]) })
+		sort.Slice(gs, func(i, j int) bool { return rcKey(gs[i]) < rcKey(gs[j]) })
 	}
 	return v
 }
 
-func check(t *testing.T, got any, expected json.RawMessage) {
+func rcCheck(t *testing.T, got any, expected json.RawMessage) {
 	t.Helper()
 	var want any
-	decode(t, expected, &want)
-	if mode == "approx" {
-		g, w := generic(t, got).(float64), fixNil(want).(float64)
+	rcDecode(t, expected, &want)
+	if rcMode == "approx" {
+		g, w := rcGeneric(t, got).(float64), rcFixNil(want).(float64)
 		if math.Abs(g-w) > 1e-5*math.Max(1, math.Abs(w)) {
 			t.Fatalf("got %v, want %v", g, w)
 		}
 		return
 	}
-	g, w := normalize(generic(t, got)), normalize(fixNil(want))
+	g, w := rcNormalize(rcGeneric(t, got)), rcNormalize(rcFixNil(want))
 	if !reflect.DeepEqual(g, w) {
-		t.Fatalf("got %s, want %s", key(g), key(w))
+		t.Fatalf("got %s, want %s", rcKey(g), rcKey(w))
 	}
 }
 

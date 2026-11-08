@@ -120,7 +120,8 @@ watch(() => props.run, () => pick(0))
 .bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-bottom: 14px; }
 .bar span { display: block; height: 100%; background: var(--accent); transition: width .2s; }
 .say { display: flex; gap: 10px; align-items: flex-start; font-size: 1.05rem; margin: 0 0 10px; min-height: 3.4em; }
-.result { margin: 0 0 10px; }
+.result { margin: 0 0 10px; min-width: 0; }
+.result code { display: inline-block; max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; }
 .warn { color: var(--miss-fg); margin: 0 0 8px; }
 .stages { list-style: none; margin: 0; padding: 10px 0 0; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px; }
 .stages li { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 6px; border-radius: 999px; font-size: .82rem; color: var(--ink-2); border: 1px solid var(--line); }
