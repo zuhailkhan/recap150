@@ -5,18 +5,18 @@ defineProps<{ example: ReadyMeta['example'] }>()
 </script>
 
 <template>
-  <div class="ex card">
-    <div class="side"><span class="tag">Input</span><PanelView v-for="(p, i) in example.input" :key="i" :panel="p" /></div>
-    <div class="arrow" aria-hidden="true">↓</div>
-    <div class="side"><span class="tag">Output</span><PanelView v-for="(p, i) in example.output" :key="i" :panel="p" /></div>
-    <p class="cap small muted">{{ example.caption }}</p>
-  </div>
+  <figure class="ex">
+    <div class="row"><span class="tag">in</span><div class="panels"><PanelView v-for="(p, i) in example.input" :key="i" :panel="p" /></div></div>
+    <div class="row"><span class="tag out">out</span><div class="panels"><PanelView v-for="(p, i) in example.output" :key="i" :panel="p" /></div></div>
+    <figcaption class="cap small muted">{{ example.caption }}</figcaption>
+  </figure>
 </template>
 
 <style scoped>
-.ex { display: grid; gap: 10px; }
-.side { display: grid; gap: 8px; min-width: 0; }
-.tag { font: 700 .72rem var(--font-body); text-transform: uppercase; letter-spacing: .1em; color: var(--accent); }
-.arrow { color: var(--ink-2); font-size: 1.2rem; line-height: 1; }
+.ex { margin: 0; display: grid; gap: 14px; padding: 18px 20px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; align-items: start; min-width: 0; }
+.row + .row { padding-top: 14px; border-top: 1px dashed var(--line); }
+.tag { font: 600 .78rem var(--font-mono); color: var(--ink-3); }
+.panels { display: grid; gap: 12px; min-width: 0; }
 .cap { margin: 0; }
 </style>

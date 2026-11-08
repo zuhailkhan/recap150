@@ -50,25 +50,25 @@ watch(() => route.fullPath, () => (drawer.value = false))
 </template>
 
 <style>
-.skip { position: absolute; left: -999px; top: 8px; z-index: 100; background: var(--accent); color: var(--accent-ink); padding: 10px 14px; border-radius: 8px; }
+.skip { position: absolute; left: -999px; top: 8px; z-index: 100; background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 8px; }
 .skip:focus { left: 8px; }
 .shell { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 100dvh; }
 .app-col { min-width: 0; display: flex; flex-direction: column; }
-.appbar { display: flex; align-items: center; gap: 6px; padding: 6px var(--gutter); border-bottom: 1px solid var(--line); background: var(--bg); position: sticky; top: 0; z-index: 20; min-height: 56px; }
-.appbar .brand { font: 700 1.3rem var(--font-head); color: var(--ink); text-decoration: none; }
-.appbar .brand span { color: var(--accent); }
+.appbar { display: flex; align-items: center; gap: 4px; padding: 6px var(--gutter); border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 20; min-height: 56px; }
+.appbar .brand { font: 760 1.35rem var(--font-head); letter-spacing: -0.04em; color: var(--ink); text-decoration: none; }
+.appbar .brand span { font: 500 .9em var(--font-mono); letter-spacing: -0.04em; color: var(--ink-3); margin-left: 1px; }
 .app-grow { flex: 1; }
-main { padding: 24px var(--gutter) 72px; min-width: 0; outline: none; }
+main { padding: 28px var(--gutter) 88px; min-width: 0; outline: none; }
 .app-banner { margin: 0; padding: 10px var(--gutter); background: var(--miss-bg); color: var(--miss-fg); font-size: .9rem; }
 .app-nav { position: fixed; z-index: 40; inset: 0 auto 0 0; width: min(88vw, 340px); background: var(--surface); border-right: 1px solid var(--line); overflow-y: auto; overscroll-behavior: contain; visibility: hidden; transform: translateX(-100%); transition: transform .2s, visibility .2s; }
 .app-nav.open { visibility: visible; transform: none; }
-.scrim { position: fixed; inset: 0; z-index: 30; background: rgb(0 0 0 / 45%); }
+.scrim { position: fixed; inset: 0; z-index: 30; background: rgb(6 10 15 / 55%); }
 @media (min-width: 1024px) {
-  .shell { grid-template-columns: 300px minmax(0, 1fr); }
+  .shell { grid-template-columns: 296px minmax(0, 1fr); }
   .app-nav { position: sticky; top: 0; height: 100dvh; width: auto; visibility: visible; transform: none; z-index: 1; }
   .appbar .menu, .appbar .brand { display: none; }
   .appbar { justify-content: flex-end; padding-inline: 40px; }
-  main { padding: 36px 40px 96px; }
+  main { padding: 40px 40px 120px; }
 }
 @media (min-width: 1700px) { main { padding-inline: 64px; } }
 </style>

@@ -78,15 +78,17 @@ async function wipe() {
 </template>
 
 <style scoped>
-.st { max-width: 720px; display: grid; gap: 16px; }
+.st { max-width: 720px; display: grid; gap: 28px; }
 .st h1, .st p { margin: 0; }
-.card { display: grid; gap: 10px; } .card h2 { margin: 0; }
+.card { display: grid; gap: 12px; padding: 0 0 24px; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
+.card h2 { margin: 0; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; }
-fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 4px; }
-.opt { display: flex; gap: 8px; align-items: center; min-height: 44px; }
-.opt input { width: 20px; height: 20px; accent-color: var(--accent); }
-textarea { width: 100%; font: .85rem var(--font-mono); padding: 10px; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; resize: vertical; }
-.msg { padding: 10px 12px; border-radius: 10px; background: var(--hit-bg); color: var(--hit-fg); border: 2px solid var(--hit-bd); }
+fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 2px; }
+.opt { display: flex; gap: 10px; align-items: center; min-height: 44px; }
+.opt input { width: 20px; height: 20px; accent-color: var(--ink); }
+textarea { width: 100%; font: .85rem var(--font-mono); padding: 12px; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--radius-s); resize: vertical; }
+.msg { padding: 12px 14px; border-radius: var(--radius-s); background: var(--hit-bg); color: var(--hit-fg); border: 1.5px solid var(--hit-bd); }
 .msg.err { background: var(--miss-bg); color: var(--miss-fg); border-color: var(--miss-bd); }
 .danger { color: var(--miss-fg); border-color: var(--miss-bd); }
+.danger:hover:not(:disabled) { background: var(--miss-bg); border-color: var(--miss-bd); }
 </style>

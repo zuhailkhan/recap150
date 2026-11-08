@@ -12,7 +12,9 @@ const v = computed(() => props.variants.find((x) => x.id === active.value) ?? pr
   <div class="cs">
     <div v-if="variants.length > 1" class="toggle" role="group" aria-label="Approach">
       <span class="muted small">Approach</span>
-      <button v-for="x in variants" :key="x.id" type="button" class="btn sm" :class="{ primary: x.id === v.id }" :aria-pressed="x.id === v.id" @click="active = x.id">{{ x.label }}</button>
+      <div class="seg">
+        <button v-for="x in variants" :key="x.id" type="button" class="btn sm" :aria-pressed="x.id === v.id" @click="active = x.id">{{ x.label }}</button>
+      </div>
     </div>
     <div class="blocks">
       <MaskedCode lang="pseudo" label="Pseudocode" :code="v.pseudo" :stages="v.stages" />
@@ -23,7 +25,8 @@ const v = computed(() => props.variants.find((x) => x.id === active.value) ?? pr
 </template>
 
 <style scoped>
-.cs { display: grid; gap: 14px; min-width: 0; }
-.toggle { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.blocks { display: grid; gap: 14px; min-width: 0; }
+.cs { display: grid; gap: 16px; min-width: 0; }
+.toggle { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.seg { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.blocks { display: grid; gap: 16px; min-width: 0; }
 </style>

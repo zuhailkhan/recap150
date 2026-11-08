@@ -38,43 +38,41 @@ const runner = computed(() => (args: unknown[]) => runTrace(variants.value[0].fn
 
   <div v-else-if="!meta" class="wrap">
     <h1>{{ official.title }}</h1>
-    <p class="muted">{{ official.category }} · {{ official.difficulty }}</p>
-    <p>This explainer has not been written yet. It is on the list for a later pass.</p>
+    <p class="muted">{{ official.category }}, {{ official.difficulty }}</p>
+    <p>This explainer has not been written yet.</p>
     <p><a :href="leetcodeUrl(official.slug)" target="_blank" rel="noopener">Open the problem on LeetCode</a></p>
   </div>
 
   <div v-else-if="!ready" class="wrap">
     <h1>{{ meta.title }}</h1>
-    <p class="muted">{{ meta.category }} · {{ meta.difficulty }} · draft</p>
-    <p>This explainer is a draft. It is hidden from recap until it passes the quality checks.</p>
+    <p class="muted">{{ meta.category }}, {{ meta.difficulty }}, draft</p>
+    <p>This explainer is a draft. It stays out of recap until it passes the quality checks.</p>
   </div>
 
   <article v-else class="problem">
     <header class="hd">
       <div class="hd-text">
-        <div class="chips"><span class="chip">{{ ready.category }}</span><span class="chip" :class="ready.difficulty">{{ ready.difficulty }}</span></div>
+        <p class="meta"><span class="cat">{{ ready.category }}</span><span class="chip" :class="ready.difficulty">{{ ready.difficulty }}</span></p>
         <h1>{{ ready.title }}</h1>
         <p class="statement">{{ ready.statement }}</p>
         <p class="links small">
-          <a :href="leetcodeUrl(ready.slug)" target="_blank" rel="noopener">Original problem on LeetCode</a>
-          <template v-if="official?.video"> · <a :href="videoUrl(official.video)" target="_blank" rel="noopener">NeetCode video</a></template>
-          · <a :href="NEETCODE_LIST_URL" target="_blank" rel="noopener">NeetCode 150 list</a>
+          <a :href="leetcodeUrl(ready.slug)" target="_blank" rel="noopener">Original problem</a>
+          <a v-if="official?.video" :href="videoUrl(official.video)" target="_blank" rel="noopener">NeetCode video</a>
+          <a :href="NEETCODE_LIST_URL" target="_blank" rel="noopener">NeetCode 150</a>
         </p>
       </div>
       <ExampleVisual :example="ready.example" />
     </header>
 
-    <section id="idea" aria-labelledby="h-idea">
-      <h2 id="h-idea">The one idea</h2>
-      <div class="two">
-        <div>
-          <p class="idea">{{ ready.idea.sentence }}</p>
-          <dl v-if="ready.idea.jargon.length" class="jargon small">
-            <template v-for="j in ready.idea.jargon" :key="j.term"><dt>{{ j.term }}</dt><dd>{{ j.plain }}</dd></template>
-          </dl>
-        </div>
-        <div class="card"><component :is="ready.idea.demo === 'custom' ? customDemo(ready.slug) : DEMOS[ready.idea.demo]" /></div>
+    <section id="idea" aria-labelledby="h-idea" class="idea-sec">
+      <div class="idea-text">
+        <h2 id="h-idea" class="sr-only">The one idea</h2>
+        <p class="idea">{{ ready.idea.sentence }}</p>
+        <dl v-if="ready.idea.jargon.length" class="jargon small">
+          <template v-for="j in ready.idea.jargon" :key="j.term"><dt>{{ j.term }}</dt><dd>{{ j.plain }}</dd></template>
+        </dl>
       </div>
+      <div class="card demo stage"><component :is="ready.idea.demo === 'custom' ? customDemo(ready.slug) : DEMOS[ready.idea.demo]" /></div>
     </section>
 
     <section id="watch" aria-labelledby="h-watch">
@@ -84,71 +82,90 @@ const runner = computed(() => (args: unknown[]) => runTrace(variants.value[0].fn
       <p v-else class="muted">Loading…</p>
     </section>
 
-    <section id="fast" aria-labelledby="h-fast">
-      <h2 id="h-fast">Why it's fast</h2>
-      <div class="two">
-        <div class="card"><ComplexityPlay :fast="ready.fast" /></div>
-        <div class="tbl">
-          <table>
-            <thead><tr><th>Approach</th><th>Time</th><th>Space</th></tr></thead>
-            <tbody>
-              <tr v-for="r in ready.fast.rows" :key="r.name">
-                <th scope="row" data-label="Approach">{{ r.name }}<span class="note small muted">{{ r.note }}</span></th>
-                <td data-label="Time"><code>{{ r.time }}</code></td>
-                <td data-label="Space"><code>{{ r.space }}</code></td>
-              </tr>
-            </tbody>
-          </table>
+    <section id="fast" class="sec" aria-labelledby="h-fast">
+      <div class="sec-h"><h2 id="h-fast">Why it's fast</h2><p class="muted small">Brute force against the real approach, then the cost table.</p></div>
+      <div class="sec-b">
+        <div class="two">
+          <div class="plain"><ComplexityPlay :fast="ready.fast" /></div>
+          <div class="tbl">
+            <table>
+              <thead><tr><th>Approach</th><th>Time</th><th>Space</th></tr></thead>
+              <tbody>
+                <tr v-for="r in ready.fast.rows" :key="r.name">
+                  <th scope="row" data-label="Approach">{{ r.name }}<span class="note small muted">{{ r.note }}</span></th>
+                  <td data-label="Time"><code>{{ r.time }}</code></td>
+                  <td data-label="Space"><code>{{ r.space }}</code></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
+        <p class="takeaway">{{ ready.fast.takeaway }}</p>
       </div>
-      <p class="takeaway">{{ ready.fast.takeaway }}</p>
     </section>
 
-    <section id="code" aria-labelledby="h-code">
-      <h2 id="h-code">Code</h2>
-      <p class="muted small">Each language is hidden until you ask. Try to write it in your head first. The numbers match the stages in the stepper.</p>
-      <CodeSection v-if="variants.length" :variants="variants" />
+    <section id="code" class="sec" aria-labelledby="h-code">
+      <div class="sec-h"><h2 id="h-code">Code</h2><p class="muted small">Each language stays hidden until you ask. Try writing it in your head first. The badges match the stages in the stepper.</p></div>
+      <div class="sec-b"><CodeSection v-if="variants.length" :variants="variants" /></div>
     </section>
 
-    <section id="edges" aria-labelledby="h-edges">
-      <h2 id="h-edges">Edge cases and gotchas</h2>
-      <EdgeCards :edges="ready.edges" :gotchas="ready.gotchas" />
+    <section id="edges" class="sec" aria-labelledby="h-edges">
+      <div class="sec-h"><h2 id="h-edges">Edge cases and gotchas</h2><p class="muted small">Inputs that break the obvious solution, and traps in the languages.</p></div>
+      <div class="sec-b"><EdgeCards :edges="ready.edges" :gotchas="ready.gotchas" /></div>
     </section>
 
-    <section id="recap" aria-labelledby="h-recap">
-      <h2 id="h-recap">30-second recap</h2>
-      <RecapCard :recap="ready.recap" />
+    <section id="recap" class="sec" aria-labelledby="h-recap">
+      <div class="sec-h"><h2 id="h-recap">30-second recap</h2><p class="muted small">What to remember tomorrow.</p></div>
+      <div class="sec-b"><RecapCard :recap="ready.recap" /></div>
     </section>
   </article>
 </template>
 
 <style scoped>
 .wrap { max-width: 720px; }
-.problem { display: grid; gap: 40px; max-width: 1180px; min-width: 0; }
+.problem { display: grid; gap: 56px; max-width: 1240px; min-width: 0; }
 section { min-width: 0; }
-.hd { display: grid; gap: 18px; min-width: 0; }
-@media (min-width: 980px) { .hd { grid-template-columns: minmax(0, 1.2fr) minmax(300px, 1fr); gap: 32px; align-items: start; } }
-.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.statement { font-size: 1.1rem; max-width: 62ch; }
-.links { margin: 0; }
-.two { display: grid; gap: 16px; min-width: 0; }
-@media (min-width: 980px) { .two { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 28px; align-items: start; } }
-.idea { font: 600 clamp(1.15rem, 1rem + .8vw, 1.5rem) var(--font-head); line-height: 1.4; margin-bottom: 14px; }
-.jargon { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; }
-.jargon dt { font-weight: 700; } .jargon dd { margin: 0; color: var(--ink-2); }
-.takeaway { margin: 14px 0 0; font-weight: 600; }
+.hd { display: grid; gap: 28px; min-width: 0; }
+@media (min-width: 1020px) { .hd { grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr); gap: 56px; align-items: start; } }
+.meta { display: flex; align-items: center; gap: 18px; margin: 0 0 14px; font-size: .9rem; color: var(--ink-2); }
+.cat { font-weight: 560; color: var(--ink); }
+.hd h1 { margin-bottom: .3em; }
+.statement { font-size: 1.18rem; line-height: 1.55; max-width: 58ch; color: var(--ink); }
+.links { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 22px; }
+
+.idea-sec { display: grid; gap: 22px; align-items: stretch; }
+@media (min-width: 1020px) { .idea-sec { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 56px; align-items: center; } }
+.idea { font: 560 clamp(1.4rem, 1.05rem + 1.4vw, 2.1rem)/1.22 var(--font-head); letter-spacing: -0.022em; margin: 0 0 18px; text-wrap: balance; max-width: 26ch; }
+.jargon { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; max-width: 56ch; }
+.jargon dt { font: 600 .82rem var(--font-mono); padding-top: 1px; }
+.jargon dd { margin: 0; color: var(--ink-2); }
+.demo { padding: 22px; border-radius: 14px; }
+
+#watch > h2 { margin-bottom: 16px; }
+
+/* editorial sections: a heading rail on wide screens, stacked on narrow ones */
+.sec { display: grid; gap: 18px; }
+.sec-h h2 { margin-bottom: .3em; }
+.sec-h p { margin: 0; max-width: 34ch; }
+@media (min-width: 1280px) { .sec { grid-template-columns: 230px minmax(0, 1fr); gap: 44px; } .sec-h { position: sticky; top: 76px; align-self: start; } }
+.sec-b { min-width: 0; }
+
+.two { display: grid; gap: 28px; min-width: 0; }
+@media (min-width: 980px) { .two { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 40px; align-items: start; } }
+.plain { min-width: 0; }
+.takeaway { margin: 22px 0 0; font: 560 1.15rem/1.4 var(--font-head); letter-spacing: -0.012em; max-width: 56ch; }
 .warn { color: var(--miss-fg); }
 .tbl { min-width: 0; }
-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
-thead th { background: var(--surface-2); font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; }
-tbody th { font-weight: 700; }
-.note { display: block; font-weight: 400; margin-top: 2px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 12px 12px 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+thead th { font: 500 .8rem var(--font-ui); color: var(--ink-3); padding-top: 0; }
+tbody th { font-weight: 640; }
+.note { display: block; font-weight: 400; margin-top: 3px; max-width: 40ch; }
 @media (max-width: 560px) {
   thead { display: none; }
   tr, tbody th, td { display: block; }
-  td { border: 0; padding-top: 2px; } td::before { content: attr(data-label) ': '; color: var(--ink-2); font-size: .8rem; }
+  td { border: 0; padding: 2px 0 0; } td::before { content: attr(data-label) ': '; color: var(--ink-3); font-size: .8rem; }
   tbody th { border: 0; padding-bottom: 2px; }
-  tr { border-bottom: 1px solid var(--line); padding: 6px 0; }
+  tr { border-bottom: 1px solid var(--line); padding: 8px 0; }
 }
 </style>

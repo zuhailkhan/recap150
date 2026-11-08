@@ -23,7 +23,7 @@ let timer: ReturnType<typeof setInterval> | undefined
 const last = computed(() => trace.value.frames.length - 1)
 const frame = computed(() => trace.value.frames[idx.value])
 const atEnd = computed(() => idx.value >= last.value)
-const pct = computed(() => (last.value <= 0 ? 100 : Math.round(((idx.value + 1) / (last.value + 1)) * 100)))
+const pct = computed(() => (last.value <= 0 ? 100 : (idx.value / last.value) * 100))
 const resultText = computed(() => {
   if (trace.value.error) return `Error: ${trace.value.error}`
   return trace.value.result === undefined ? '' : JSON.stringify(trace.value.result)
@@ -33,6 +33,7 @@ function stop() { playing.value = false; if (timer) clearInterval(timer); timer 
 function next() { if (idx.value < last.value) idx.value++; else stop() }
 function back() { stop(); if (idx.value > 0) idx.value-- }
 function reset() { stop(); idx.value = 0 }
+function seek(e: Event) { stop(); idx.value = Number((e.target as HTMLInputElement).value) }
 function play() {
   if (playing.value) return stop()
   if (atEnd.value) idx.value = 0
@@ -65,38 +66,28 @@ watch(() => props.run, () => pick(0))
 </script>
 
 <template>
-  <div class="stepper">
-    <div class="visual card">
+  <div class="stepper stage">
+    <div class="viz">
       <Legend />
       <div class="panels">
         <PanelView v-for="(p, i) in frame.panels" :key="i" :panel="p" />
       </div>
     </div>
 
-    <div class="side">
-      <div class="narr card" aria-live="polite">
-        <div class="count">Step {{ idx + 1 }} of {{ last + 1 }}</div>
-        <div class="bar" role="progressbar" aria-label="Progress through the run" :aria-valuenow="idx + 1" aria-valuemin="1" :aria-valuemax="last + 1"><span :style="{ width: pct + '%' }"></span></div>
-        <p class="say"><span class="badge">{{ frame.stage }}</span><span>{{ frame.say }}</span></p>
-        <p v-if="atEnd && resultText" class="result"><span class="muted small">Returns</span> <code>{{ resultText }}</code></p>
-        <p v-if="atEnd && trace.truncated" class="warn small">The run was cut off to keep this readable. Try a smaller input.</p>
-        <p v-if="trace.error" class="warn small" role="alert">{{ trace.error }}</p>
-        <ul class="stages" aria-label="Stages in the code">
-          <li v-for="s in stages" :key="s.n" :class="{ on: s.n === frame.stage }"><span class="badge sm">{{ s.n }}</span>{{ s.title }}</li>
-        </ul>
-      </div>
+    <div class="say-area" aria-live="polite">
+      <p class="say"><span class="badge">{{ frame.stage }}</span><span>{{ frame.say }}</span></p>
+      <p v-if="atEnd && resultText" class="result"><span class="muted small">returns</span> <code>{{ resultText }}</code></p>
+      <p v-if="atEnd && trace.truncated" class="warn small">The run was cut off to keep this readable. Try a smaller input.</p>
+      <p v-if="trace.error" class="warn small" role="alert">{{ trace.error }}</p>
+      <ul class="stages" aria-label="Stages in the code">
+        <li v-for="s in stages" :key="s.n" :class="{ on: s.n === frame.stage }"><span class="n">{{ s.n }}</span>{{ s.title }}</li>
+      </ul>
+    </div>
 
-      <div class="ctl">
-        <button class="btn" type="button" :disabled="idx === 0" @click="back">Back</button>
-        <button class="btn primary" type="button" :disabled="atEnd" @click="stop(); next()">Next</button>
-        <button class="btn" type="button" @click="play">{{ playing ? 'Pause' : 'Play' }}</button>
-        <button class="btn quiet" type="button" @click="reset">Reset</button>
-      </div>
-      <p class="keys muted small">Keys: <kbd>←</kbd> <kbd>→</kbd> step, <kbd>Space</kbd> play, <kbd>R</kbd> reset.</p>
-
+    <div class="more">
       <div class="presets" role="group" aria-label="Example inputs">
-        <span class="muted small">Examples</span>
-        <button v-for="(p, i) in presets" :key="p.label" type="button" class="btn sm" :class="{ primary: presetIdx === i }" :aria-pressed="presetIdx === i" @click="pick(i)">{{ p.label }}</button>
+        <span class="muted small">Try</span>
+        <button v-for="(p, i) in presets" :key="p.label" type="button" class="btn sm" :aria-pressed="presetIdx === i" @click="pick(i)">{{ p.label }}</button>
       </div>
       <form class="custom" @submit.prevent="submitCustom">
         <label for="custom-in" class="small muted">Your own input. {{ inputHint }}</label>
@@ -107,31 +98,82 @@ watch(() => props.run, () => pick(0))
         <p v-if="customError" class="warn small" role="alert">{{ customError }}</p>
       </form>
     </div>
+
+    <div class="transport">
+      <div class="ctl">
+        <button class="btn" type="button" :disabled="idx === 0" @click="back">
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M10.5 3 5 8l5.5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>Back
+        </button>
+        <button class="btn primary" type="button" :disabled="atEnd" @click="stop(); next()">
+          Next<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M5.5 3 11 8l-5.5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
+        <button class="btn" type="button" @click="play">
+          <svg v-if="!playing" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor" /></svg>
+          <svg v-else viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z" fill="currentColor" /></svg>{{ playing ? 'Pause' : 'Play' }}
+        </button>
+        <button class="btn quiet" type="button" @click="reset">
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 8a5 5 0 1 0 1.8-3.85M3 2.5v3h3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>Reset
+        </button>
+      </div>
+      <div class="scrub">
+        <label for="scrubber" class="sr-only">Step</label>
+        <input id="scrubber" type="range" min="0" :max="last" :value="idx" :style="{ '--p': pct + '%', '--n': last + 1 }" @input="seek" />
+        <span class="count" role="status">Step <b>{{ idx + 1 }}</b> of {{ last + 1 }}</span>
+      </div>
+      <p class="keys muted small">Keys: <kbd>←</kbd> <kbd>→</kbd> step, <kbd>Space</kbd> play, <kbd>R</kbd> reset.</p>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.stepper { display: grid; gap: 14px; min-width: 0; }
-.side { display: grid; gap: 12px; align-content: start; min-width: 0; }
-@media (min-width: 1000px) { .stepper { grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr); gap: 20px; align-items: start; } .visual { position: sticky; top: 16px; } }
-.visual { display: grid; gap: 16px; min-height: 220px; align-content: start; }
-.panels { display: grid; gap: 18px; min-width: 0; }
-.count { font-weight: 700; margin-bottom: 8px; }
-.bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-bottom: 14px; }
-.bar span { display: block; height: 100%; background: var(--accent); transition: width .2s; }
-.say { display: flex; gap: 10px; align-items: flex-start; font-size: 1.05rem; margin: 0 0 10px; min-height: 3.4em; }
-.result { margin: 0 0 10px; min-width: 0; }
-.result code { display: inline-block; max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; }
-.warn { color: var(--miss-fg); margin: 0 0 8px; }
-.stages { list-style: none; margin: 0; padding: 10px 0 0; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px; }
-.stages li { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 6px; border-radius: 999px; font-size: .82rem; color: var(--ink-2); border: 1px solid var(--line); }
-.stages li.on { background: var(--accent-soft); color: var(--ink); border-color: var(--accent); font-weight: 600; }
-.ctl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; position: sticky; bottom: 8px; z-index: 5; padding: 8px; margin: 0 -8px; background: color-mix(in srgb, var(--bg) 90%, transparent); border-radius: 14px; backdrop-filter: blur(4px); }
-@media (min-width: 1000px) { .ctl { position: static; padding: 0; margin: 0; background: none; backdrop-filter: none; } }
-.keys { margin: 0; }
-@media (pointer: coarse) { .keys { display: none; } }
+.stepper { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; min-width: 0; padding: 0; overflow: clip; }
+.viz { grid-row: 1; padding: 18px 18px 22px; display: grid; gap: 18px; align-content: start; min-height: 230px; min-width: 0; }
+.panels { display: grid; gap: 22px; min-width: 0; }
+.say-area { grid-row: 2; padding: 16px 18px; border-top: 1px solid var(--line); min-width: 0; display: grid; gap: 10px; align-content: start; }
+.say { display: flex; gap: 12px; align-items: flex-start; font: 500 clamp(1.05rem, .95rem + .5vw, 1.25rem)/1.4 var(--font-ui); letter-spacing: -0.01em; margin: 0; min-height: 3.6em; }
+.say .badge { margin-top: 3px; }
+.result { margin: 0; min-width: 0; }
+.result code { display: inline-block; max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; background: var(--hit-bg); color: var(--hit-fg); }
+.warn { color: var(--miss-fg); margin: 0; }
+.stages { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.stages li { display: inline-flex; align-items: center; gap: 7px; min-height: 28px; font-size: .84rem; color: var(--ink-3); border-bottom: 2px solid transparent; }
+.stages .n { font: 600 .72rem var(--font-mono); display: inline-grid; place-items: center; min-width: 19px; height: 19px; border-radius: 5px; border: 1px solid var(--line); }
+.stages li.on { color: var(--ink); border-bottom-color: var(--ink); }
+.stages li.on .n { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.more { grid-row: 3; padding: 14px 18px 18px; border-top: 1px solid var(--line); display: grid; gap: 14px; min-width: 0; }
 .presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .custom { display: grid; gap: 6px; }
 .row { display: flex; gap: 8px; }
-input { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; font: 1rem var(--font-mono); color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; }
+input[type='text'] { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; font: 1rem var(--font-mono); color: var(--ink); background: var(--bg); border: 1.5px solid var(--line); border-radius: var(--radius-s); }
+input[type='text']::placeholder { color: var(--ink-3); }
+
+.transport { grid-row: 4; position: sticky; bottom: 0; z-index: 5; display: grid; gap: 10px; padding: 12px 18px 14px; border-top: 1px solid var(--line); background: color-mix(in srgb, #0c121a 94%, transparent); backdrop-filter: blur(6px); border-radius: 0 0 14px 14px; }
+.ctl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ctl .btn { padding: 0 8px; }
+.scrub { display: flex; align-items: center; gap: 14px; }
+.count { font: 500 .85rem var(--font-mono); color: var(--ink-2); white-space: nowrap; }
+.count b { color: var(--ink); font-weight: 700; }
+.keys { margin: 0; }
+@media (pointer: coarse) { .keys { display: none; } }
+
+/* scrubber: a thin rail with one tick per step */
+input[type='range'] { -webkit-appearance: none; appearance: none; flex: 1; min-width: 0; height: 44px; background: transparent; cursor: pointer; margin: 0; }
+input[type='range']::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background:
+  linear-gradient(90deg, var(--ink) 0 var(--p), transparent var(--p)),
+  repeating-linear-gradient(90deg, #243244 0 100%); }
+input[type='range']::-moz-range-track { height: 6px; border-radius: 3px; background: #243244; }
+input[type='range']::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--ink); }
+input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%; background: var(--ink); border: 3px solid #0c121a; box-shadow: 0 0 0 1.5px var(--ink); }
+input[type='range']::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--ink); border: 3px solid #0c121a; box-shadow: 0 0 0 1.5px var(--ink); }
+
+@media (min-width: 1000px) {
+  .stepper { grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr); }
+  .viz { grid-row: 1 / span 2; grid-column: 1; padding: 24px 26px 28px; border-right: 1px solid var(--line); }
+  .say-area { grid-row: 1; grid-column: 2; border-top: 0; padding: 24px 24px 12px; }
+  .more { grid-row: 2; grid-column: 2; border-top: 0; padding: 4px 24px 24px; align-content: start; }
+  .transport { grid-row: 3; grid-column: 1 / -1; position: static; grid-template-columns: auto 1fr auto; align-items: center; gap: 22px; padding: 12px 24px; background: #0a1017; }
+  .ctl { grid-template-columns: repeat(4, auto); }
+  .ctl .btn { padding: 0 16px; }
+  .keys { grid-column: 3; grid-row: 1; }
+}
 </style>

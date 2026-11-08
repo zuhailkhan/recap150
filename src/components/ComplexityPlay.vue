@@ -40,14 +40,15 @@ const ratio = computed(() => Math.max(1, Math.round(brute.value / Math.max(1, be
 </template>
 
 <style scoped>
-.cp { display: grid; gap: 12px; }
-.sliders { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.cp { display: grid; gap: 14px; }
+.sliders { display: flex; flex-wrap: wrap; gap: 4px 28px; }
 label { display: flex; align-items: center; gap: 10px; font: 600 .95rem var(--font-mono); min-height: 44px; }
 output { min-width: 2.5ch; text-align: right; }
-input[type='range'] { width: 180px; max-width: 100%; accent-color: var(--accent); min-height: 44px; }
+input[type='range'] { width: 180px; max-width: 100%; accent-color: var(--ink); min-height: 44px; }
 .vars { margin: 0; }
-.bars { display: grid; gap: 12px; }
-.cap { display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; margin-bottom: 4px; }
-.track { height: 18px; border-radius: 9px; background: var(--surface-2); overflow: hidden; }
-.fill { display: block; height: 100%; border-right: 2px solid; transition: width .2s; }
+.bars { display: grid; gap: 16px; }
+.cap { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: .92rem; margin-bottom: 6px; }
+.cap strong { font: 600 .95rem var(--font-mono); font-variant-numeric: tabular-nums; }
+.track { height: 14px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.fill { display: block; height: 100%; border-radius: 4px; border-right: 2px solid; transition: width .2s; }
 </style>

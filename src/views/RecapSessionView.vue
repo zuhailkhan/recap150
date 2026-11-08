@@ -69,44 +69,47 @@ const labels: Record<Grade, string> = { again: 'Again', hard: 'Hard', good: 'Goo
 
 <template>
   <div class="rs">
-    <p class="crumb small"><router-link to="/recap">← Recap</router-link> · {{ title }}</p>
+    <p class="crumb small"><router-link to="/recap">Recap</router-link> / {{ title }}</p>
 
     <p v-if="!started" class="muted">Loading your progress…</p>
 
-    <div v-else-if="!queue.length" class="card empty">
+    <div v-else-if="!queue.length" class="empty">
       <h1>Nothing to review</h1>
-      <p>No cards match this list right now. Come back when something is due, or try another mode.</p>
+      <p class="muted">No cards match this list right now. Come back when something is due, or try another mode.</p>
       <router-link class="btn primary" to="/recap">Back to recap</router-link>
     </div>
 
-    <div v-else-if="done" class="card empty">
+    <div v-else-if="done" class="empty">
       <h1>Done for now</h1>
       <p>You went through {{ tally.again + tally.hard + tally.good + tally.easy }} card{{ tally.again + tally.hard + tally.good + tally.easy === 1 ? '' : 's' }}.</p>
-      <p class="tally"><span v-for="g in GRADES" :key="g" class="chip">{{ labels[g] }} {{ tally[g] }}</span></p>
-      <p>Streak: <strong>{{ currentStreak() }}</strong> day{{ currentStreak() === 1 ? '' : 's' }}.</p>
+      <p class="tally"><span v-for="g in GRADES" :key="g" class="grade" :class="g"><b>{{ tally[g] }}</b> {{ labels[g].toLowerCase() }}</span></p>
+      <p class="muted">Streak: {{ currentStreak() }} day{{ currentStreak() === 1 ? '' : 's' }}.</p>
       <router-link class="btn primary" to="/recap">Back to recap</router-link>
     </div>
 
-    <article v-else-if="meta" class="card c">
+    <article v-else-if="meta" class="c">
       <div class="meta">
-        <span class="count">Card {{ pos + 1 }} of {{ queue.length }}</span>
-        <span class="chip">{{ meta.category }}</span><span class="chip" :class="meta.difficulty">{{ meta.difficulty }}</span>
+        <span class="count">Card <b>{{ pos + 1 }}</b> of {{ queue.length }}</span>
+        <span class="cat">{{ meta.category }}</span><span class="chip" :class="meta.difficulty">{{ meta.difficulty }}</span>
       </div>
       <div class="bar" role="progressbar" :aria-valuenow="pos" aria-valuemin="0" :aria-valuemax="queue.length" aria-label="Session progress"><span :style="{ width: (pos / queue.length) * 100 + '%' }"></span></div>
       <h1>{{ meta.title }}</h1>
       <p class="statement">{{ meta.statement }}</p>
 
       <template v-if="!revealed">
-        <p class="prompt">Try to recall the key idea, then the code. Say it out loud if you can.</p>
+        <p class="prompt">Say the key idea and the first move out loud. Then reveal.</p>
         <button class="btn primary big" type="button" @click="reveal">Show answer</button>
         <p class="muted small hint">or press <kbd>Space</kbd></p>
       </template>
 
       <template v-else>
-        <h2>Key idea</h2>
         <p class="idea">{{ meta.idea.sentence }}</p>
-        <RecapCard :recap="meta.recap" />
-        <h2 class="gap">Code</h2>
+        <div class="two">
+          <ol class="moves">
+            <li v-for="(m, i) in meta.recap.moves" :key="i"><span class="badge">{{ i + 1 }}</span>{{ m }}</li>
+          </ol>
+          <p class="cx muted">{{ meta.recap.complexity }}</p>
+        </div>
         <div v-if="code" class="blocks">
           <MaskedCode lang="pseudo" label="Pseudocode" :code="code.pseudo" :stages="code.stages" />
           <MaskedCode lang="ts" label="TypeScript" :code="code.ts" :stages="code.stages" />
@@ -114,11 +117,13 @@ const labels: Record<Grade, string> = { again: 'Again', hard: 'Hard', good: 'Goo
         </div>
         <p v-else class="muted">Loading code…</p>
 
-        <p class="rate-q">How did that go?</p>
-        <div class="rate" role="group" aria-label="Rate your recall">
-          <button v-for="(g, i) in GRADES" :key="g" type="button" class="btn rbtn" :class="g" @click="rate(g)">
-            <span>{{ labels[g] }}</span><small>{{ preview ? formatInterval(preview[g]) : '' }} · <kbd>{{ i + 1 }}</kbd></small>
-          </button>
+        <div class="dock stage" role="group" aria-label="Rate your recall">
+          <p class="q">How did that go?</p>
+          <div class="rate">
+            <button v-for="(g, i) in GRADES" :key="g" type="button" class="btn rbtn" :class="g" @click="rate(g)">
+              <span>{{ labels[g] }}</span><small>{{ preview ? formatInterval(preview[g]) : '' }} <kbd>{{ i + 1 }}</kbd></small>
+            </button>
+          </div>
         </div>
       </template>
     </article>
@@ -126,30 +131,39 @@ const labels: Record<Grade, string> = { again: 'Again', hard: 'Hard', good: 'Goo
 </template>
 
 <style scoped>
-.rs { max-width: 900px; }
-.crumb { margin: 0 0 12px; }
-.c { display: grid; gap: 12px; padding: clamp(16px, 3vw, 28px); }
-.meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.count { font-weight: 700; margin-right: auto; }
-.bar { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
-.bar span { display: block; height: 100%; background: var(--accent); }
-h1 { margin: 6px 0 0; } h2 { margin: 8px 0 0; font-size: 1.15rem; }
-.gap { margin-top: 12px; }
-.statement { font-size: 1.1rem; margin: 0; }
-.prompt { margin: 12px 0 0; padding: 14px; border: 2px dashed var(--line); border-radius: 12px; color: var(--ink-2); }
-.big { min-height: 52px; font-size: 1.05rem; }
-.hint { margin: 0; text-align: center; }
-.idea { font: 600 1.25rem var(--font-head); margin: 0; }
-.blocks { display: grid; gap: 12px; }
-.rate-q { margin: 12px 0 0; font-weight: 700; }
-.rate { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; position: sticky; bottom: 8px; padding: 8px; background: color-mix(in srgb, var(--surface) 92%, transparent); border-radius: 14px; backdrop-filter: blur(4px); }
+.rs { max-width: 880px; }
+.crumb { margin: 0 0 18px; color: var(--ink-2); }
+.c { display: grid; gap: 16px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; font-size: .9rem; color: var(--ink-2); }
+.count { margin-right: auto; font: 500 .85rem var(--font-mono); } .count b { color: var(--ink); }
+.cat { font-weight: 560; color: var(--ink); }
+.bar { height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--ink); transition: width .25s; }
+h1 { margin: 10px 0 0; font-size: clamp(2.2rem, 1.5rem + 3vw, 3.4rem); }
+.statement { font-size: 1.15rem; line-height: 1.55; margin: 0; max-width: 60ch; }
+.prompt { margin: 14px 0 0; padding: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--ink-2); font-size: 1.05rem; }
+.big { min-height: 54px; font-size: 1.05rem; justify-self: start; padding: 0 28px; }
+.hint { margin: 0; }
+.idea { font: 600 clamp(1.4rem, 1.1rem + 1.2vw, 1.9rem)/1.25 var(--font-head); letter-spacing: -0.02em; margin: 10px 0 0; padding-top: 18px; border-top: 2px solid var(--ink); max-width: 30ch; text-wrap: balance; }
+.two { display: grid; gap: 14px 40px; }
+@media (min-width: 820px) { .two { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; } }
+.moves { list-style: none; margin: 0; padding: 0; }
+.moves li { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); line-height: 1.5; }
+.moves li:first-child { padding-top: 0; }
+.cx { margin: 0; font: 500 .9rem var(--font-mono); }
+.blocks { display: grid; gap: 14px; }
+.dock { position: sticky; bottom: 10px; z-index: 6; padding: 12px 14px 14px; margin-top: 8px; display: grid; gap: 8px; }
+.q { margin: 0; font-weight: 600; font-size: .95rem; color: var(--ink-2); }
+.rate { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 @media (min-width: 640px) { .rate { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.rbtn { flex-direction: column; gap: 0; min-height: 60px; border-width: 2px; }
-.rbtn small { font-weight: 500; color: inherit; opacity: .85; }
+.rbtn { flex-direction: column; gap: 0; min-height: 58px; border-width: 1.5px; }
+.rbtn small { font: 500 .78rem var(--font-mono); opacity: .85; }
+.rbtn kbd { background: transparent; color: inherit; border-color: currentColor; opacity: .7; }
 .rbtn.again { border-color: var(--miss-bd); color: var(--miss-fg); background: var(--miss-bg); }
 .rbtn.hard { border-color: var(--focus-bd); color: var(--focus-fg); background: var(--focus-bg); }
 .rbtn.good { border-color: var(--hit-bd); color: var(--hit-fg); background: var(--hit-bg); }
 .rbtn.easy { border-color: var(--keep-bd); color: var(--keep-fg); background: var(--keep-bg); }
-.empty { display: grid; gap: 10px; justify-items: start; }
-.tally { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.empty { display: grid; gap: 14px; justify-items: start; max-width: 560px; }
+.tally { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0; }
+.grade { font: 500 .95rem var(--font-mono); color: var(--ink-2); } .grade b { color: var(--ink); font-size: 1.3rem; }
 </style>

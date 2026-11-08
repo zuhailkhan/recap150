@@ -1,15 +1,15 @@
 <template>
   <ul class="legend" aria-label="Color key">
-    <li><span class="sw tone-focus"></span>looking at now</li>
-    <li><span class="sw tone-keep"></span>remembered</li>
-    <li><span class="sw tone-hit"></span>match / answer</li>
-    <li><span class="sw tone-miss"></span>mismatch</li>
-    <li><span class="sw tone-dim"></span>already handled</li>
+    <li><i class="sw tone-focus"></i>looking at</li>
+    <li><i class="sw tone-keep"></i>remembered</li>
+    <li><i class="sw tone-hit"></i>match</li>
+    <li><i class="sw tone-miss"></i>mismatch</li>
+    <li><i class="sw tone-dim"></i>done</li>
   </ul>
 </template>
 
 <style scoped>
-.legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .8rem; color: var(--ink-2); }
+.legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; font: 500 .72rem var(--font-mono); color: var(--ink-3); }
 .legend li { display: inline-flex; align-items: center; gap: 6px; }
-.sw { width: 16px; height: 16px; border-radius: 5px; border: 2px solid; }
+.sw { width: 11px; height: 11px; border-radius: 3px; border: 1.5px solid; box-shadow: none !important; }
 </style>

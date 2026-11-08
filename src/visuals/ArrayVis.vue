@@ -20,8 +20,8 @@ const inWin = (i: number) => !!props.p.window && i >= props.p.window[0] && i <= 
 </template>
 
 <style scoped>
-.av { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
-.cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; border-radius: 12px; border: 2px solid transparent; }
+.av { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+.cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px; border-radius: 12px; border: 2px solid transparent; }
 .cell.inwin { border-color: var(--focus-bd); background: var(--focus-bg); }
 .idx { font: 500 .72rem var(--font-mono); color: var(--ink-2); }
 .ptrs { display: flex; flex-direction: column; gap: 2px; min-height: 20px; }
