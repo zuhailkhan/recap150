@@ -1,0 +1,20 @@
+function spiralOrder(matrix)
+  out = empty list
+  top = 0 ; bottom = rows - 1
+  left = 0 ; right = columns - 1
+  while top <= bottom and left <= right        # [1] stop when the fences cross
+    for c from left to right                   # [2] top row, left to right
+      append matrix[top][c] to out
+    top = top + 1
+    for r from top to bottom                   # [3] right column, top to bottom
+      append matrix[r][right] to out
+    right = right - 1
+    if top <= bottom                           # [4] a bottom row is left only if the fences have not crossed
+      for c from right down to left            # [4] bottom row, right to left
+        append matrix[bottom][c] to out
+      bottom = bottom - 1
+    if left <= right                           # [5] a left column is left only if the fences have not crossed
+      for r from bottom down to top            # [5] left column, bottom to top
+        append matrix[r][left] to out
+      left = left + 1
+  return out

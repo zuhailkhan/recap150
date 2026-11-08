@@ -1,0 +1,69 @@
+{
+  "slug": "spiral-matrix",
+  "title": "Spiral Matrix",
+  "category": "Math & Geometry",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a grid with any number of rows and columns. Read its values in a spiral: start at the top-left, go right along the top row, down the right column, left along the bottom row, up the left column, then keep winding inward. Return the values in that order.",
+  "example": {
+    "caption": "A 3 by 3 grid read as a spiral. The path ends in the middle.",
+    "input": [{ "kind": "grid", "label": "matrix", "cells": [[1, 2, 3], [4, 5, 6], [7, 8, 9]] }],
+    "output": [{ "kind": "array", "label": "spiral order", "items": [1, 2, 3, 6, 9, 8, 7, 4, 5], "tones": ["hit", "hit", "hit", "hit", "hit", "hit", "hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Keep four fences (top, bottom, left, right) around the cells not yet read, walk one side at a time, and pull that side's fence inward after each walk.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "fence", "plain": "My name for a boundary index: top and bottom are row numbers, left and right are column numbers. Cells outside the four fences are already read." },
+      { "term": "ring", "plain": "One lap of the outer edge of the still-unread area. After a ring the unread area is a smaller rectangle." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a matrix (list of equal-length rows) with at least one row and one column, like [[1,2],[3,4]].",
+    "presets": [
+      { "label": "3 rows, 4 columns", "args": [[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]] },
+      { "label": "4 by 4", "args": [[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]]] },
+      { "label": "Single column", "args": [[[1], [2], [3], [4]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of cells in the matrix (rows times columns)" }],
+    "compare": { "brute": "n", "optimal": "n", "bruteLabel": "Walk with a direction and a visited grid", "optimalLabel": "Walk four sides between shrinking fences", "unit": "cells read (same shape)" },
+    "rows": [
+      { "name": "Direction + visited grid", "time": "O(n)", "space": "O(n)", "note": "Step forward, turn right when you hit an edge or a visited cell. Needs a second grid of flags." },
+      { "name": "Four fences", "time": "O(n)", "space": "O(1) extra", "note": "Each cell is read once. Apart from the answer list, only four integers are stored." }
+    ],
+    "takeaway": "Every cell must be read, so n is the floor for both. The fences just remove the visited grid and the turn logic."
+  },
+  "variants": [
+    { "id": "boundaries", "label": "Four fences", "tsFn": "spiralOrder", "goFn": "spiralOrder", "stages": [
+      { "n": 1, "title": "Set the fences", "note": "top = 0, bottom = last row, left = 0, right = last column. Keep going while top <= bottom and left <= right." },
+      { "n": 2, "title": "Top row", "note": "Read the top row from left to right, then move the top fence down by one." },
+      { "n": 3, "title": "Right column", "note": "Read the right column from the new top down to the bottom, then move the right fence left by one." },
+      { "n": 4, "title": "Bottom row", "note": "Only if a row is left (top <= bottom): read the bottom row right to left, then move the bottom fence up." },
+      { "n": 5, "title": "Left column", "note": "Only if a column is left (left <= right): read the left column bottom to top, then move the left fence right." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One row", "input": "[[1,2,3,4]]", "output": "[1,2,3,4]", "why": "The top row takes everything and the top fence passes the bottom. Without the row guard the bottom row step would read the same cells backwards." },
+    { "title": "One column", "input": "[[1],[2],[3],[4]]", "output": "[1,2,3,4]", "why": "The top cell and the right column cover all of it. The right fence then crosses the left one, and the left column guard stops a second pass." },
+    { "title": "Odd by odd", "input": "3 by 3", "output": "ends on the centre 5", "why": "The last ring is a single cell. Only the top-row step reads it. The other three sides find nothing left to read." },
+    { "title": "Wide rectangle", "input": "3 rows, 4 columns", "output": "ends in the middle row", "why": "The rings do not meet in a cell but in a row, so a guard must stop the bottom row after the fences cross." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Without the two guards (top <= bottom, left <= right) a single row or a single column gets read twice. Re-check after the first two sides, because those moves changed the fences." },
+    { "lang": "General", "text": "Move the fence right after its walk, not at the end of the loop. The next side must start from the new fence." },
+    { "lang": "TypeScript", "text": "matrix[0].length throws on an empty matrix. The task promises at least one row and one column. Add a guard if you ever reuse this on raw input." },
+    { "lang": "Go", "text": "Start with out := []int{} (not var out []int) if callers may print or JSON-encode the result. A nil slice encodes to null, an empty one to []." },
+    { "lang": "Go", "text": "A [][]int has no fixed row width. len(matrix[0]) is the column count only if every row is the same length, which the problem guarantees." }
+  ],
+  "recap": {
+    "pattern": "Matrix: shrinking boundaries",
+    "key": "Walk top row, right column, bottom row, left column, moving each fence in after its side. Guard the last two sides.",
+    "complexity": "Time O(rows x columns). Space O(1) besides the output.",
+    "moves": ["Fences: top, bottom, left, right", "Top row then top++; right column then right--", "If top <= bottom: bottom row then bottom--", "If left <= right: left column then left++"]
+  }
+}

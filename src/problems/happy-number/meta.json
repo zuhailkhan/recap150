@@ -1,0 +1,69 @@
+{
+  "slug": "happy-number",
+  "title": "Happy Number",
+  "category": "Math & Geometry",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "Take a positive integer, square each of its digits and add the squares. Repeat with the result. If the process reaches 1 the number is happy. If it never does, it ends up circling through the same numbers forever. Say whether the starting number is happy.",
+  "example": {
+    "caption": "19 becomes 82, then 68, then 100, then 1. It reaches 1, so it is happy.",
+    "input": [{ "kind": "array", "label": "n", "items": [19] }],
+    "output": [
+      { "kind": "array", "label": "the chain", "items": [19, 82, 68, 100, 1], "tones": ["keep", "keep", "keep", "keep", "hit"] },
+      { "kind": "array", "label": "happy?", "items": ["true"], "tones": ["hit"] }
+    ]
+  },
+  "idea": {
+    "sentence": "The sequence either reaches 1 or comes back to a number it has already seen, so keep a set of seen numbers and stop on either event.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "cycle", "plain": "A run of numbers that repeats forever. Once a value shows up a second time, everything after it repeats too." },
+      { "term": "digit square sum", "plain": "Split the number into its digits, square each one and add. For 82 that is 8² + 2² = 68." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a positive integer, like 19. Unhappy numbers make a loop of about 8 numbers, so keep it small.",
+    "presets": [
+      { "label": "19 (happy)", "args": [19] },
+      { "label": "2 (loops)", "args": [2] },
+      { "label": "7 (happy)", "args": [7] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "k", "meaning": "how many numbers appear before the chain hits 1 or repeats (small: under about 20 for any 32-bit input)" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Keep a list, scan it for repeats each time", "optimalLabel": "Set lookup, one check per number", "unit": "comparisons over k steps" },
+    "rows": [
+      { "name": "List of seen numbers", "time": "O(k²)", "space": "O(k)", "note": "Scan the whole list each step to see if the number is there." },
+      { "name": "Set of seen numbers", "time": "O(k log n)", "space": "O(k)", "note": "A lookup is O(1). Each step costs a digit split, about log n digits for the first number and 3 digits after that." },
+      { "name": "Slow and fast pointers", "time": "O(k log n)", "space": "O(1)", "note": "Floyd's cycle trick: one runner takes one step, one takes two. If they meet, there is a loop. No set needed." }
+    ],
+    "takeaway": "After the first step the value is at most 810 for any 32-bit start, so k stays tiny. In practice both set and pointer versions are instant. The set is the simplest to read."
+  },
+  "variants": [
+    { "id": "seen", "label": "Seen set", "tsFn": "isHappy", "goFn": "isHappy", "stages": [
+      { "n": 1, "title": "Stop at 1 or a repeat", "note": "The loop ends when the number is 1 (happy, return true) or when it is already in the set (a cycle, return false)." },
+      { "n": 2, "title": "Remember and step", "note": "Put the number in the set, then replace it with the sum of its squared digits." }
+    ] }
+  ],
+  "goArgs": ["int"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "The number 1", "input": "1", "output": "true", "why": "It is already 1, so the loop never starts. 1 squared is 1, so it would stay there anyway." },
+    { "title": "A number that falls into the 4-cycle", "input": "2", "output": "false", "why": "2 → 4 → 16 → 37 → 58 → 89 → 145 → 42 → 20 → 4. Every unhappy number ends in this same loop, and the set notices the second 4." },
+    { "title": "Trailing zeros", "input": "100", "output": "true", "why": "1 + 0 + 0 = 1 in one step. Zero digits add nothing, but they must not stop the digit loop early." },
+    { "title": "Biggest 32-bit number", "input": "2147483647", "output": "true", "why": "Ten digits add up to a few hundred in one step. From there the chain is short, so a big input is no harder." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "n / 10 is a float division, not integer division. Use Math.floor(n / 10), or the loop never reaches 0 and the digits are wrong." },
+    { "lang": "TypeScript", "text": "String(n).split('') hands you digit strings. d * d works only by coercion, and d + d would glue the text together. The n % 10 loop keeps every digit a number." },
+    { "lang": "Go", "text": "n / 10 on an int is integer division, so no floor is needed. A map[int]bool gives false for a missing key, so if seen[n] needs no second return value." },
+    { "lang": "General", "text": "Do not loop 'a big fixed number of times' instead of tracking seen values. It happens to work, but it is a guess. The seen set proves a loop." }
+  ],
+  "recap": {
+    "pattern": "Cycle detection on a number sequence",
+    "key": "Replace n by the sum of its squared digits. Stop at 1 (happy) or on a repeated number (loop, not happy).",
+    "complexity": "Time O(k log n). Space O(k), or O(1) with slow and fast pointers.",
+    "moves": ["Loop while n is not 1", "If n is in the seen set, return false", "Add n to the set", "Set n to its digit square sum"]
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "slug": "powx-n",
+  "title": "Pow(x, n)",
+  "category": "Math & Geometry",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Compute x raised to the integer power n, where x is a real number and n is an integer that can be negative, zero, or as big as about two billion. Write it without the built-in power function, and fast enough that multiplying n times is not an option.",
+  "example": {
+    "caption": "2 to the 10 needs only four squarings. The bits of 10 are 1010, so keep the squares 4 and 256 and multiply them: 4 × 256 = 1024.",
+    "input": [{ "kind": "array", "label": "x, n", "items": [2, 10] }],
+    "output": [
+      { "kind": "array", "label": "squares of x: x², x⁴, x⁸ (used are green)", "items": [4, 16, 256], "tones": ["hit", "dim", "hit"] },
+      { "kind": "array", "label": "x to the n", "items": [1024], "tones": ["hit"] }
+    ]
+  },
+  "idea": {
+    "sentence": "Write n in binary: x^n is the product of x^1, x^2, x^4, x^8 and so on for each 1 bit, and each of those is the previous one squared.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "exponentiation by squaring", "plain": "Get x^(2k) from x^k with one multiplication (x^k times x^k), so the power doubles every step and n needs only about log2(n) steps." },
+      { "term": "bit", "plain": "One binary digit. The lowest bit of k tells you if k is odd. Dropping it is k divided by 2, rounded down." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: x (a number) and n (an integer, may be negative). Keep x small and n modest, so the answer stays within normal float range.",
+    "presets": [
+      { "label": "2 to the 10", "args": [2, 10] },
+      { "label": "Negative power", "args": [2, -3] },
+      { "label": "3 to the 13", "args": [3, 13] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "the exponent" }],
+    "compare": { "brute": "n", "optimal": "logn", "bruteLabel": "Multiply x by itself n times", "optimalLabel": "Square the base, one step per bit of n", "unit": "multiplications" },
+    "rows": [
+      { "name": "Multiply n times", "time": "O(n)", "space": "O(1)", "note": "For n around two billion that is billions of steps, far too slow." },
+      { "name": "Square the base", "time": "O(log n)", "space": "O(1)", "note": "n has about log2(n) bits, so at most 31 squarings and 31 multiplications for any 32-bit n." }
+    ],
+    "takeaway": "Doubling the power each step turns two billion steps into about 31. The same trick powers modular arithmetic in cryptography."
+  },
+  "variants": [
+    { "id": "squaring", "label": "Square on the bits of n", "tsFn": "myPow", "goFn": "myPow", "stages": [
+      { "n": 1, "title": "Set up", "note": "result = 1. If n is negative, replace x by 1/x and n by its absolute value, so k is never negative." },
+      { "n": 2, "title": "Bit is 1: multiply", "note": "If the lowest bit of k is 1, the current base is one of the factors. Multiply it into the result." },
+      { "n": 3, "title": "Square and shift", "note": "Square the base, drop the lowest bit of k, repeat until k is 0." }
+    ] }
+  ],
+  "goArgs": ["float64", "int"],
+  "goRet": "float64",
+  "compare": "approx",
+  "edges": [
+    { "title": "Power zero", "input": "x = 5, n = 0", "output": "1", "why": "The loop never runs and result stays 1. This holds for every x, even 0 by the usual convention." },
+    { "title": "Negative power", "input": "x = 2, n = -2", "output": "0.25", "why": "Flip to 1/2 = 0.5 and square it. A negative n is just the reciprocal of the positive power." },
+    { "title": "Smallest 32-bit n", "input": "x = 2, n = -2147483648", "output": "0", "why": "The true answer is far below the smallest float, so it underflows to 0. The code must not crash while negating n." },
+    { "title": "Base 1 or -1 with a huge n", "input": "x = -1, n = 2147483647", "output": "-1", "why": "The loop takes only 31 turns. The first bit multiplies in -1, then the base squares to 1, so every later bit multiplies in 1." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "n = -2147483648 has no positive twin in 32 bits. Writing n = -n there overflows back to the same negative number and the loop never runs. Languages with 32-bit ints must widen to 64 bits first." },
+    { "lang": "TypeScript", "text": "JS numbers are doubles, so Math.abs(-2147483648) is fine. But k >> 1 and k | 0 first convert to a 32-bit int, which turns 2147483648 into a negative number. Use Math.floor(k / 2), not shifts." },
+    { "lang": "TypeScript", "text": "Math.pow and ** exist and are correct, but the exercise asks you to write the loop. Also remember 0.1 + 0.2 is not 0.3: powers of floats carry tiny errors, so compare answers with a tolerance." },
+    { "lang": "TypeScript", "text": "A negative x with an underflowing power can print as -0. -0 === 0 is true, but Object.is(-0, 0) is false and a test that expects 0 may complain." },
+    { "lang": "Go", "text": "int is 64 bits on 64-bit machines, so n = -n is safe for any 32-bit n there. With int32 it would overflow just like in C. Go has no ** operator, and math.Pow exists but hides the idea." }
+  ],
+  "recap": {
+    "pattern": "Fast exponentiation (binary)",
+    "key": "Walk the bits of n from the lowest. Multiply the base into the result on every 1 bit, and square the base every turn.",
+    "complexity": "Time O(log n). Space O(1).",
+    "moves": ["Negative n: use 1/x and |n|", "While k > 0: if k is odd, result *= base", "base *= base; k = k / 2 (drop the lowest bit)", "Return result"]
+  }
+}

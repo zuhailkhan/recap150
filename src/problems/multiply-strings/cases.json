@@ -1,0 +1,13 @@
+[
+  {"name":"single digits","input":["2","3"],"expected":"6"},
+  {"name":"classic","input":["123","456"],"expected":"56088"},
+  {"name":"carry chain","input":["99","99"],"expected":"9801"},
+  {"name":"zero times zero","input":["0","0"],"expected":"0","edge":true},
+  {"name":"zero times a number","input":["0","52"],"expected":"0","edge":true},
+  {"name":"one times a number","input":["1","987"],"expected":"987"},
+  {"name":"different lengths","input":["12","3456"],"expected":"41472"},
+  {"name":"round numbers","input":["100","100"],"expected":"10000"},
+  {"name":"overflow size","input":["123456789012345678","987654321098765432"],"expected":"121932631137021794322511812221002896","edge":true},
+  {"name":"twenty nines","input":["99999999999999999999","99999999999999999999"],"expected":"9999999999999999999800000000000000000001","edge":true},
+  {"name":"long times short","input":["555555555555555555555555555555","7"],"expected":"3888888888888888888888888888885"}
+]

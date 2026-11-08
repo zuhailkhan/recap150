@@ -1,0 +1,7 @@
+function rotate(matrix)             # n by n, changed in place
+  n = size of matrix
+  for i from 0 to n - 1
+    for j from i + 1 to n - 1
+      swap matrix[i][j] and matrix[j][i]   # [1] transpose: swap across the diagonal
+  for each row in matrix
+    reverse the row                        # [2] mirror it left to right

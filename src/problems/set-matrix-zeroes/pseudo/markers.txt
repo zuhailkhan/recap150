@@ -1,0 +1,14 @@
+function setZeroes(matrix)                    # changed in place
+  firstRow = row 0 contains a zero             # [1] remember before row 0 becomes marker space
+  firstCol = column 0 contains a zero          # [1] same for column 0
+  for r from 1 to lastRow
+    for c from 1 to lastColumn
+      if matrix[r][c] is 0
+        matrix[r][0] = 0                       # [2] mark this row in column 0
+        matrix[0][c] = 0                       # [2] mark this column in row 0
+  for r from 1 to lastRow
+    for c from 1 to lastColumn
+      if matrix[r][0] is 0 or matrix[0][c] is 0
+        matrix[r][c] = 0                       # [3] a marker says wipe this cell
+  if firstRow then set all of row 0 to 0       # [4] wipe row 0 last
+  if firstCol then set all of column 0 to 0    # [4] wipe column 0 last

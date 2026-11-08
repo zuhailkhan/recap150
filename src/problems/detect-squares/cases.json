@@ -1,0 +1,11 @@
+[
+  {"name":"classic","input":[["DetectSquares","add","add","add","count","count","add","count"],[[],[1,3],[4,0],[1,0],[4,3],[5,2],[4,0],[4,3]]],"expected":[null,null,null,null,1,0,null,2]},
+  {"name":"no points","input":[["DetectSquares","count"],[[],[2,2]]],"expected":[null,0],"edge":true},
+  {"name":"duplicate corners multiply","input":[["DetectSquares","add","add","add","add","count","add","count"],[[],[0,0],[0,0],[2,0],[0,2],[2,2],[2,0],[2,2]]],"expected":[null,null,null,null,null,2,null,4]},
+  {"name":"squares of two sizes","input":[["DetectSquares","add","add","add","add","add","count","count"],[[],[0,0],[2,0],[0,2],[4,0],[0,4],[2,2],[4,4]]],"expected":[null,null,null,null,null,null,1,1]},
+  {"name":"query point already stored","input":[["DetectSquares","add","add","add","add","add","count","count"],[[],[3,3],[3,3],[5,3],[3,5],[5,5],[3,3],[5,5]]],"expected":[null,null,null,null,null,null,1,2],"edge":true},
+  {"name":"rectangle is not a square","input":[["DetectSquares","add","add","add","count"],[[],[0,0],[3,0],[0,2],[3,2]]],"expected":[null,null,null,null,0]},
+  {"name":"square on both sides","input":[["DetectSquares","add","add","add","add","add","add","count","count","count"],[[],[2,2],[4,2],[2,4],[0,2],[0,0],[2,0],[4,4],[0,4],[4,0]]],"expected":[null,null,null,null,null,null,null,1,1,1]},
+  {"name":"far apart coordinates","input":[["DetectSquares","add","add","add","count","count"],[[],[1000,1000],[0,0],[0,1000],[1000,0],[500,500]]],"expected":[null,null,null,null,1,0],"edge":true},
+  {"name":"same diagonal, missing corner","input":[["DetectSquares","add","add","add","count","add","count"],[[],[1,1],[3,3],[1,3],[3,1],[3,1],[3,3]]],"expected":[null,null,null,null,1,null,1]}
+]

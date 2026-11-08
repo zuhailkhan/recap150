@@ -1,0 +1,71 @@
+{
+  "slug": "multiply-strings",
+  "title": "Multiply Strings",
+  "category": "Math & Geometry",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Two non-negative whole numbers arrive as digit strings, each up to a couple of hundred digits long. Return their product, also as a digit string. Do not convert the inputs to a number type or use a big-integer library: do the multiplication digit by digit.",
+  "example": {
+    "caption": "12 times 34. Each digit of 12 meets each digit of 34, and the four partial products land in four result slots.",
+    "input": [{ "kind": "array", "label": "num1, num2", "items": ["12", "34"] }],
+    "output": [
+      { "kind": "array", "label": "result slots (4 = 2 + 2 digits)", "items": [0, 4, 0, 8], "tones": ["dim", "hit", "hit", "hit"] },
+      { "kind": "array", "label": "product", "items": ["408"], "tones": ["hit"] }
+    ]
+  },
+  "idea": {
+    "sentence": "Digit i of the first number times digit j of the second lands in result slots i+j and i+j+1, so fill a result array of m+n slots and carry as you go.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "slot", "plain": "One position in the result array. Slot 0 is the leftmost digit of the product, slot m+n-1 the rightmost." },
+      { "term": "carry", "plain": "When a slot would hold 10 or more, keep the ones digit and push the tens digit one slot to the left." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two digit strings, like \"123\" and \"45\". Keep them short (a product of about 3 by 2 digits fits the step cap).",
+    "presets": [
+      { "label": "123 x 45", "args": ["123", "45"] },
+      { "label": "99 x 99", "args": ["99", "99"] },
+      { "label": "Zero times 52", "args": ["0", "52"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "m", "meaning": "digits in the first number" }, { "sym": "n", "meaning": "digits in the second number" }],
+    "compare": { "brute": "2n", "optimal": "nm", "bruteLabel": "Add num1 to itself num2 times", "optimalLabel": "One multiply per pair of digits", "unit": "operations (rough shape; repeated addition grows with the value, so exponentially in the digits)" },
+    "rows": [
+      { "name": "Repeated addition", "time": "O(10^n x m)", "space": "O(m + n)", "note": "Adding num1 to itself num2 times is exponential in the number of digits. Useless for 200 digits." },
+      { "name": "Grade-school multiplication", "time": "O(m x n)", "space": "O(m + n)", "note": "Every digit pair is multiplied once and written into the result array." }
+    ],
+    "takeaway": "This is long multiplication from school, with the carries written into an array. Faster methods like Karatsuba exist, but m x n is what interviews expect."
+  },
+  "variants": [
+    { "id": "grade", "label": "Grade-school digits", "tsFn": "multiply", "goFn": "multiply", "stages": [
+      { "n": 1, "title": "Result slots", "note": "An m-digit number times an n-digit number has at most m + n digits, so start with m + n zeros." },
+      { "n": 2, "title": "Pick a digit of num1", "note": "Walk the first number from its last digit to its first." },
+      { "n": 3, "title": "Multiply and carry", "note": "For each digit of the second number: p = product + the ones slot. Keep p % 10 in slot i+j+1 and add p / 10 to slot i+j." },
+      { "n": 4, "title": "Trim and join", "note": "The product may be one digit shorter than m + n, so skip leading zeros, but keep one digit so that 0 times 0 is 0." }
+    ] }
+  ],
+  "goArgs": ["string", "string"],
+  "goRet": "string",
+  "compare": "exact",
+  "edges": [
+    { "title": "Zero times zero", "input": "\"0\", \"0\"", "output": "\"0\"", "why": "Both result slots stay 0. Trimming must stop at the last digit, or it would return an empty string." },
+    { "title": "Zero times anything", "input": "\"0\", \"52\"", "output": "\"0\"", "why": "Three slots of 0. The product is shorter than m + n, so trim until only one 0 is left." },
+    { "title": "All nines", "input": "\"99\", \"99\"", "output": "\"9801\"", "why": "Every product is 81, the worst case for carries. Four slots are needed, and no leading zero is left to trim." },
+    { "title": "Bigger than any integer", "input": "20 nines times 20 nines", "output": "40 digits", "why": "A 64-bit integer holds about 19 digits. This case is exactly why the task forbids converting to numbers." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Converting to numbers overflows. A 64-bit integer holds only about 19 digits, and a JS number is exact only up to 15 or 16. Keep each digit separate and carry by hand." },
+    { "lang": "General", "text": "Place digits by index from the right: i+j+1 is the ones slot, i+j the tens slot. If you swap them, every carry lands one place too far right." },
+    { "lang": "TypeScript", "text": "num1[i] is a one-character string. '7' * '8' works by coercion, but '7' + '8' gives '78'. Wrap each digit with Number(...) so the intent is clear and the plus never joins text." },
+    { "lang": "TypeScript", "text": "res[i + j] += Math.floor(p / 10) can leave a slot at 10 or more for a moment. That is fine: the next pass writes that slot as p % 10 and carries again. Never print a slot before the loops end." },
+    { "lang": "Go", "text": "num1[i] is a byte, not a rune or a string. Digits are ASCII, so num1[i]-'0' is the digit value. Convert it to int before multiplying: a byte holds only 0 to 255, so product-plus-carry math done in bytes could wrap around." }
+  ],
+  "recap": {
+    "pattern": "Math: digit-by-digit multiplication",
+    "key": "Digit i times digit j goes into slots i+j and i+j+1 of an (m+n)-slot result. Keep the ones digit, carry the tens left.",
+    "complexity": "Time O(m x n). Space O(m + n).",
+    "moves": ["Result array of m + n zeros", "For each digit pair (from the right): p = a x b + res[i+j+1]", "res[i+j+1] = p % 10; res[i+j] += p / 10", "Skip leading zeros, keep one, join"]
+  }
+}

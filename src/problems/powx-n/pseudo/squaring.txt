@@ -1,0 +1,13 @@
+function myPow(x, n)
+  base = x                              # [1]
+  k = n                                 # [1] k counts the power still to apply
+  if k < 0
+    base = 1 / base                     # [1] a negative power is a positive power of 1/x
+    k = -k
+  result = 1
+  while k > 0                           # [3] until every bit of k is used
+    if k is odd                         # [2] lowest bit is 1: this base is part of the answer
+      result = result * base
+    base = base * base                  # [3] square the base: it now stands for twice the power
+    k = k div 2                         # [3] drop the lowest bit of k
+  return result

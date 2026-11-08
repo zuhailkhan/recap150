@@ -1,0 +1,17 @@
+[
+  {"name":"2 to the 10","input":[2,10],"expected":1024.0},
+  {"name":"fraction base","input":[2.1,3],"expected":9.261000000000001},
+  {"name":"negative exponent","input":[2,-2],"expected":0.25},
+  {"name":"zero exponent","input":[5,0],"expected":1.0,"edge":true},
+  {"name":"zero base","input":[0,5],"expected":0.0},
+  {"name":"negative base odd","input":[-2,3],"expected":-8.0},
+  {"name":"negative base even","input":[-2,4],"expected":16.0},
+  {"name":"one to a huge power","input":[1,2147483647],"expected":1.0,"edge":true},
+  {"name":"minus one odd huge","input":[-1,2147483647],"expected":-1.0,"edge":true},
+  {"name":"minus one at min int","input":[-1,-2147483648],"expected":1.0,"edge":true},
+  {"name":"two at min int","input":[2,-2147483648],"expected":0.0,"edge":true},
+  {"name":"small base shrinks","input":[0.5,10],"expected":0.0009765625},
+  {"name":"gentle growth","input":[1.00001,1000],"expected":1.010050116582064},
+  {"name":"negative exponent, odd","input":[-2,-3],"expected":-0.125},
+  {"name":"3 to the 13","input":[3,13],"expected":1594323.0}
+]

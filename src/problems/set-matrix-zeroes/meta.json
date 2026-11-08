@@ -1,0 +1,69 @@
+{
+  "slug": "set-matrix-zeroes",
+  "title": "Set Matrix Zeroes",
+  "category": "Math & Geometry",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a grid of integers. Wherever a cell is 0, turn its entire row and its entire column into 0. Do the change inside the same grid. The best answers use only a constant amount of extra memory.",
+  "example": {
+    "caption": "One zero in the middle wipes the whole middle row and the whole middle column.",
+    "input": [{ "kind": "grid", "label": "matrix", "cells": [[1, 1, 1], [1, 0, 1], [1, 1, 1]], "tones": [[null, null, null], [null, "miss", null], [null, null, null]] }],
+    "output": [{ "kind": "grid", "label": "after", "cells": [[1, 0, 1], [0, 0, 0], [1, 0, 1]], "tones": [[null, "hit", null], ["hit", "hit", "hit"], [null, "hit", null]] }]
+  },
+  "idea": {
+    "sentence": "Use row 0 and column 0 as free notepads that say which rows and columns to wipe, and keep two flags for whether row 0 and column 0 held a real zero themselves.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "marker", "plain": "A 0 written into the first cell of a row (column 0) or the first cell of a column (row 0) to say: wipe this row, or wipe this column." },
+      { "term": "O(1) extra space", "plain": "Only a fixed handful of variables beyond the grid, no matter how big the grid is." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a matrix of integers (equal-length rows), like [[1,0],[3,4]].",
+    "presets": [
+      { "label": "Zeros in row 0", "args": [[[0, 1, 2, 0], [3, 4, 5, 2], [1, 3, 1, 5]]] },
+      { "label": "Zero in the middle", "args": [[[1, 1, 1], [1, 0, 1], [1, 1, 1]]] },
+      { "label": "Zero in column 0 only", "args": [[[1, 2, 3], [0, 5, 6], [7, 8, 9]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "m", "meaning": "number of rows" }, { "sym": "n", "meaning": "number of columns, so the grid has m times n cells" }],
+    "compare": { "brute": "nm", "optimal": "nm", "bruteLabel": "Two lists of rows and columns to wipe", "optimalLabel": "Markers in row 0 and column 0", "unit": "cell visits (same shape)" },
+    "rows": [
+      { "name": "Copy of the grid", "time": "O(mn)", "space": "O(mn)", "note": "Zero into a copy while reading the original. Simple, but it doubles the memory." },
+      { "name": "Row and column lists", "time": "O(mn)", "space": "O(m + n)", "note": "Remember which rows and columns hold a zero in two small arrays, then wipe." },
+      { "name": "Markers in row 0 and column 0", "time": "O(mn)", "space": "O(1)", "note": "The first row and column act as those two lists. Two boolean flags protect their own zeros." }
+    ],
+    "takeaway": "Every cell must be read at least once, so mn is the floor. The three answers differ only in where the notes are kept: a copy, two lists, or the grid itself."
+  },
+  "variants": [
+    { "id": "markers", "label": "Row 0 and col 0 markers", "tsFn": "setZeroesDriver", "goFn": "setZeroesDriver", "stages": [
+      { "n": 1, "title": "Flag row 0 and column 0", "note": "Before they turn into marker space, remember whether each already holds a real zero." },
+      { "n": 2, "title": "Mark", "note": "Scan the inside cells. A zero at (r, c) writes 0 at (r, 0) and (0, c)." },
+      { "n": 3, "title": "Wipe the inside", "note": "Scan the inside cells again. If its row marker or column marker is 0, the cell becomes 0." },
+      { "n": 4, "title": "Wipe row 0 and column 0", "note": "Last of all, use the two flags to zero row 0 and column 0 if they had a real zero." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "[][]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Real zero in row 0 only", "input": "[[0,1,2,0],[3,4,5,2],[1,3,1,5]]", "output": "[[0,0,0,0],[0,4,5,0],[0,3,1,0]]", "why": "Row 0 is wiped, but rows 1 and 2 are not. A zero in row 0 is a column marker, never a row marker." },
+    { "title": "Real zero in column 0 only", "input": "[[1,2,3],[0,5,6],[7,8,9]]", "output": "[[0,2,3],[0,0,0],[0,8,9]]", "why": "Row 1 and column 0 get wiped. Without a column flag, a zero in column 0 looks like a marker for a zero that is not there." },
+    { "title": "One cell, a zero", "input": "[[0]]", "output": "[[0]]", "why": "There are no inside cells. Both flags are true and wiping row 0 and column 0 changes nothing." },
+    { "title": "Single row", "input": "[[1,0,3]]", "output": "[[0,0,0]]", "why": "There are no inside rows. The row flag alone carries the whole answer." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Compute both flags before you write any marker. Marking first overwrites row 0 and column 0, so you can no longer tell a real zero from a marker." },
+    { "lang": "General", "text": "Wipe the inside cells before row 0 and column 0. The markers must still be intact while the inside is being read. Zeroing row 0 first erases every column marker." },
+    { "lang": "General", "text": "Scan the inside cells only (from index 1). If the mark pass also visited row 0 and column 0, it would read its own markers as new zeros and wipe too much." },
+    { "lang": "TypeScript", "text": "To keep the original grid, copy it with matrix.map((row) => [...row]). Both matrix.slice() and [...matrix] copy only the outer array, so the rows are shared and the 'copy' gets zeroed too." },
+    { "lang": "Go", "text": "The function takes a [][]int and edits the shared rows, so the caller sees the change with no return value. A test that wants the original must copy every row first, because copying the outer slice shares the rows." }
+  ],
+  "recap": {
+    "pattern": "Matrix: in-place markers",
+    "key": "Store the wipe-this-row and wipe-this-column notes in row 0 and column 0, guarded by two flags, and apply them in the right order.",
+    "complexity": "Time O(m x n). Space O(1).",
+    "moves": ["Flags: does row 0 or column 0 hold a real zero?", "Inside cells: a zero marks (r, 0) and (0, c)", "Inside cells again: marker says wipe", "Last: wipe row 0 and column 0 using the flags"]
+  }
+}

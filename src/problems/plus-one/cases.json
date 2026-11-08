@@ -1,0 +1,12 @@
+[
+  {"name":"no carry","input":[[1,2,3]],"expected":[1,2,4]},
+  {"name":"carry one place","input":[[1,2,9]],"expected":[1,3,0]},
+  {"name":"carry through the middle","input":[[4,9,9,9,1,9]],"expected":[4,9,9,9,2,0]},
+  {"name":"single nine","input":[[9]],"expected":[1,0],"edge":true},
+  {"name":"all nines","input":[[9,9,9]],"expected":[1,0,0,0],"edge":true},
+  {"name":"single zero","input":[[0]],"expected":[1],"edge":true},
+  {"name":"nine then zero","input":[[9,0]],"expected":[9,1]},
+  {"name":"leading carry stops","input":[[8,9,9,9]],"expected":[9,0,0,0]},
+  {"name":"twenty five nines","input":[[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9]],"expected":[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"edge":true},
+  {"name":"long mixed digits","input":[[1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,9]],"expected":[1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,9,0,0]}
+]

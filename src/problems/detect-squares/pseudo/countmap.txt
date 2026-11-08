@@ -1,0 +1,17 @@
+class DetectSquares
+  copies = empty map                          # point -> how many copies of it
+  pts = empty list                            # every point added, repeats included
+
+  add(x, y)
+    copies[(x, y)] = copies[(x, y)] + 1       # [1] one more copy of this point
+    append (x, y) to pts                      # [1] and remember it as a possible opposite corner
+
+  count(qx, qy)
+    total = 0
+    for each (px, py) in pts                  # [2] each stored point could be the opposite corner
+      if |px - qx| is not |py - qy| or px is qx
+        continue                              # [2] needs equal, non-zero distance across and up
+      a = copies[(qx, py)] or 0               # [3] the corner straight above or below the query
+      b = copies[(px, qy)] or 0               # [3] the corner straight beside the query
+      total = total + a * b                   # [3] every pairing of copies is one square
+    return total                              # [4] the sum over all opposite corners

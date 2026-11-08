@@ -1,0 +1,16 @@
+function digitSquareSum(n)
+  sum = 0
+  while n > 0
+    d = n mod 10
+    sum = sum + d * d                 # [2] square each digit and add it up
+    n = n div 10                      # whole-number division drops the last digit
+  return sum
+
+function isHappy(n)
+  seen = empty set
+  while n is not 1                    # [1] stop at 1 (happy) or at a repeat (loop)
+    if n is in seen
+      return false                    # [1] seen before: a loop
+    add n to seen                     # [2] remember it, then take the next step
+    n = digitSquareSum(n)
+  return true                         # [1] left the loop at 1
