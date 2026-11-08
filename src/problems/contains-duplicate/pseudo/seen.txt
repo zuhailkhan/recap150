@@ -1,0 +1,8 @@
+function containsDuplicate(nums)
+  seen = empty set                    # [1] numbers already passed
+  for each x in nums
+    # [2] look at x: is it in the set?
+    if x is in seen                   # [3] met it before: duplicate
+      return true
+    add x to seen                     # [4] new value: remember it
+  return false                        # [3] no repeat anywhere

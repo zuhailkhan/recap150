@@ -1,0 +1,68 @@
+{
+  "slug": "product-of-array-except-self",
+  "title": "Product of Array Except Self",
+  "category": "Arrays & Hashing",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of integers. Return a new list where each position holds the product of all the other numbers, everything except the one at that position. Do not use division, and aim for a single pass in each direction.",
+  "example": {
+    "caption": "For index 2 the others are 1, 2 and 4. Their product is 8.",
+    "input": [{ "kind": "array", "label": "nums", "items": [1, 2, 3, 4] }],
+    "output": [{ "kind": "dp", "cells": [[1, 2, 3, 4], [24, 12, 8, 6]], "rowLabels": ["nums", "out"], "colLabels": [0, 1, 2, 3], "tones": [[null, null, "focus", null], [null, null, "hit", null]] }]
+  },
+  "idea": {
+    "sentence": "Everything except nums[i] is the product on its left times the product on its right. Sweep left to right for the first part, then right to left for the second.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "prefix product", "plain": "The product of all numbers before index i." },
+      { "term": "suffix product", "plain": "The product of all numbers after index i." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of numbers, e.g. [1,2,3,4]",
+    "presets": [
+      { "label": "Classic", "args": [[1, 2, 3, 4]] },
+      { "label": "One zero", "args": [[-1, 1, 0, -3, 3]] },
+      { "label": "Two zeros", "args": [[0, 0, 2]] },
+      { "label": "Two numbers", "args": [[2, 3]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of integers in the list" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Multiply all the others, per index", "optimalLabel": "Left sweep, then right sweep", "unit": "multiplications (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n²)", "space": "O(1)", "note": "For each index, multiply the other n minus 1 numbers." },
+      { "name": "Total divided by self", "time": "O(n)", "space": "O(1)", "note": "Not allowed here, and it breaks when a zero is in the list." },
+      { "name": "Prefix and suffix sweeps", "time": "O(n)", "space": "O(1) extra", "note": "Two passes with two running numbers. The output list does not count as extra space." }
+    ],
+    "takeaway": "Each answer splits into a left part and a right part. A running product gives each part for free, one step at a time."
+  },
+  "variants": [
+    { "id": "prefixsuffix", "label": "Prefix and suffix", "tsFn": "productExceptSelf", "goFn": "productExceptSelf", "stages": [
+      { "n": 1, "title": "Start the output", "note": "The output list is the only storage. Its slots will be filled by two sweeps." },
+      { "n": 2, "title": "Left sweep", "note": "Store in out[i] the product of everything left of i. Then fold nums[i] into the running prefix." },
+      { "n": 3, "title": "Right sweep", "note": "Multiply out[i] by the product of everything right of i. Then fold nums[i] into the running suffix." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One zero", "input": "[-1, 1, 0, -3, 3]", "output": "[0, 0, 9, 0, 0]", "why": "Only the zero's own slot is nonzero, because every other slot includes the zero in its product." },
+    { "title": "Two zeros", "input": "[0, 0]", "output": "[0, 0]", "why": "Every slot has a zero among the others. All answers are zero." },
+    { "title": "Two numbers", "input": "[2, 3]", "output": "[3, 2]", "why": "Each slot is just the other number. Prefix and suffix start at one, the empty product." },
+    { "title": "Zero at the start", "input": "[0, 4, 5]", "output": "[20, 0, 0]", "why": "The prefix is 1 for index 0, but becomes 0 for the rest. The suffix part then rescues index 0." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Dividing the total by nums[i] fails on zeros, since you cannot divide by zero and the total itself becomes zero. The sweeps never divide." },
+    { "lang": "TypeScript", "text": "A product of 0 and a negative number gives -0 in JavaScript. -0 === 0 is true, but Object.is(-0, 0) is false and a deep-equals helper may complain. Only strict comparisons with Object.is notice it." },
+    { "lang": "TypeScript", "text": "Numbers are doubles. Products stay exact only up to 2^53 − 1. This problem promises results fit in 32 bits, so it is fine here." },
+    { "lang": "Go", "text": "int is 64-bit on 64-bit machines. It does not overflow here, but on a 32-bit build a large product could." }
+  ],
+  "recap": {
+    "pattern": "Prefix and suffix products",
+    "key": "The answer at i is the product on its left times the product on its right. Build the left parts going right, then multiply the right parts in going left.",
+    "complexity": "Time O(n). Space O(1) beyond the output.",
+    "moves": ["Make the output list", "Left to right: store the running product, then grow it", "Right to left: multiply by the running product, then grow it", "Return the output"]
+  }
+}

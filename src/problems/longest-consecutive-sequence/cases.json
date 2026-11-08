@@ -1,0 +1,12 @@
+[
+  {"name":"classic","input":[[100,4,200,1,3,2]],"expected":4},
+  {"name":"long run with duplicates","input":[[0,3,7,2,5,8,4,6,0,1]],"expected":9},
+  {"name":"empty list","input":[[]],"expected":0,"edge":true},
+  {"name":"single number","input":[[5]],"expected":1,"edge":true},
+  {"name":"all duplicates","input":[[1,1,1]],"expected":1,"edge":true},
+  {"name":"duplicate inside a run","input":[[1,2,0,1]],"expected":3},
+  {"name":"negatives","input":[[-1,-2,-3,10]],"expected":3,"edge":true},
+  {"name":"two runs, second is longer","input":[[9,1,4,7,3,-1,0,5,8,-1,6]],"expected":7},
+  {"name":"descending input","input":[[5,4,3,2,1]],"expected":5},
+  {"name":"huge gap between values","input":[[1000000000,999999999,-1000000000]],"expected":2,"edge":true}
+]

@@ -1,0 +1,12 @@
+function topKFrequent(nums, k)
+  count = empty map, value -> number          # [1] how often each value appears
+  for each x in nums
+    count[x] = count[x] + 1                   # [1] one more for this value
+  slots = list of (length(nums) + 1) empty lists   # [2] slot f: values seen f times
+  for each (x, c) in count
+    add x to slots[c]                         # [2] the count is the slot number
+  result = empty list
+  for f from length(nums) down to 1           # [3] highest frequency first
+    if size of result >= k then stop
+    add every value in slots[f] to result     # [3]
+  return the first k values of result

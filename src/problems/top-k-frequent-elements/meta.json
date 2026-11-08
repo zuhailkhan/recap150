@@ -1,0 +1,76 @@
+{
+  "slug": "top-k-frequent-elements",
+  "title": "Top K Frequent Elements",
+  "category": "Arrays & Hashing",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of integers and a number k. Return the k values that appear most often. The answer is guaranteed to be unique, and you may return the values in any order. Aim for better than sorting everything.",
+  "example": {
+    "caption": "1 appears three times and 2 appears twice. They are the two most frequent values.",
+    "input": [
+      { "kind": "array", "label": "nums", "items": [1, 1, 1, 2, 2, 3] },
+      { "kind": "array", "label": "k", "items": [2] }
+    ],
+    "output": [{ "kind": "buckets", "label": "slots: the frequency is the index", "keyLabel": "appears this many times", "buckets": [
+      { "key": "1", "items": [3], "tone": "dim" },
+      { "key": "2", "items": [2], "tone": "hit" },
+      { "key": "3", "items": [1], "tone": "hit" }
+    ] }]
+  },
+  "idea": {
+    "sentence": "Count each value, then file it into a slot numbered by its count. Read the slots from the highest number down and stop after k values.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "frequency", "plain": "How many times a value appears in the list." },
+      { "term": "bucket sort", "plain": "Sorting by dropping items into numbered slots, so the slot number does the ordering. No comparisons needed." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the list, then k, e.g. [1,1,1,2,2,3], 2",
+    "presets": [
+      { "label": "Classic", "args": [[1, 1, 1, 2, 2, 3], 2] },
+      { "label": "All the same", "args": [[4, 4, 4, 4], 1] },
+      { "label": "Negatives", "args": [[-1, -1, 5, 5, 5, 2], 1] },
+      { "label": "k is every value", "args": [[1, 2, 2, 3], 3] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of integers in the list" }],
+    "compare": { "brute": "nlogn", "optimal": "n", "bruteLabel": "Count, then sort the counts", "optimalLabel": "Count, then bucket by count", "unit": "steps (rough)" },
+    "rows": [
+      { "name": "Count and sort", "time": "O(n log n)", "space": "O(n)", "note": "Sort the distinct values by count. At most n distinct values." },
+      { "name": "Count and min-heap of size k", "time": "O(n log k)", "space": "O(n)", "note": "Keep only the k best so far. Good when k is small. Not traced here." },
+      { "name": "Count and buckets", "time": "O(n)", "space": "O(n)", "note": "A count is never more than n, so n+1 slots are enough. Filing is one step per value, walking the slots is at most n steps." }
+    ],
+    "takeaway": "A count can only be between 1 and n. That makes the count itself a usable array index, so no sorting is needed."
+  },
+  "variants": [
+    { "id": "bucket", "label": "Count and buckets", "tsFn": "topKFrequent", "goFn": "topKFrequent", "stages": [
+      { "n": 1, "title": "Count", "note": "One pass builds a map from value to how many times it appears." },
+      { "n": 2, "title": "File by count", "note": "Make n+1 empty slots. Put each value into the slot numbered by its count." },
+      { "n": 3, "title": "Read from the top", "note": "Walk the slots from the highest count down. Take their values until you have k." }
+    ] }
+  ],
+  "goArgs": ["[]int", "int"],
+  "goRet": "[]int",
+  "compare": "sortedFlat",
+  "edges": [
+    { "title": "One number", "input": "[1], 1", "output": "[1]", "why": "One value, one slot. The first slot read gives the answer." },
+    { "title": "All the same", "input": "[4, 4, 4, 4], 1", "output": "[4]", "why": "The only value lands in slot 4, the last one. Slots 1 to 3 stay empty." },
+    { "title": "k is every value", "input": "[1, 2, 2, 3, 3, 3], 3", "output": "[1, 2, 3]", "why": "The walk goes all the way down to slot 1 before it has k values." },
+    { "title": "Zero and negatives", "input": "[0, 0, 1], 1", "output": "[0]", "why": "Values are map keys, never indexes. Only the counts are used as slot numbers." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Array.from({ length: n + 1 }, () => []) makes separate inner arrays. new Array(n + 1).fill([]) makes one shared array in every slot, so every value lands everywhere." },
+    { "lang": "TypeScript", "text": "out.push(...bucket) passes each item as an argument. A very large bucket can overflow the call stack. A plain for loop is safe." },
+    { "lang": "TypeScript", "text": "If you sort the entries instead, remember Array.sort with no comparer orders as text. Counts 10 and 9 would sort as \"10\" < \"9\". Use (a, b) => b[1] - a[1]." },
+    { "lang": "Go", "text": "Map iteration order is random. Values inside one slot can come out in any order, which is fine here because any order is allowed. Compare after sorting in tests." },
+    { "lang": "Go", "text": "make([][]int, n+1) gives nil inner slices. append works on a nil slice, so no setup is needed per slot." }
+  ],
+  "recap": {
+    "pattern": "Count, then bucket by frequency",
+    "key": "Count each value. The count is a slot number between 1 and n. Read slots from the top until k values are taken.",
+    "complexity": "Time O(n). Space O(n).",
+    "moves": ["Count each value in a map", "Make n+1 slots and file each value by its count", "Walk slots from n down to 1", "Stop once you have k values"]
+  }
+}

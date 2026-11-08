@@ -1,0 +1,13 @@
+function isValidSudoku(board)
+  rows  = 9 empty sets                    # [1] digits seen in each row
+  cols  = 9 empty sets                    # [1] digits seen in each column
+  boxes = 9 empty sets                    # [1] digits seen in each 3x3 box
+  for r from 0 to 8
+    for c from 0 to 8
+      d = board[r][c]
+      if d is "." then continue           # empty: nothing to check
+      b = floor(r / 3) * 3 + floor(c / 3) # [2] which box holds this cell
+      if d is in rows[r] or cols[c] or boxes[b]
+        return false                      # [3] seen in its row, column or box
+      add d to rows[r], cols[c] and boxes[b]   # [4] remember it in all three
+  return true                             # [3] nothing clashed

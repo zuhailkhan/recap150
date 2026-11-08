@@ -1,0 +1,72 @@
+{
+  "slug": "valid-sudoku",
+  "title": "Valid Sudoku",
+  "category": "Arrays & Hashing",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a 9 by 9 board. Each cell holds a digit from 1 to 9 or a dot for empty. Check only the filled cells: no digit may repeat in a row, in a column, or in any of the nine 3 by 3 boxes. The board does not need to be solvable.",
+  "example": {
+    "caption": "The two 5s share the top-left 3 by 3 box. They share no row and no column, but the board is still invalid.",
+    "input": [{ "kind": "grid", "label": "board (dots are empty)", "cells": [["5",".","3",".",".",".",".",".","."],[".",".",".","7",".",".",".",".","."],[".",".","5",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."]] }],
+    "output": [
+      { "kind": "grid", "label": "the clash", "cells": [["5",".","3",".",".",".",".",".","."],[".",".",".","7",".",".",".",".","."],[".",".","5",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."]], "tones": [["miss",null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null],[null,null,"miss",null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null]] },
+      { "kind": "array", "label": "valid?", "items": ["false"], "tones": ["miss"] }
+    ]
+  },
+  "idea": {
+    "sentence": "Keep a set of seen digits for every row, every column and every box. A filled cell is fine only if its digit is in none of its three sets.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "box index", "plain": "A number 0 to 8 for the 3 by 3 box a cell sits in, counted left to right, top to bottom: floor(r/3)*3 + floor(c/3)." },
+      { "term": "peers", "plain": "The cells that share a row, a column or a box with a given cell." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a 9 by 9 board of strings, dots for empty. Use the presets as a template.",
+    "presets": [
+      { "label": "Valid, few clues", "args": [[["5","3",".",".","7",".",".",".","."],["6",".",".","1",".",".",".",".","."],[".","9","8",".",".",".",".",".","."],["8",".",".",".",".",".",".",".","."],[".",".",".",".","6",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."]]] },
+      { "label": "Clash in a row", "args": [[["5","3",".",".","7",".",".",".","5"],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."]]] },
+      { "label": "Clash in a column", "args": [[[".","6",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".","9",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".","4",".",".","."],[".",".",".",".",".",".",".",".","."],[".","6",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."]]] },
+      { "label": "Clash in a box only", "args": [[["5",".","3",".",".",".",".",".","."],[".",".",".","7",".",".",".",".","."],[".",".","5",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."],[".",".",".",".",".",".",".",".","."]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of filled cells (at most 81)" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Compare each cell with all its peers", "optimalLabel": "One scan with 27 sets", "unit": "checks (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n²)", "space": "O(1)", "note": "Compare every filled cell with every other filled cell and test if they are peers." },
+      { "name": "Three families of sets", "time": "O(n)", "space": "O(n)", "note": "Each filled cell does three lookups and three inserts. The 27 sets hold each digit three times at most." }
+    ],
+    "takeaway": "The board is a fixed 9 by 9, so both are tiny in practice. The idea is what to learn: one set per row, column and box turns every rule into a lookup."
+  },
+  "variants": [
+    { "id": "sets", "label": "Row, column and box sets", "tsFn": "isValidSudoku", "goFn": "isValidSudoku", "stages": [
+      { "n": 1, "title": "27 empty sets", "note": "Nine sets for rows, nine for columns, nine for boxes. Each holds the digits seen there." },
+      { "n": 2, "title": "Find the box", "note": "A cell has a row r and a column c. Its box is floor(r/3)*3 + floor(c/3)." },
+      { "n": 3, "title": "Seen? Invalid", "note": "If the digit is already in the row set, the column set or the box set, the board is invalid. After the last cell it is valid." },
+      { "n": 4, "title": "Remember in all three", "note": "Add the digit to its row set, its column set and its box set." }
+    ] }
+  ],
+  "goArgs": ["[][]string"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty board", "input": "all dots", "output": "true", "why": "Nothing is filled, so nothing can clash. Dots are skipped, never stored." },
+    { "title": "Clash only in a box", "input": "5 at (0,0) and (2,2)", "output": "false", "why": "No shared row or column. Only the box set catches it." },
+    { "title": "Same digit, diagonal boxes", "input": "5 at (0,3) and (3,0)", "output": "true", "why": "Different row, column and box. A wrong box formula such as r/3 + c/3 would put both in box 1 and fail this." },
+    { "title": "Clash in the last cell", "input": "solved board, last cell changed", "output": "false", "why": "The scan must reach the end. Stopping early on a small prefix of the board misses it." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "new Array(9).fill(new Set()) puts the same Set object in all nine slots. Every row would share one set. Use Array.from({ length: 9 }, () => new Set())." },
+    { "lang": "TypeScript", "text": "Cells are strings. The dot is a string too. Compare with '.' and keep digits as strings in the sets. Do not mix 5 and '5'." },
+    { "lang": "Go", "text": "[9][9]bool arrays are zeroed values, so no setup is needed. Index the digit as board[r][c][0] - '1' to get 0 to 8. A dot must be skipped before that, or the byte math wraps around." },
+    { "lang": "Go", "text": "r/3 is integer division, so r/3*3 + c/3 needs no floor. In TypeScript the same expression needs Math.floor, because / gives a float." },
+    { "lang": "General", "text": "Use one pass with all three checks. Three separate passes work too, but the box check is the one most often forgotten." }
+  ],
+  "recap": {
+    "pattern": "Hash sets per row, column and box",
+    "key": "Each digit must be new in its row set, its column set and its box set. The box is floor(r/3)*3 + floor(c/3).",
+    "complexity": "Time O(81) = constant for a 9 by 9 board. Space O(81).",
+    "moves": ["Make 9 row sets, 9 column sets, 9 box sets", "Skip empty cells", "Reject if the digit is in its row, column or box set", "Otherwise add it to all three"]
+  }
+}

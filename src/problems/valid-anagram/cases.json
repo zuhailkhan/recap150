@@ -1,0 +1,12 @@
+[
+  {"name":"classic anagram","input":["anagram","nagaram"],"expected":true},
+  {"name":"different letters","input":["rat","car"],"expected":false},
+  {"name":"listen and silent","input":["listen","silent"],"expected":true},
+  {"name":"whole alphabet reversed","input":["abcdefghijklmnopqrstuvwxyz","zyxwvutsrqponmlkjihgfedcba"],"expected":true},
+  {"name":"two empty strings","input":["",""],"expected":true,"edge":true},
+  {"name":"different lengths","input":["ab","a"],"expected":false,"edge":true},
+  {"name":"same letter set, different counts","input":["aab","abb"],"expected":false,"edge":true},
+  {"name":"same length, one letter too many","input":["aacc","ccac"],"expected":false,"edge":true},
+  {"name":"single equal letters","input":["a","a"],"expected":true,"edge":true},
+  {"name":"same string","input":["hello","hello"],"expected":true}
+]

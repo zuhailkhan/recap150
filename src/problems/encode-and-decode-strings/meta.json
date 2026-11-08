@@ -1,0 +1,70 @@
+{
+  "slug": "encode-and-decode-strings",
+  "title": "Encode and Decode Strings",
+  "category": "Arrays & Hashing",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Write two functions. encode turns a list of strings into one single string. decode turns that string back into the exact same list. The strings may hold any characters at all, including empty ones, commas, hashes and digits.",
+  "example": {
+    "caption": "Each word is written as its length, a hash, then the word. The length tells decode where the word ends.",
+    "input": [{ "kind": "array", "label": "strs", "items": ["lint", "code", "!"] }],
+    "output": [{ "kind": "array", "label": "encoded", "items": ["4", "#", "l", "i", "n", "t", "4", "#", "c", "o", "d", "e", "1", "#", "!"], "tones": ["focus", "keep", "hit", "hit", "hit", "hit", "focus", "keep", "hit", "hit", "hit", "hit", "focus", "keep", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Write each word as its length, then a #, then the word. When decoding, read the length and then take exactly that many characters, no matter what they are.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "delimiter", "plain": "A separator character such as a comma. It breaks as soon as the data itself can contain that character." },
+      { "term": "length prefix", "plain": "A number written before the data that says how long the data is. Many network formats work this way." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of strings. The trace runs encode, then decode, and the result is the decoded list.",
+    "presets": [
+      { "label": "Two words", "args": [["lint", "code"]] },
+      { "label": "Hash and digits inside", "args": [["3#a", "#"]] },
+      { "label": "Empty string inside", "args": [["", "ok"]] },
+      { "label": "Only empty strings", "args": [["", ""]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "total number of characters in all the strings" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Escape every special character, then unescape", "optimalLabel": "Length prefix, one pass", "unit": "character visits (rough)" },
+    "rows": [
+      { "name": "Delimiter with escaping", "time": "O(n)", "space": "O(n)", "note": "Works, but you must escape the delimiter and the escape character everywhere, and unescape correctly. Easy to get wrong." },
+      { "name": "Length prefix", "time": "O(n)", "space": "O(n)", "note": "Each character is written once and read once. Decode never rescans a word, it jumps over it." }
+    ],
+    "takeaway": "Both are linear. The prefix wins on safety: decode never has to guess where a word ends, so no character is special inside a word."
+  },
+  "variants": [
+    { "id": "prefix", "label": "Length prefix", "tsFn": "roundTrip", "goFn": "roundTrip", "stages": [
+      { "n": 1, "title": "Encode: length # word", "note": "For each word write its length, a hash, then the word. Join them all in one string." },
+      { "n": 2, "title": "Decode: read the length", "note": "From position i, read digits up to the first hash. That number is the length of the next word." },
+      { "n": 3, "title": "Take that many characters", "note": "Cut exactly that many characters after the hash. A hash or digit inside the word is only text now." },
+      { "n": 4, "title": "Jump to the next length", "note": "Move i past the word. Repeat until the end of the text." }
+    ] }
+  ],
+  "goArgs": ["[]string"],
+  "goRet": "[]string",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty list", "input": "[]", "output": "[]", "why": "Encodes to empty text. Decode loops zero times and returns an empty list, not null." },
+    { "title": "One empty string", "input": "[\"\"]", "output": "[\"\"]", "why": "Encodes to \"0#\", not to empty text. That is how it differs from an empty list." },
+    { "title": "Hash inside a word", "input": "[\"a#b\", \"#\"]", "output": "[\"a#b\", \"#\"]", "why": "Decode finds the first hash after the length only. The rest is taken by count, so inner hashes never matter." },
+    { "title": "Word that looks like a prefix", "input": "[\"3#x\", \"12\"]", "output": "[\"3#x\", \"12\"]", "why": "Digits and hashes inside words are skipped over by length. Only the position after a word is read as a length." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Never join with a plain delimiter such as a comma and split on it. The data may contain that character. Escaping fixes it but is fragile. A length prefix needs no escaping." },
+    { "lang": "General", "text": "An empty list and a list with one empty string must encode differently. \"\" versus \"0#\" does that." },
+    { "lang": "TypeScript", "text": "Read the length by finding the first '#', not by reading one digit. Lengths like 12 have two digits." },
+    { "lang": "TypeScript", "text": "String length counts UTF-16 units and slice uses the same units, so the round trip is consistent even for emoji. The encoded text is still correct." },
+    { "lang": "Go", "text": "len(s) counts bytes, and slicing by bytes is consistent with it. The round trip is exact for any UTF-8. Do not mix len(s) with a rune count." },
+    { "lang": "Go", "text": "Start decode with res := []string{}, not var res []string. A nil slice becomes JSON null when you serialise it." }
+  ],
+  "recap": {
+    "pattern": "Length-prefix framing",
+    "key": "Store the length before each word. Decode reads the number, then takes exactly that many characters.",
+    "complexity": "Time O(n) for n total characters. Space O(n).",
+    "moves": ["For each word, append length, then #, then the word", "In decode, read digits up to the first #", "Take exactly that many characters as the word", "Move past the word and repeat"]
+  }
+}

@@ -1,0 +1,11 @@
+function isAnagram(s, w)
+  if length(s) != length(w)             # [1] different lengths can never match
+    return false
+  count = empty tally, letter -> number # [1] how many more s used than w so far
+  for each letter c in s
+    count[c] = count[c] + 1             # [2] count up with s
+  for each letter c in w
+    count[c] = count[c] - 1             # [3] count down with w
+    if count[c] < 0                     # [3] w used c more often than s had it
+      return false
+  return true                           # [4] no count went negative, so all are zero

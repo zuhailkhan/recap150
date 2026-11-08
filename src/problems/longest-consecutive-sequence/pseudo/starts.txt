@@ -1,0 +1,11 @@
+function longestConsecutive(nums)
+  set = set of all numbers in nums        # [1] instant "is it present?"
+  best = 0
+  for each x in set
+    if x - 1 is in set                    # [2] x is in the middle of a run: skip
+      continue
+    end = x                               # [3] x starts a run: walk upward
+    while end + 1 is in set
+      end = end + 1
+    best = max(best, end - x + 1)         # [4] keep the longest run seen
+  return best

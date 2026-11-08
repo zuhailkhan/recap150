@@ -1,0 +1,12 @@
+function productExceptSelf(nums)
+  n = length(nums)
+  out = list of n zeros                 # [1] out[i] will be the answer for i
+  prefix = 1                            # product of everything left of i
+  for i from 0 to n - 1
+    out[i] = prefix                     # [2] left sweep
+    prefix = prefix * nums[i]
+  suffix = 1                            # product of everything right of i
+  for i from n - 1 down to 0
+    out[i] = out[i] * suffix            # [3] right sweep
+    suffix = suffix * nums[i]
+  return out

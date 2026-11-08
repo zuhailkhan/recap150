@@ -1,0 +1,76 @@
+{
+  "slug": "valid-anagram",
+  "title": "Valid Anagram",
+  "category": "Arrays & Hashing",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get two strings of lowercase letters. Return true if the second one can be made by rearranging the letters of the first, using every letter exactly as many times as it appears. Otherwise return false.",
+  "example": {
+    "caption": "Both words use one r, one a and one t. Only the order differs, so every count ends at zero.",
+    "input": [
+      { "kind": "array", "label": "s", "items": ["r", "a", "t"] },
+      { "kind": "array", "label": "w", "items": ["t", "a", "r"] }
+    ],
+    "output": [{ "kind": "buckets", "label": "tally after both passes", "keyLabel": "letter → count", "buckets": [
+      { "key": "r", "items": [0], "tone": "hit" },
+      { "key": "a", "items": [0], "tone": "hit" },
+      { "key": "t", "items": [0], "tone": "hit" }
+    ] }]
+  },
+  "idea": {
+    "sentence": "Count the letters of the first word going up, then the letters of the second word going down. Anagrams end with every count at zero.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "anagram", "plain": "A word made by rearranging the letters of another word." },
+      { "term": "tally", "plain": "A table of letter to count. It is a small hash map." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: two lowercase strings, e.g. \"anagram\", \"nagaram\"",
+    "presets": [
+      { "label": "Anagram", "args": ["listen", "silent"] },
+      { "label": "Extra letter in w", "args": ["aab", "abb"] },
+      { "label": "Letter w lacks", "args": ["abc", "abd"] },
+      { "label": "Repeated letters", "args": ["aacc", "ccac"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of each string" }],
+    "compare": { "brute": "nlogn", "optimal": "n", "bruteLabel": "Sort both, then compare", "optimalLabel": "Count up, count down", "unit": "steps (rough)" },
+    "rows": [
+      { "name": "Sort both strings", "time": "O(n log n)", "space": "O(n)", "note": "Anagrams sort to the same string. Sorting costs the log factor." },
+      { "name": "Tally up and down", "time": "O(n)", "space": "O(1)", "note": "Two passes. The tally has at most 26 letters, so it does not grow with n." }
+    ],
+    "takeaway": "Order does not matter for an anagram, only the counts do. Counting skips the sort."
+  },
+  "variants": [
+    { "id": "tally", "label": "Letter tally", "tsFn": "isAnagram", "goFn": "isAnagram", "stages": [
+      { "n": 1, "title": "Length check, empty tally", "note": "Different lengths fail at once. Otherwise start a table of letter counts." },
+      { "n": 2, "title": "Count up with s", "note": "Add one to the count of each letter of the first word." },
+      { "n": 3, "title": "Count down with w", "note": "Take one away for each letter of the second word. A count below zero means w has a letter s lacks." },
+      { "n": 4, "title": "All zero", "note": "Equal lengths and no negative count means every count is zero. It is an anagram." }
+    ] }
+  ],
+  "goArgs": ["string", "string"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Two empty strings", "input": "\"\", \"\"", "output": "true", "why": "No letters on either side. Every count is trivially zero." },
+    { "title": "Different lengths", "input": "\"ab\", \"a\"", "output": "false", "why": "The length check answers at once. Without it, the leftover letter would need extra logic." },
+    { "title": "Same letters, other counts", "input": "\"aab\", \"abb\"", "output": "false", "why": "Both use only a and b. The counts differ, so a set of letters is not enough." },
+    { "title": "One letter", "input": "\"a\", \"a\"", "output": "true", "why": "Up one, down one, back to zero." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "The sort-both approach is tempting: [...s].sort().join('') === [...w].sort().join(''). It works for letters, but it is O(n log n). Array.sort with no comparer compares as text, so never reuse it for numbers." },
+    { "lang": "TypeScript", "text": "Map.get returns undefined for a letter never counted. Use ?? 0, or the first increment gives NaN." },
+    { "lang": "Go", "text": "count[s[i]-'a'] panics if a byte is not a lowercase letter. An uppercase letter or a digit gives an index outside 0..25. For unicode input use map[rune]int and range over the string." },
+    { "lang": "Go", "text": "A [26]int is a value, not a pointer. It lives on the stack and is zeroed for you. No make call is needed." },
+    { "lang": "General", "text": "Comparing only the sets of letters is wrong. \"aab\" and \"abb\" share the same letters with different counts." }
+  ],
+  "recap": {
+    "pattern": "Frequency count: up then down",
+    "key": "Anagrams have equal letter counts. Add for one string, subtract for the other, and nothing may go below zero.",
+    "complexity": "Time O(n). Space O(1) for 26 letters.",
+    "moves": ["Return false if the lengths differ", "Count each letter of s", "Subtract each letter of w. Below zero means false", "Otherwise return true"]
+  }
+}

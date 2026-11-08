@@ -1,0 +1,72 @@
+{
+  "slug": "contains-duplicate",
+  "title": "Contains Duplicate",
+  "category": "Arrays & Hashing",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get a list of integers. Return true if any value shows up more than once, and false if every value is different.",
+  "example": {
+    "caption": "The value 1 appears at index 0 and at index 3. So the answer is true.",
+    "input": [{ "kind": "array", "label": "nums", "items": [1, 2, 3, 1] }],
+    "output": [
+      { "kind": "array", "label": "nums", "items": [1, 2, 3, 1], "tones": ["hit", null, null, "hit"] },
+      { "kind": "array", "label": "answer", "items": ["true"], "tones": ["hit"] }
+    ]
+  },
+  "idea": {
+    "sentence": "Keep a set of the numbers you have passed. If the next number is already in the set, it is a repeat.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "set", "plain": "A collection with no repeats. Asking whether a value is in it takes about one step." },
+      { "term": "first repeat", "plain": "The earliest position whose value was already seen. We can stop right there." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of numbers, e.g. [1,2,3,1]",
+    "presets": [
+      { "label": "Repeat found", "args": [[4, 7, 1, 7, 9]] },
+      { "label": "All different", "args": [[3, 1, 2]] },
+      { "label": "Zero twice", "args": [[0, 5, 0]] },
+      { "label": "Back to back", "args": [[6, 6]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of integers in the list" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Compare every pair", "optimalLabel": "One pass with a set", "unit": "comparisons (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n²)", "space": "O(1)", "note": "Compare each number with every number after it." },
+      { "name": "Sort first", "time": "O(n log n)", "space": "O(1) to O(n)", "note": "Equal values end up side by side. Compare neighbours. Sorting costs the log factor." },
+      { "name": "Set, one pass", "time": "O(n)", "space": "O(n)", "note": "One lookup and one insert per number. The set can hold all n if nothing repeats." }
+    ],
+    "takeaway": "A set answers \"have I seen this?\" in one step. That replaces the rescan of the whole list."
+  },
+  "variants": [
+    { "id": "seen", "label": "Seen set", "tsFn": "containsDuplicate", "goFn": "containsDuplicate", "stages": [
+      { "n": 1, "title": "Empty set", "note": "A set that will hold every number already passed." },
+      { "n": 2, "title": "Look at a number", "note": "Take the next number and ask whether the set already has it." },
+      { "n": 3, "title": "Seen? Answer true", "note": "If the set has it, return true at once. If the loop ends, return false." },
+      { "n": 4, "title": "Remember", "note": "Otherwise add the number to the set and continue." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty list", "input": "[]", "output": "false", "why": "There is nothing to repeat. The loop never runs and the answer is false." },
+    { "title": "One number", "input": "[7]", "output": "false", "why": "A number cannot repeat itself. The check runs before the insert." },
+    { "title": "Zero twice", "input": "[0, 0]", "output": "true", "why": "Zero is a normal value. Test with has, not with a truthy check." },
+    { "title": "Repeat at the far end", "input": "[5, 1, 2, 3, 5]", "output": "true", "why": "The set must remember the very first number until the end." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Checking nums.includes(x) inside the loop looks like a set lookup but scans the array. That turns O(n) into O(n²)." },
+    { "lang": "TypeScript", "text": "new Set(nums).size !== nums.length is a short valid answer. It always builds the whole set, so it never stops early." },
+    { "lang": "Go", "text": "Go has no set type. Use map[int]struct{}. The empty struct takes no space, and the comma-ok form tells you if the key exists." },
+    { "lang": "General", "text": "Insert after the check. If you add first, every number finds itself in the set and the answer is always true." }
+  ],
+  "recap": {
+    "pattern": "Hash set: have I seen this?",
+    "key": "Walk the list with a set of past values. A value already in the set is the answer.",
+    "complexity": "Time O(n). Space O(n).",
+    "moves": ["Make an empty set", "For each number, check if the set has it", "If yes, return true", "Otherwise add it. Return false at the end"]
+  }
+}

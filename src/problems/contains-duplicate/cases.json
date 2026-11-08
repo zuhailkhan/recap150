@@ -1,0 +1,11 @@
+[
+  {"name":"repeat at the end","input":[[1,2,3,1]],"expected":true},
+  {"name":"all different","input":[[1,2,3,4]],"expected":false},
+  {"name":"many repeats","input":[[1,1,1,3,3,4,3,2,4,2]],"expected":true},
+  {"name":"repeat at both ends","input":[[5,1,2,3,5]],"expected":true},
+  {"name":"empty list","input":[[]],"expected":false,"edge":true},
+  {"name":"single number","input":[[7]],"expected":false,"edge":true},
+  {"name":"zero twice","input":[[0,0]],"expected":true,"edge":true},
+  {"name":"negatives","input":[[-1,1,-1]],"expected":true,"edge":true},
+  {"name":"huge values, no repeat","input":[[1000000000,-1000000000,999999999]],"expected":false}
+]

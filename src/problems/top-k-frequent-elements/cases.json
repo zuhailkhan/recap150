@@ -1,0 +1,11 @@
+[
+  {"name":"classic","input":[[1,1,1,2,2,3],2],"expected":[1,2]},
+  {"name":"single element","input":[[1],1],"expected":[1],"edge":true},
+  {"name":"all the same","input":[[4,4,4,4],1],"expected":[4],"edge":true},
+  {"name":"k equals distinct count","input":[[1,2,2,3,3,3],3],"expected":[1,2,3],"edge":true},
+  {"name":"negative values","input":[[-1,-1,5,5,5,2],1],"expected":[5]},
+  {"name":"zero is a value","input":[[0,0,1],1],"expected":[0],"edge":true},
+  {"name":"frequent value is not first","input":[[5,3,3,5,5,3,3],1],"expected":[3]},
+  {"name":"ten or more repeats","input":[[7,7,7,7,7,7,7,7,7,7,8,8,9],2],"expected":[7,8]},
+  {"name":"two values, k is two","input":[[1,2],2],"expected":[1,2],"edge":true}
+]

@@ -1,0 +1,16 @@
+function encodeList(strs)
+  out = empty text
+  for each word w in strs
+    out = out + length(w) + "#" + w     # [1] length, then '#', then the word
+
+function decodeList(s)
+  result = empty list
+  i = 0
+  while i < length(s)
+    j = i
+    while s[j] is not "#"
+      j = j + 1                         # [2] the digits run up to the first '#'
+    n = number written in s[i .. j-1]
+    add s[j+1 .. j+n] to result         # [3] take exactly n characters
+    i = j + 1 + n                       # [4] jump past the word to the next length
+  return result

@@ -1,0 +1,12 @@
+[
+  {"name":"two words","input":[["lint","code"]],"expected":["lint","code"]},
+  {"name":"four words","input":[["we","say",":","yes"]],"expected":["we","say",":","yes"]},
+  {"name":"empty list","input":[[]],"expected":[],"edge":true},
+  {"name":"one empty string","input":[[""]],"expected":[""],"edge":true},
+  {"name":"several empty strings","input":[["","",""]],"expected":["","",""],"edge":true},
+  {"name":"words with hash","input":[["a#b","#","##"]],"expected":["a#b","#","##"],"edge":true},
+  {"name":"words that look like prefixes","input":[["3#x","12","0#"]],"expected":["3#x","12","0#"],"edge":true},
+  {"name":"commas and spaces","input":[["a,b"," ","c, d"]],"expected":["a,b"," ","c, d"]},
+  {"name":"unicode","input":[["héllo","日本","x"]],"expected":["héllo","日本","x"]},
+  {"name":"long word","input":[["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","b"]],"expected":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","b"]}
+]

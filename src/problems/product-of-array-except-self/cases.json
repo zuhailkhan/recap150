@@ -1,0 +1,12 @@
+[
+  {"name":"classic","input":[[1,2,3,4]],"expected":[24,12,8,6]},
+  {"name":"one zero","input":[[-1,1,0,-3,3]],"expected":[0,0,9,0,0],"edge":true},
+  {"name":"two elements","input":[[2,3]],"expected":[3,2],"edge":true},
+  {"name":"two zeros","input":[[0,0]],"expected":[0,0],"edge":true},
+  {"name":"zero in the middle","input":[[1,0,3]],"expected":[0,3,0]},
+  {"name":"all the same","input":[[5,5,5]],"expected":[25,25,25]},
+  {"name":"negatives","input":[[-2,-3,4]],"expected":[-12,-8,6]},
+  {"name":"mixed signs","input":[[10,-10,1,2]],"expected":[-20,20,-200,-100]},
+  {"name":"all ones","input":[[1,1,1,1]],"expected":[1,1,1,1]},
+  {"name":"zero at the start","input":[[0,4,5]],"expected":[20,0,0],"edge":true}
+]
