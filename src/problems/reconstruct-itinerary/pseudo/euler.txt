@@ -1,0 +1,12 @@
+function findItinerary(tickets)
+  next = map: airport -> its destinations
+  sort each list so the smallest is taken first      # [1] smallest on the end of the list
+  path = [JFK] ; route = []
+  while path is not empty
+    here = last of path
+    if next[here] has an unused ticket
+      push (remove and return smallest of next[here]) onto path   # [2] fly it, ticket used up
+    else
+      move here from path to route                   # [3] stuck: add it AFTER its tickets are done
+  reverse route                                      # [4] route was built from the back
+  return route

@@ -1,0 +1,17 @@
+function alienOrder(words)
+  after = map: letter -> set of letters that must come after it
+  add every letter of every word as a node                    # [1] even letters with no rule
+  for each pair of neighbouring words a, b
+    if a is longer than b and b is a prefix of a: return ""   # [2] "abc" before "ab" is impossible
+    find the first position where a and b differ (x in a, y in b)
+    if there is one: add rule x -> y                          # [2] x comes before y
+  indegree[letter] = number of rules pointing at it
+  queue = letters with indegree 0                             # [3] nothing must come before them
+  order = ""
+  while queue is not empty
+    ch = pop front ; append ch to order                       # [4] output it
+    for each letter nxt that ch points to
+      indegree[nxt] -= 1
+      if indegree[nxt] == 0: push nxt                         # [4] unlocked
+  if order is shorter than the number of letters: return ""   # [5] a cycle blocked some letters
+  return order

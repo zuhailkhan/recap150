@@ -1,0 +1,74 @@
+{
+  "slug": "min-cost-to-connect-all-points",
+  "title": "Min Cost to Connect All Points",
+  "category": "Advanced Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get points on a flat grid as [x, y] pairs. Linking two points costs the Manhattan distance: |x1 - x2| + |y1 - y2|. Link the points with cables so that every point can reach every other one, as cheaply as possible. Return that minimum total cost.",
+  "example": {
+    "caption": "Five points, four cables, total cost 20. Each cable is labelled with its Manhattan distance.",
+    "input": [
+      { "kind": "array", "label": "points (x,y)", "items": ["0,0", "2,2", "3,10", "5,2", "7,0"] }
+    ],
+    "output": [
+      { "kind": "graph", "label": "cheapest cables, total 20", "nodes": [{ "id": "0", "x": 12, "y": 88 }, { "id": "1", "x": 34, "y": 73 }, { "id": "2", "x": 45, "y": 12 }, { "id": "3", "x": 66, "y": 73 }, { "id": "4", "x": 88, "y": 88 }], "edges": [{ "from": "0", "to": "1", "weight": 4, "tone": "hit" }, { "from": "1", "to": "3", "weight": 3, "tone": "hit" }, { "from": "3", "to": "4", "weight": 4, "tone": "hit" }, { "from": "1", "to": "2", "weight": 9, "tone": "hit" }] }
+    ]
+  },
+  "idea": {
+    "sentence": "Grow one connected group from a start point, and each time add the outside point that is cheapest to link to the group.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "minimum spanning tree (MST)", "plain": "The cheapest set of links that connects every point. With n points it has exactly n-1 links and no loops." },
+      { "term": "Manhattan distance", "plain": "Distance when you can only move along the grid: horizontal steps plus vertical steps." },
+      { "term": "Prim's algorithm", "plain": "Build the tree from one point outward, always taking the cheapest link that leaves the tree." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of [x, y] points, e.g. [[0,0],[2,2],[3,10],[5,2],[7,0]]",
+    "presets": [
+      { "label": "Five points", "args": [[[0, 0], [2, 2], [3, 10], [5, 2], [7, 0]]] },
+      { "label": "In a line", "args": [[[0, 0], [1, 0], [2, 0], [3, 0]]] },
+      { "label": "Plus shape", "args": [[[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of points" }],
+    "compare": { "brute": "n3", "optimal": "n2", "bruteLabel": "Try combinations of links", "optimalLabel": "Prim with a cost array", "unit": "checks (rough; real brute force is far worse)" },
+    "rows": [
+      { "name": "Try every set of links", "time": "exponential", "space": "O(n)", "note": "There are n(n-1)/2 possible links. Choosing n-1 of them blows up fast." },
+      { "name": "Prim with a cost array", "time": "O(n^2)", "space": "O(n)", "note": "n rounds. Each round scans for the cheapest outside point and updates costs. Good for a complete graph." },
+      { "name": "Kruskal with union-find", "time": "O(n^2 log n)", "space": "O(n^2)", "note": "Sort all n^2/2 links, then join groups. Not shown. Slower here because the graph is complete." }
+    ],
+    "takeaway": "Every point can reach every other, so the graph is dense. A plain array scan beats a heap, because the heap would hold about n^2 links."
+  },
+  "variants": [
+    { "id": "prim", "label": "Prim (cost array)", "tsFn": "minCostConnectPoints", "goFn": "minCostConnectPoints", "stages": [
+      { "n": 1, "title": "Start the tree", "note": "Point 0 joins for free. Every other point has no known link yet, so its cost is infinity." },
+      { "n": 2, "title": "Pick the cheapest outside point", "note": "Scan the points not yet in the tree. The one with the smallest cost joins, and its cost is added to the total." },
+      { "n": 3, "title": "Update costs", "note": "The new tree point may be closer to an outside point than any earlier tree point. If so, lower that point's cost." },
+      { "n": 4, "title": "Return the total", "note": "After n rounds all points are connected. The sum of the costs paid is the answer." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One point", "input": "[[0,0]]", "output": "0", "why": "Nothing to connect. Point 0 joins for free and the loop ends." },
+    { "title": "Points in a line", "input": "[[0,0],[1,0],[2,0],[3,0]]", "output": "3", "why": "The cheapest cables join neighbours only. Jumping from 0 straight to 3 costs 3 by itself and still leaves others out." },
+    { "title": "Very far apart", "input": "[[-1000000,-1000000],[1000000,1000000]]", "output": "4000000", "why": "Negative coordinates are fine because of the absolute values. The total can reach about 4 million times n, which still fits in an int." },
+    { "title": "Cheap link updated later", "input": "[[0,0],[2,2],[3,10],[5,2],[7,0]]", "output": "20", "why": "Point 3 first looks 7 away through point 0, then only 3 away through point 1. The update step is what finds that." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Only update an outside point's cost, never a point already in the tree. Its cost was paid and is final." },
+    { "lang": "General", "text": "Prim needs a single connected start. Because every pair of points can be linked, point 0 reaches everyone and no connectivity check is needed." },
+    { "lang": "TypeScript", "text": "Infinity works as 'no link yet' in comparisons, but it turns into null in JSON. Never put raw Infinity into anything you serialise or display." },
+    { "lang": "Go", "text": "math.MaxInt as 'no link yet' is safe here because it is only compared, never added to. Adding to it would overflow to a negative number and win every comparison." },
+    { "lang": "Go", "text": "There is no built-in integer abs. math.Abs takes and returns float64, so write a small abs(x int) helper." }
+  ],
+  "recap": {
+    "pattern": "MST: Prim's algorithm",
+    "key": "Keep the cheapest link into the tree for every outside point, add the cheapest point, then refresh the links.",
+    "complexity": "Time O(n^2). Space O(n).",
+    "moves": ["Start the tree at point 0 with cost 0", "Pick the outside point with the smallest cost", "Add its cost, then lower other costs via the new point", "Repeat n times and return the total"]
+  }
+}

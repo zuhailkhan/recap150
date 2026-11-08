@@ -1,0 +1,11 @@
+function swimInWater(grid)
+  heap = min-heap of (level, row, col)
+  push (grid[0][0], 0, 0) ; mark (0,0) seen            # [1] start costs its own height
+  while heap is not empty
+    (level, r, c) = pop smallest level                 # [2] lowest water that reaches a new cell
+    if (r, c) is the bottom-right cell
+      return level                                     # [4] goal reached at the lowest level
+    for each unseen neighbour (nr, nc)
+      mark seen
+      push (max(level, grid[nr][nc]), nr, nc)          # [3] the path is as high as its highest cell
+  return -1

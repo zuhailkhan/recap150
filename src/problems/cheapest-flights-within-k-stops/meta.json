@@ -1,0 +1,77 @@
+{
+  "slug": "cheapest-flights-within-k-stops",
+  "title": "Cheapest Flights Within K Stops",
+  "category": "Advanced Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "There are n cities and a list of one-way flights [from, to, price]. Find the cheapest price to get from src to dst using at most k stops in between. A trip with k stops uses k + 1 flights. Return -1 if no such trip exists.",
+  "example": {
+    "caption": "From city 0 to city 3 with at most 1 stop. 0, 1, 3 costs 700. The cheaper 0, 1, 2, 3 (400) needs two stops, so it is not allowed.",
+    "input": [
+      { "kind": "graph", "label": "flights, k = 1", "nodes": [{ "id": "0", "x": 12, "y": 50 }, { "id": "1", "x": 44, "y": 10 }, { "id": "2", "x": 44, "y": 90 }, { "id": "3", "x": 88, "y": 50 }], "edges": [{ "from": "0", "to": "1", "weight": 100, "directed": true }, { "from": "1", "to": "2", "weight": 100, "directed": true }, { "from": "2", "to": "0", "weight": 100, "directed": true }, { "from": "1", "to": "3", "weight": 600, "directed": true }, { "from": "2", "to": "3", "weight": 200, "directed": true }] }
+    ],
+    "output": [{ "kind": "graph", "label": "best trip within 1 stop: 700", "nodes": [{ "id": "0", "x": 12, "y": 50 }, { "id": "1", "x": 44, "y": 10 }, { "id": "2", "x": 44, "y": 90 }, { "id": "3", "x": 88, "y": 50 }], "edges": [{ "from": "0", "to": "1", "weight": 100, "directed": true, "tone": "hit" }, { "from": "1", "to": "3", "weight": 600, "directed": true, "tone": "hit" }, { "from": "1", "to": "2", "weight": 100, "directed": true }, { "from": "2", "to": "3", "weight": 200, "directed": true }, { "from": "2", "to": "0", "weight": 100, "directed": true }] }]
+  },
+  "idea": {
+    "sentence": "Run k + 1 rounds, where round r finds the best price using at most r flights, and in each round read prices from a copy of the previous round.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "Bellman-Ford", "plain": "Go over every edge again and again, lowering a node's cost when an edge gives a cheaper way. After r passes, costs are correct for paths of at most r edges." },
+      { "term": "stop", "plain": "A city you land in between the start and the goal. k stops means k + 1 flights." },
+      { "term": "relax an edge", "plain": "If cost[from] + price beats cost[to], update cost[to]." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Five arguments: n, flights, src, dst, k. E.g. 4, [[0,1,100],[1,2,100],[2,0,100],[1,3,600],[2,3,200]], 0, 3, 1",
+    "presets": [
+      { "label": "One stop allowed", "args": [4, [[0, 1, 100], [1, 2, 100], [2, 0, 100], [1, 3, 600], [2, 3, 200]], 0, 3, 1] },
+      { "label": "Two stops allowed", "args": [4, [[0, 1, 100], [1, 2, 100], [2, 0, 100], [1, 3, 600], [2, 3, 200]], 0, 3, 2] },
+      { "label": "No route", "args": [3, [[0, 1, 100]], 0, 2, 1] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "n", "meaning": "number of cities" },
+      { "sym": "m", "meaning": "number of flights" },
+      { "sym": "k", "meaning": "stops allowed" }
+    ],
+    "compare": { "brute": "2n", "optimal": "nm", "bruteLabel": "Try every route up to k+1 flights", "optimalLabel": "k+1 rounds over all flights", "unit": "steps (rough; routes can grow like m^(k+1), and nm stands for (k+1) * m)" },
+    "rows": [
+      { "name": "Try every route", "time": "O(m^(k+1))", "space": "O(k)", "note": "Follow every flight sequence of at most k+1 flights and keep the cheapest that reaches dst." },
+      { "name": "Bellman-Ford, k+1 rounds", "time": "O(k * m)", "space": "O(n)", "note": "Each round touches every flight once. Only two cost arrays are alive." },
+      { "name": "Dijkstra on (city, flights used)", "time": "O(k * m log(k * n))", "space": "O(k * n)", "note": "Not shown. Works, but the state must include flights used, so plain Dijkstra on cities is wrong." }
+    ],
+    "takeaway": "Plain Dijkstra ignores the stop limit. Bellman-Ford rounds count flights for free, but only if every round reads a frozen copy."
+  },
+  "variants": [
+    { "id": "bellman", "label": "Bellman-Ford", "tsFn": "findCheapestPrice", "goFn": "findCheapestPrice", "stages": [
+      { "n": 1, "title": "Start", "note": "Cost to src is 0, everything else infinity. This is the situation with zero flights." },
+      { "n": 2, "title": "Copy for the round", "note": "Make next as a copy of cost. The round reads cost and writes next." },
+      { "n": 3, "title": "Add one flight", "note": "For each flight, if cost[from] + price beats next[to], update next[to]. Reading cost keeps it to one extra flight." },
+      { "n": 4, "title": "Answer", "note": "After k + 1 rounds read cost[dst]. If it is still infinity, return -1." }
+    ] }
+  ],
+  "goArgs": ["int", "[][]int", "int", "int", "int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "k = 0, direct flight only", "input": "0 to 2 in [[0,1,100],[1,2,100],[0,2,500]], k=0", "output": "500", "why": "One round means one flight. The cheap two-flight route through city 1 is not allowed." },
+    { "title": "Cheaper route needs too many stops", "input": "chain 0-1-2-3-4 at 1 each, plus 0 to 4 at 10, k=2", "output": "10", "why": "The chain costs 4 but needs 4 flights. With k=2 only 3 flights are allowed, so the direct 10 wins." },
+    { "title": "No route", "input": "[[0,1,100]], 0 to 2, k=1", "output": "-1", "why": "City 2 stays at infinity. Return -1, not the infinity value." },
+    { "title": "Parallel flights", "input": "[[0,1,5],[0,1,2]], 0 to 1, k=0", "output": "2", "why": "Both flights are checked. The second one lowers the cost from 5 to 2." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Update in place and a single round can chain several flights, because a later flight sees the price the earlier one just wrote. The stop limit is silently ignored. Always write to a copy." },
+    { "lang": "General", "text": "Do not run Dijkstra on cities alone. The cheapest way to a city may use too many flights, while a pricier way with fewer flights is the one you need later." },
+    { "lang": "TypeScript", "text": "cost.slice() is a shallow copy, which is enough for a flat number array. For a 2-D table you would also have to copy every row." },
+    { "lang": "TypeScript", "text": "Infinity is fine for comparing costs, but JSON turns it into null. Never put raw Infinity into anything you display or send." },
+    { "lang": "Go", "text": "math.MaxInt + price overflows to a negative number and would beat every real cost. Check cost[from] != math.MaxInt before adding." },
+    { "lang": "Go", "text": "next := cost would only copy the slice header, so both names would share one array. Use slices.Clone (or make + copy)." }
+  ],
+  "recap": {
+    "pattern": "Bellman-Ford with a round limit",
+    "key": "Round r holds the best prices using at most r flights, built by reading the previous round's copy.",
+    "complexity": "Time O(k * m). Space O(n).",
+    "moves": ["Set cost[src] = 0, others infinity", "Each of k + 1 rounds: copy cost into next", "For every flight, relax next[to] using cost[from]", "Swap, repeat, then return cost[dst] or -1"]
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "slug": "swim-in-rising-water",
+  "title": "Swim In Rising Water",
+  "category": "Advanced Graphs",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "An n by n grid holds each height from 0 to n*n-1 exactly once. Water rises over time: at time t you may stand on any cell with height at most t, and you can swim between touching cells instantly. Starting at the top-left cell at time 0, find the earliest time you can stand on the bottom-right cell.",
+  "example": {
+    "caption": "The best path goes 0, 3, 1, 2, 4. Its highest cell is 4, so you must wait until time 4. Going through the 8 would cost more.",
+    "input": [
+      { "kind": "grid", "label": "heights", "cells": [[0, 3, 1], [7, 8, 2], [6, 5, 4]] }
+    ],
+    "output": [{ "kind": "grid", "label": "best path, highest cell 4", "cells": [[0, 3, 1], [7, 8, 2], [6, 5, 4]], "tones": [["hit", "hit", "hit"], [null, null, "hit"], [null, null, "hit"]] }]
+  },
+  "idea": {
+    "sentence": "The cost of a path is its highest cell, so run Dijkstra where a cell's cost is the larger of the cost so far and its own height.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "bottleneck path", "plain": "A path judged by its single worst step (here the highest cell) instead of by the sum of its steps." },
+      { "term": "Dijkstra-like", "plain": "Always process the cheapest unfinished item next. Only the cost rule changes: max instead of plus." },
+      { "term": "flooded region", "plain": "All cells you can reach at the current water level. It only grows as the level rises." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a square grid of distinct heights, e.g. [[0,3,1],[7,8,2],[6,5,4]]",
+    "presets": [
+      { "label": "Three by three", "args": [[[0, 3, 1], [7, 8, 2], [6, 5, 4]]] },
+      { "label": "Shortcut costs more", "args": [[[0, 5, 4], [1, 8, 3], [2, 6, 7]]] },
+      { "label": "Start is not zero", "args": [[[3, 2], [0, 1]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "grid side, so there are n*n cells" }],
+    "compare": { "brute": "n3", "optimal": "nlogn", "bruteLabel": "Try each water level, flood-fill each time", "optimalLabel": "One heap pass over the cells", "unit": "operations (rough; heap cost is N log N for N = n*n cells)" },
+    "rows": [
+      { "name": "Each level, flood-fill", "time": "O(n^4)", "space": "O(n^2)", "note": "For every time t from 0 to n*n-1, flood from the start. Each flood visits up to n*n cells." },
+      { "name": "Binary search on time + flood-fill", "time": "O(n^2 log n)", "space": "O(n^2)", "note": "Not shown. Connectivity only improves with time, so binary search the first time the corners connect." },
+      { "name": "Dijkstra with a heap", "time": "O(n^2 log n)", "space": "O(n^2)", "note": "Each cell enters the heap once. Each push and pop costs log of the heap size." }
+    ],
+    "takeaway": "When a path is judged by its worst cell, the cost rule is max, and Dijkstra's greedy order still works."
+  },
+  "variants": [
+    { "id": "dijkstra", "label": "Dijkstra (heap)", "tsFn": "swimInWater", "goFn": "swimInWater", "stages": [
+      { "n": 1, "title": "Start cell", "note": "Push the top-left cell with its own height as its level and mark it seen." },
+      { "n": 2, "title": "Pop the lowest level", "note": "Take the waiting cell with the smallest level. That level is the lowest water that reaches it." },
+      { "n": 3, "title": "Add neighbours", "note": "Each unseen neighbour costs max(current level, its own height). Mark it seen and push it." },
+      { "n": 4, "title": "Goal popped", "note": "The first time the bottom-right cell comes out of the heap, its level is the answer." }
+    ] }
+  ],
+  "goArgs": ["[][]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One cell", "input": "[[0]]", "output": "0", "why": "Start is also the goal. The very first pop is the target and returns its level." },
+    { "title": "Start is not the lowest", "input": "[[3,2],[0,1]]", "output": "3", "why": "You must stand on the start, so the answer is at least 3. Beginning the level at 0 instead of grid[0][0] would give a wrong answer." },
+    { "title": "Goal is the lowest", "input": "[[1,2],[3,0]]", "output": "2", "why": "Even a very low goal cell does not help. The path still needs to cross cell 2 or 3, and 2 is cheaper." },
+    { "title": "Longer path, lower peak", "input": "[[0,5,4],[1,8,3],[2,6,7]]", "output": "7", "why": "The route down the left edge then along the bottom touches 7 as its highest. Cutting through the 8 would need 8." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The path cost is max, not a sum. Push max(level, grid[nr][nc]). Adding heights would be a different, wrong problem." },
+    { "lang": "General", "text": "Marking a cell seen when you push it is safe here. The first route to reach a cell comes from the lowest popped level, so no later route can beat it." },
+    { "lang": "TypeScript", "text": "No built-in heap. Do not use array.sort() inside the loop. Also build seen with map, not Array(n).fill(Array(n).fill(false)), which would share one inner array across all rows." },
+    { "lang": "Go", "text": "Build the 2-D seen grid with a loop. make([][]bool, n) gives n nil rows, and indexing a nil row panics until you allocate it." },
+    { "lang": "Go", "text": "Use container/heap: heap.Push(h, x) and heap.Pop(h). Calling h.Push or h.Pop directly does not restore the heap order." }
+  ],
+  "recap": {
+    "pattern": "Dijkstra with a max cost",
+    "key": "Heap of cells by level. Pop the lowest, push neighbours with max(level, own height), stop when the goal pops.",
+    "complexity": "Time O(n^2 log n). Space O(n^2).",
+    "moves": ["Push the start with its own height", "Pop the cell with the lowest level", "Push each unseen neighbour at max(level, its height)", "Return the level when the bottom-right cell pops"]
+  }
+}

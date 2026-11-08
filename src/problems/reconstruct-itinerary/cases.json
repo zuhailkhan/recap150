@@ -1,0 +1,11 @@
+[
+  {"name": "classic", "input": [[["MUC", "LHR"], ["JFK", "MUC"], ["SFO", "SJC"], ["LHR", "SFO"]]], "expected": ["JFK", "MUC", "LHR", "SFO", "SJC"]},
+  {"name": "dead end first", "input": [[["JFK", "ATL"], ["JFK", "NRT"], ["NRT", "LAX"], ["LAX", "JFK"]]], "expected": ["JFK", "NRT", "LAX", "JFK", "ATL"], "edge": true},
+  {"name": "two loops", "input": [[["JFK", "SFO"], ["JFK", "ATL"], ["SFO", "ATL"], ["ATL", "JFK"], ["ATL", "SFO"]]], "expected": ["JFK", "ATL", "JFK", "SFO", "ATL", "SFO"]},
+  {"name": "one ticket", "input": [[["JFK", "AAA"]]], "expected": ["JFK", "AAA"], "edge": true},
+  {"name": "duplicate tickets", "input": [[["JFK", "KUL"], ["JFK", "KUL"], ["KUL", "JFK"]]], "expected": ["JFK", "KUL", "JFK", "KUL"], "edge": true},
+  {"name": "round trip", "input": [[["JFK", "NRT"], ["NRT", "JFK"]]], "expected": ["JFK", "NRT", "JFK"]},
+  {"name": "forced chain", "input": [[["JFK", "ZZZ"], ["ZZZ", "AAA"], ["AAA", "BBB"]]], "expected": ["JFK", "ZZZ", "AAA", "BBB"]},
+  {"name": "two returns", "input": [[["JFK", "ATL"], ["ATL", "JFK"], ["JFK", "BOS"], ["BOS", "JFK"]]], "expected": ["JFK", "ATL", "JFK", "BOS", "JFK"]},
+  {"name": "shuffled input", "input": [[["ATL", "JFK"], ["BOS", "JFK"], ["JFK", "BOS"], ["JFK", "ATL"]]], "expected": ["JFK", "ATL", "JFK", "BOS", "JFK"]}
+]

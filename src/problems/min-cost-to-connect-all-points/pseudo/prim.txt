@@ -1,0 +1,10 @@
+function minCostConnectPoints(points)
+  dist[i] = infinity for every point ; dist[0] = 0   # [1] tree = point 0
+  total = 0
+  repeat n times
+    u = outside point with the smallest dist          # [2] cheapest to reach
+    mark u as in the tree ; total += dist[u]
+    for each outside point v
+      d = |ux - vx| + |uy - vy|
+      if d < dist[v]: dist[v] = d                     # [3] u is a cheaper way in
+  return total                                        # [4] cost of the cheapest tree

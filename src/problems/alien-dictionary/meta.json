@@ -1,0 +1,75 @@
+{
+  "slug": "alien-dictionary",
+  "title": "Alien Dictionary",
+  "category": "Advanced Graphs",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "Aliens use the same letters we do, but in a different alphabet order. You get a list of words that is sorted by that unknown order. Work out a letter order that makes the list sorted, and return it as a string. If no order can work, return an empty string. If several orders work, any is fine. Here you get one fixed answer, as the notes explain.",
+  "example": {
+    "caption": "Neighbouring words give rules: t before f, w before e, r before t, e before r. The only order that obeys all four is w e r t f.",
+    "input": [
+      { "kind": "array", "label": "sorted words", "items": ["wrt", "wrf", "er", "ett", "rftt"] }
+    ],
+    "output": [{ "kind": "graph", "label": "rules, then order w e r t f", "nodes": [{ "id": "w", "x": 50, "y": 14 }, { "id": "r", "x": 84, "y": 40 }, { "id": "t", "x": 70, "y": 84 }, { "id": "f", "x": 30, "y": 84 }, { "id": "e", "x": 16, "y": 40 }], "edges": [{ "from": "t", "to": "f", "directed": true }, { "from": "w", "to": "e", "directed": true }, { "from": "r", "to": "t", "directed": true }, { "from": "e", "to": "r", "directed": true }], "tones": { "w": "hit", "e": "hit", "r": "hit", "t": "hit", "f": "hit" } }]
+  },
+  "idea": {
+    "sentence": "Each pair of neighbouring words gives one rule (first different letters), and a topological sort of those rules is the alphabet.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "topological sort", "plain": "An order of nodes where every arrow points forward. It exists only if the arrows have no loop." },
+      { "term": "indegree", "plain": "How many arrows still point at a node. A node with indegree 0 has nothing that must come before it." },
+      { "term": "Kahn's algorithm", "plain": "Output a node with indegree 0, delete its arrows, repeat. If nodes remain but none has indegree 0, there is a loop." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of words, e.g. [\"wrt\",\"wrf\",\"er\",\"ett\",\"rftt\"]",
+    "presets": [
+      { "label": "Five letters", "args": [["wrt", "wrf", "er", "ett", "rftt"]] },
+      { "label": "Rules form a loop", "args": [["a", "b", "c", "a"]] },
+      { "label": "Prefix trap", "args": [["x", "y", "abc", "ab"]] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "C", "meaning": "total number of characters in all words" },
+      { "sym": "U", "meaning": "number of distinct letters (at most 26)" }
+    ],
+    "compare": { "brute": "n3", "optimal": "n", "bruteLabel": "Try every letter order", "optimalLabel": "Read the words once, sort the rules", "unit": "steps (rough; trying every order is really U!)" },
+    "rows": [
+      { "name": "Try every order", "time": "O(U! * C)", "space": "O(U)", "note": "Check each permutation of the letters against the word list." },
+      { "name": "Rules + Kahn's sort", "time": "O(C + U + rules)", "space": "O(U + rules)", "note": "One pass over neighbouring words gives the rules. The sort touches each letter and rule once." }
+    ],
+    "takeaway": "Only neighbouring words matter, and only their first different letter. That turns a pile of words into a small graph."
+  },
+  "variants": [
+    { "id": "kahn", "label": "Kahn (queue)", "tsFn": "alienOrder", "goFn": "alienOrder", "stages": [
+      { "n": 1, "title": "Collect letters", "note": "Every letter in every word is a node, including letters that end up with no rule." },
+      { "n": 2, "title": "Rules from neighbours", "note": "Compare each word with the next. The first different letters give a rule. A longer word before its own prefix means no answer." },
+      { "n": 3, "title": "Find the starters", "note": "Count the rules pointing at each letter. Letters with none are put in the queue." },
+      { "n": 4, "title": "Output and unlock", "note": "Take a letter from the queue, output it, remove its rules. Letters whose count reaches 0 join the queue." },
+      { "n": 5, "title": "Check for a loop", "note": "If every letter was output the order is valid. If some are stuck, the rules form a loop, so return an empty string." }
+    ] }
+  ],
+  "goArgs": ["[]string"],
+  "goRet": "string",
+  "compare": "exact",
+  "edges": [
+    { "title": "Prefix trap", "input": "[\"abc\", \"ab\"]", "output": "\"\"", "why": "The shorter word must come first. There is no letter to compare, so check the lengths yourself or you will accept it." },
+    { "title": "Rules form a loop", "input": "[\"a\", \"b\", \"c\", \"a\"]", "output": "\"\"", "why": "a before b, b before c, c before a. Nobody can go first, so the queue starts empty and nothing is output." },
+    { "title": "One letter", "input": "[\"z\", \"z\"]", "output": "\"z\"", "why": "No difference, so no rule. The letter is still output because step 1 added it as a node." },
+    { "title": "Letters with no rule", "input": "[\"ab\", \"abc\"]", "output": "\"abc\"", "why": "Same prefix, no difference, no rules at all. All three letters start with indegree 0 and come out in first-seen order." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Only the first different letter of two neighbouring words counts. Later letters say nothing, so never add rules for them." },
+    { "lang": "General", "text": "Many orders can be valid. This solution breaks ties by first-seen letter, so it returns one fixed answer. Keep that tie-break the same in every language so tests can compare strings." },
+    { "lang": "TypeScript", "text": "An empty string is falsy, and it is also the 'no answer' value. Compare with === '' explicitly. A valid answer is never empty because every word has at least one letter." },
+    { "lang": "Go", "text": "Ranging over a map visits keys in random order. Keep the letters in a slice in first-seen order and loop over that, or the output changes from run to run." },
+    { "lang": "Go", "text": "Indexing a string gives bytes, not characters. That is right for lowercase a to z, but would split any multi-byte character." }
+  ],
+  "recap": {
+    "pattern": "Topological sort (Kahn)",
+    "key": "Turn each neighbouring word pair into one rule, then output letters whose rule count is zero.",
+    "complexity": "Time O(C). Space O(U + rules).",
+    "moves": ["Add every letter as a node", "Add the first-difference rule for each neighbouring pair. Word before its own prefix: return empty", "Queue the letters with indegree 0, output and unlock", "Fewer letters output than exist means a loop. Return empty"]
+  }
+}

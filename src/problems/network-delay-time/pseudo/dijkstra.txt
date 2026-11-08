@@ -1,0 +1,12 @@
+function networkDelayTime(times, n, k)
+  build adj: node -> list of (neighbour, time)
+  dist[all] = infinity ; dist[k] = 0
+  heap = min-heap of (time, node) ; push (0, k)         # [1] start at the source
+  while heap is not empty
+    (d, u) = pop smallest                               # [2] closest unfinished node
+    if d > dist[u]: continue                            # stale entry, skip
+    for (v, w) in adj[u]
+      if d + w < dist[v]                                # [3] a shorter route to v
+        dist[v] = d + w ; push (dist[v], v)
+  worst = max of dist[1..n]                             # [4] slowest node
+  return -1 if worst is infinity else worst

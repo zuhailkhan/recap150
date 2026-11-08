@@ -1,0 +1,76 @@
+{
+  "slug": "network-delay-time",
+  "title": "Network Delay Time",
+  "category": "Advanced Graphs",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "A network has n nodes numbered 1 to n. Each entry [u, v, w] says a signal sent from u reaches v after w time units, in that direction only. A signal starts at node k. Return how long until every node has received it, or -1 if some node never does.",
+  "example": {
+    "caption": "The signal starts at node 1. Node 3 is faster through node 2 (2 + 1) than directly (6). The last node to hear it is 5, at time 6.",
+    "input": [
+      { "kind": "graph", "label": "start at node 1", "nodes": [{ "id": "1", "x": 8, "y": 50 }, { "id": "2", "x": 34, "y": 12 }, { "id": "3", "x": 34, "y": 88 }, { "id": "4", "x": 64, "y": 50 }, { "id": "5", "x": 92, "y": 50 }], "edges": [{ "from": "1", "to": "2", "weight": 2, "directed": true }, { "from": "1", "to": "3", "weight": 6, "directed": true }, { "from": "2", "to": "3", "weight": 1, "directed": true }, { "from": "2", "to": "4", "weight": 7, "directed": true }, { "from": "3", "to": "4", "weight": 2, "directed": true }, { "from": "4", "to": "5", "weight": 1, "directed": true }] }
+    ],
+    "output": [{ "kind": "array", "label": "earliest time for nodes 1 to 5. Answer = the largest", "items": [0, 2, 3, 5, 6], "tones": ["hit", "hit", "hit", "hit", "focus"] }]
+  },
+  "idea": {
+    "sentence": "Always finish the unfinished node with the smallest known time next, because no later route can beat it when every link takes zero or more time.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "Dijkstra's algorithm", "plain": "Shortest paths from one start. Repeatedly take the closest unfinished node, then see if it gives its neighbours a shorter route." },
+      { "term": "stale entry", "plain": "An old heap item whose time is worse than one found later. It cannot be removed from the middle of the heap cheaply, so you skip it when it comes out." },
+      { "term": "relax an edge", "plain": "Check whether going through this node gives a neighbour a smaller time. If so, update it." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Three arguments: the links [[u,v,w],...], the node count n, the start k. E.g. [[2,1,1],[2,3,1],[3,4,1]], 4, 2",
+    "presets": [
+      { "label": "Five nodes", "args": [[[1, 2, 2], [1, 3, 6], [2, 3, 1], [2, 4, 7], [3, 4, 2], [4, 5, 1]], 5, 1] },
+      { "label": "Unreachable node", "args": [[[1, 2, 1]], 3, 1] },
+      { "label": "Start in the middle", "args": [[[2, 1, 1], [2, 3, 1], [3, 4, 1]], 4, 2] }
+    ]
+  },
+  "fast": {
+    "vars": [
+      { "sym": "V", "meaning": "number of nodes (n)" },
+      { "sym": "E", "meaning": "number of links" }
+    ],
+    "compare": { "brute": "n2", "optimal": "nlogn", "bruteLabel": "Scan for the closest node each round", "optimalLabel": "Heap gives the closest node", "unit": "operations (rough, taking E about V)" },
+    "rows": [
+      { "name": "Plain array scan", "time": "O(V^2 + E)", "space": "O(V)", "note": "Each round scans every node to find the smallest time. Fine for dense graphs." },
+      { "name": "Dijkstra with a heap", "time": "O((V + E) log V)", "space": "O(V + E)", "note": "Each improvement pushes one entry. Each push and pop costs log of the heap size." },
+      { "name": "Bellman-Ford", "time": "O(V * E)", "space": "O(V)", "note": "Not shown. Repeats all links V-1 times. Slower, but it also copes with negative weights." }
+    ],
+    "takeaway": "The heap hands you the closest unfinished node cheaply. Stale entries are the price: skip them when popped."
+  },
+  "variants": [
+    { "id": "dijkstra", "label": "Dijkstra (heap)", "tsFn": "networkDelayTime", "goFn": "networkDelayTime", "stages": [
+      { "n": 1, "title": "Start at the source", "note": "Distance to k is 0, everything else is infinity. Push (0, k) onto a min-heap." },
+      { "n": 2, "title": "Pop the closest", "note": "Take the smallest time from the heap. If it is older than the best known time, skip it. Otherwise that node is finished." },
+      { "n": 3, "title": "Relax its links", "note": "For each link out of the finished node, see if the route through it is shorter. If yes, update and push." },
+      { "n": 4, "title": "Answer", "note": "The slowest node decides the total time. If any node is still infinity, return -1." }
+    ] }
+  ],
+  "goArgs": ["[][]int", "int", "int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Node never reached", "input": "[[1,2,1]], n=3, k=1", "output": "-1", "why": "Node 3 has no incoming link, so its distance stays infinity. Check for that before returning the maximum." },
+    { "title": "Only the source", "input": "[], n=1, k=1", "output": "0", "why": "The source hears the signal at time 0 and there is no one else to wait for." },
+    { "title": "Direction matters", "input": "[[1,2,1]], n=2, k=2", "output": "-1", "why": "A link from 1 to 2 does not carry signals from 2 to 1. Start at 2 and node 1 is out of reach." },
+    { "title": "Short route found later", "input": "[[1,2,10],[1,3,1],[3,2,1]], n=3, k=1", "output": "2", "why": "Node 2 first gets time 10, then 2 through node 3. The 10 entry is still in the heap and gets skipped as stale." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Dijkstra needs every weight to be zero or more. With a negative link a finished node could still be improved, so 'finished' would be wrong. Use Bellman-Ford then." },
+    { "lang": "General", "text": "Skip stale heap entries with: if popped time > best known time, continue. Without that check the answer is still right but the work can blow up." },
+    { "lang": "TypeScript", "text": "Infinity is handy for 'unknown' and compares correctly, but JSON turns it into null. Keep it out of anything you display or serialise." },
+    { "lang": "TypeScript", "text": "Nodes are numbered from 1. Make the arrays n + 1 long, or shift every index by one." },
+    { "lang": "Go", "text": "Use container/heap with an item type and call heap.Push(h, x) and heap.Pop(h). Calling h.Push or h.Pop directly does not restore the heap order." },
+    { "lang": "Go", "text": "math.MaxInt as infinity overflows if you add to it. Here we only add to a finished node's time, never to infinity, but a variant that relaxes from unreached nodes would break." }
+  ],
+  "recap": {
+    "pattern": "Dijkstra: shortest path",
+    "key": "Pop the smallest known time, skip stale entries, and push any neighbour whose time improved.",
+    "complexity": "Time O((V + E) log V). Space O(V + E).",
+    "moves": ["Set dist[k] = 0, others infinity, push (0, k)", "Pop the smallest. Skip it if it is stale", "For each link, if dist[u] + w < dist[v], update and push", "Answer is the largest dist, or -1 if any is infinity"]
+  }
+}

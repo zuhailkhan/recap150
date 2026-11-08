@@ -1,0 +1,10 @@
+[
+  {"name": "loop of cities", "input": [4, [[0, 1, 100], [1, 2, 100], [2, 0, 100], [1, 3, 600], [2, 3, 200]], 0, 3, 1], "expected": 700},
+  {"name": "two stops allowed", "input": [4, [[0, 1, 100], [1, 2, 100], [2, 0, 100], [1, 3, 600], [2, 3, 200]], 0, 3, 2], "expected": 400},
+  {"name": "direct flight only", "input": [3, [[0, 1, 100], [1, 2, 100], [0, 2, 500]], 0, 2, 0], "expected": 500, "edge": true},
+  {"name": "one stop", "input": [3, [[0, 1, 100], [1, 2, 100], [0, 2, 500]], 0, 2, 1], "expected": 200},
+  {"name": "no route", "input": [3, [[0, 1, 100]], 0, 2, 1], "expected": -1, "edge": true},
+  {"name": "long chain too long", "input": [5, [[0, 1, 1], [1, 2, 1], [2, 3, 1], [3, 4, 1], [0, 4, 10]], 0, 4, 2], "expected": 10},
+  {"name": "long chain fits", "input": [5, [[0, 1, 1], [1, 2, 1], [2, 3, 1], [3, 4, 1], [0, 4, 10]], 0, 4, 3], "expected": 4},
+  {"name": "parallel flights", "input": [2, [[0, 1, 5], [0, 1, 2]], 0, 1, 0], "expected": 2}
+]

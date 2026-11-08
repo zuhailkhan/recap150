@@ -1,0 +1,11 @@
+[
+  {"name": "classic five", "input": [[[0, 0], [2, 2], [3, 10], [5, 2], [7, 0]]], "expected": 20},
+  {"name": "one point", "input": [[[0, 0]]], "expected": 0, "edge": true},
+  {"name": "two points", "input": [[[0, 0], [1, 1]]], "expected": 2},
+  {"name": "negatives", "input": [[[3, 12], [-2, 5], [-4, 1]]], "expected": 18},
+  {"name": "collinear", "input": [[[0, 0], [1, 0], [2, 0], [3, 0]]], "expected": 3},
+  {"name": "far apart", "input": [[[-1000000, -1000000], [1000000, 1000000]]], "expected": 4000000, "edge": true},
+  {"name": "mixed signs", "input": [[[2, -3], [-17, -8], [13, 8], [-17, -15]]], "expected": 53},
+  {"name": "plus shape", "input": [[[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]], "expected": 4},
+  {"name": "square", "input": [[[0, 0], [0, 3], [3, 0], [3, 3]]], "expected": 9}
+]

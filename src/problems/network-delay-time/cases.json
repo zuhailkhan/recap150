@@ -1,0 +1,11 @@
+[
+  {"name": "classic", "input": [[[2, 1, 1], [2, 3, 1], [3, 4, 1]], 4, 2], "expected": 2},
+  {"name": "source cannot reach", "input": [[[1, 2, 1]], 2, 2], "expected": -1, "edge": true},
+  {"name": "single node", "input": [[], 1, 1], "expected": 0, "edge": true},
+  {"name": "five nodes", "input": [[[1, 2, 2], [1, 3, 6], [2, 3, 1], [2, 4, 7], [3, 4, 2], [4, 5, 1]], 5, 1], "expected": 6},
+  {"name": "direction matters", "input": [[[1, 2, 1]], 2, 1], "expected": 1},
+  {"name": "detour is cheaper", "input": [[[1, 2, 10], [1, 3, 1], [3, 2, 1]], 3, 1], "expected": 2},
+  {"name": "big weights", "input": [[[1, 2, 100], [2, 3, 100]], 3, 1], "expected": 200},
+  {"name": "cycle", "input": [[[1, 2, 1], [2, 1, 1], [2, 3, 2]], 3, 1], "expected": 3},
+  {"name": "one node unreachable", "input": [[[1, 2, 1]], 3, 1], "expected": -1, "edge": true}
+]

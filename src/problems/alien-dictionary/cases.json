@@ -1,0 +1,13 @@
+[
+  {"name": "classic", "input": [["wrt", "wrf", "er", "ett", "rftt"]], "expected": "wertf"},
+  {"name": "two words", "input": [["z", "x"]], "expected": "zx"},
+  {"name": "cycle", "input": [["z", "x", "z"]], "expected": "", "edge": true},
+  {"name": "prefix trap", "input": [["abc", "ab"]], "expected": "", "edge": true},
+  {"name": "one letter", "input": [["z", "z"]], "expected": "z", "edge": true},
+  {"name": "same words", "input": [["ab", "ab"]], "expected": "ab"},
+  {"name": "prefix in right order", "input": [["ab", "abc"]], "expected": "abc"},
+  {"name": "three way", "input": [["a", "b", "ca", "cc"]], "expected": "abc"},
+  {"name": "ties in first-seen order", "input": [["ba", "bc", "ac"]], "expected": "bac"},
+  {"name": "longer cycle", "input": [["a", "b", "c", "a"]], "expected": ""},
+  {"name": "single word", "input": [["xyz"]], "expected": "xyz"}
+]

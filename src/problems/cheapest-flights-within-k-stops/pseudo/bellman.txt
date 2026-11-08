@@ -1,0 +1,9 @@
+function findCheapestPrice(n, flights, src, dst, k)
+  cost[all] = infinity ; cost[src] = 0               # [1] zero flights: only at the start
+  repeat k + 1 times                                 # one round per allowed flight
+    next = copy of cost                              # [2] read cost, write next
+    for each flight (from, to, price)
+      if cost[from] is not infinity and cost[from] + price < next[to]
+        next[to] = cost[from] + price                # [3] one more flight, priced from LAST round
+    cost = next
+  return -1 if cost[dst] is infinity else cost[dst]  # [4] unreachable within the limit
