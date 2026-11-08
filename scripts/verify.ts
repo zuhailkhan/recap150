@@ -10,9 +10,13 @@ import { stagesIn, stripTraceCode, stripGoPackage, badTraceLines } from '../src/
 import { runTrace, TARGET_STEPS, MAX_STEPS } from '../src/core/tracer'
 import { same } from '../src/core/compare'
 import official from '../src/data/neetcode150.json'
+import { lldSchema } from '../src/core/designSchema'
+import catalog from '../src/design/catalog.json'
 
 const root = resolve(import.meta.dirname, '..')
-const problemsDir = join(root, 'src/problems')
+// --track=lld checks src/design/lld with the LLD schema; the default checks the DSA problems
+const isLld = process.argv.includes('--track=lld')
+const problemsDir = join(root, isLld ? 'src/design/lld' : 'src/problems')
 const errors: string[] = []
 const fail = (slug: string, msg: string) => errors.push(`${slug}: ${msg}`)
 const eq = (a: number[], b: number[]) => a.join() === b.join()
@@ -21,11 +25,11 @@ const readyForGo: { meta: ReadyMeta; pkg: string }[] = []
 const status = new Map<string, 'ready' | 'draft'>()
 
 /** Go package name: the slug with - as _, and a p_ prefix when it starts with a digit (3sum -> p_3sum). */
-const pkgOf = (slug: string) => (/^[0-9]/.test(slug) ? 'p_' : '') + slug.replaceAll('-', '_')
+const pkgOf = (slug: string) => (isLld ? 'lld_' : /^[0-9]/.test(slug) ? 'p_' : '') + slug.replaceAll('-', '_')
 const argv = process.argv.slice(2)
 const onlyArg = argv.find((a) => a.startsWith('--only='))?.slice(7)
 const only = onlyArg ? new Set(onlyArg.split(',').filter(Boolean)) : null
-const skipProgress = argv.includes('--no-progress') || !!only
+const skipProgress = argv.includes('--no-progress') || !!only || isLld
 const allSlugs = readdirSync(problemsDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)
 const slugs = only ? allSlugs.filter((s) => only.has(s)) : allSlugs
 if (only) for (const o of only) if (!allSlugs.includes(o)) errors.push(`${o}: no such problem folder`)
@@ -34,22 +38,32 @@ for (const slug of slugs) {
   const dir = join(problemsDir, slug)
   const metaPath = join(dir, 'meta.json')
   if (!existsSync(metaPath)) { fail(slug, 'meta.json is missing'); continue }
-  const parsed = metaSchema.safeParse(JSON.parse(readFileSync(metaPath, 'utf8')))
+  const parsed = (isLld ? lldSchema : metaSchema).safeParse(JSON.parse(readFileSync(metaPath, 'utf8')))
   if (!parsed.success) {
     for (const i of parsed.error.issues) fail(slug, `schema: ${i.path.join('.')} ${i.message}`)
     continue
   }
-  const meta = parsed.data
+  const meta = parsed.data as unknown as ReadyMeta & { group?: string }
   status.set(slug, meta.status)
   if (meta.slug !== slug) fail(slug, `meta.slug "${meta.slug}" does not match the folder name`)
-  const off = official.find((o) => o.slug === slug)
-  if (!off) fail(slug, 'not in the official NeetCode 150 list')
-  else {
-    if (off.title !== meta.title) fail(slug, `title should be "${off.title}"`)
-    if (off.category !== meta.category) fail(slug, `category should be "${off.category}"`)
-    if (off.difficulty !== meta.difficulty) fail(slug, `difficulty should be "${off.difficulty}"`)
+  if (isLld) {
+    const c = catalog.find((x) => x.track === 'lld' && x.slug === slug)
+    if (!c) fail(slug, 'not in src/design/catalog.json')
+    else {
+      if (c.title !== meta.title) fail(slug, `title should be "${c.title}"`)
+      if (c.group !== meta.group) fail(slug, `group should be "${c.group}"`)
+      if (c.difficulty !== meta.difficulty) fail(slug, `difficulty should be "${c.difficulty}"`)
+    }
+  } else {
+    const off = official.find((o) => o.slug === slug)
+    if (!off) fail(slug, 'not in the official NeetCode 150 list')
+    else {
+      if (off.title !== meta.title) fail(slug, `title should be "${off.title}"`)
+      if (off.category !== meta.category) fail(slug, `category should be "${off.category}"`)
+      if (off.difficulty !== meta.difficulty) fail(slug, `difficulty should be "${off.difficulty}"`)
+    }
   }
-  if (meta.status === 'draft') continue
+  if ((meta as { status: string }).status === 'draft') continue
 
   // ---- cases
   const casesParsed = casesSchema.safeParse(JSON.parse(readFileSync(join(dir, 'cases.json'), 'utf8')))
@@ -59,15 +73,15 @@ for (const slug of slugs) {
   for (const c of cases) if (c.input.length !== meta.goArgs.length) fail(slug, `case "${c.name}" has ${c.input.length} args, goArgs has ${meta.goArgs.length}`)
 
   // ---- demo
-  if (!['fingerprint', 'complement', 'match', 'custom'].includes(meta.idea.demo)) fail(slug, `idea.demo "${meta.idea.demo}" is not a shared demo. Use "custom" with a Demo.vue`)
-  if (meta.idea.demo === 'custom' && !existsSync(join(dir, 'Demo.vue'))) fail(slug, 'idea.demo is "custom" but Demo.vue is missing')
+  if (!isLld && !['fingerprint', 'complement', 'match', 'custom'].includes(meta.idea.demo)) fail(slug, `idea.demo "${meta.idea.demo}" is not a shared demo. Use "custom" with a Demo.vue`)
+  if (!isLld && meta.idea.demo === 'custom' && !existsSync(join(dir, 'Demo.vue'))) fail(slug, 'idea.demo is "custom" but Demo.vue is missing')
 
   // ---- variants: files, shared stages, TypeScript cases
   const stageSets: number[][] = []
   meta.variants.forEach((v, vi) => {
     const want = v.stages.map((s) => s.n).sort((a, b) => a - b)
     stageSets.push(want)
-    const paths = { ts: join(dir, 'ts', `${v.id}.ts`), pseudo: join(dir, 'pseudo', `${v.id}.txt`), go: join(dir, 'go', `${v.id}.go`) }
+    const paths: Record<string, string> = { ts: join(dir, 'ts', `${v.id}.ts`), go: join(dir, 'go', `${v.id}.go`), ...(isLld ? {} : { pseudo: join(dir, 'pseudo', `${v.id}.txt`) }) }
     for (const [k, p] of Object.entries(paths)) if (!existsSync(p)) fail(slug, `${v.id}: missing ${k} file ${p}`)
     if (!Object.values(paths).every(existsSync)) return
     const tsRaw = readFileSync(paths.ts, 'utf8')
@@ -76,7 +90,7 @@ for (const slug of slugs) {
     const pkg = pkgOf(slug)
     if (!goRaw.startsWith(`package ${pkg}\n`)) fail(slug, `${v.id}: Go file must start with "package ${pkg}"`)
     const got = {
-      pseudo: stagesIn(readFileSync(paths.pseudo, 'utf8')),
+      ...(isLld ? {} : { pseudo: stagesIn(readFileSync(paths.pseudo, 'utf8')) }),
       ts: stagesIn(stripTraceCode(tsRaw)),
       go: stagesIn(stripGoPackage(goRaw)),
     }
@@ -129,7 +143,7 @@ for (const slug of slugs) {
 }
 
 // ---- Go: copy sources, generate tests from cases.json, gofmt, vet, test
-const goRoot = join(root, '.verify', only ? `go-${[...only].sort().join('_').slice(0, 60)}` : 'go')
+const goRoot = join(root, '.verify', (isLld ? 'lld' : 'go') + (only ? `-${[...only].sort().join('_').slice(0, 60)}` : ''))
 rmSync(goRoot, { recursive: true, force: true })
 mkdirSync(goRoot, { recursive: true })
 writeFileSync(join(goRoot, 'go.mod'), 'module recap150verify\n\ngo 1.22\n')
@@ -301,4 +315,5 @@ if (errors.length) {
   console.error(`\nverify:content FAILED (${errors.length})\n` + errors.map((e) => ' - ' + e).join('\n'))
   process.exit(1)
 }
-console.log(`verify:content OK. ${R} ready, ${D} draft, ${T - R - D} not started.`)
+if (isLld) { const st = [...status.values()]; const total = catalog.filter((c) => c.track === "lld").length; const r = st.filter((x) => x === "ready").length; const d = st.filter((x) => x === "draft").length; console.log(`verify:content (lld) OK. ${r} ready, ${d} draft, ${total - r - d} not started.`) }
+else console.log(`verify:content OK. ${R} ready, ${D} draft, ${T - R - D} not started.`)

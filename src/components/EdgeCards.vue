@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import type { ReadyMeta } from '@/core/schema'
-defineProps<{ edges: ReadyMeta['edges']; gotchas: ReadyMeta['gotchas'] }>()
+defineProps<{ edges?: ReadyMeta['edges']; gotchas: ReadyMeta['gotchas'] }>()
 const tag = { TypeScript: 'TS', Go: 'Go', General: 'Any' } as const
 </script>
 
 <template>
   <div class="ec">
-    <div class="cards">
+    <div v-if="edges?.length" class="cards">
       <article v-for="e in edges" :key="e.title" class="edge">
         <h3>{{ e.title }}</h3>
         <p class="io"><code>{{ e.input }}</code><span class="arr" aria-hidden="true">gives</span><span class="sr-only"> gives </span><code>{{ e.output }}</code></p>
         <p class="why small">{{ e.why }}</p>
       </article>
     </div>
-    <h3 class="gh">Gotchas</h3>
+    <h3 v-if="edges?.length" class="gh">Gotchas</h3>
     <ul class="gotchas">
       <li v-for="(g, i) in gotchas" :key="i"><span class="lang" :class="g.lang" :title="g.lang"><span class="sr-only">{{ g.lang }}: </span><span aria-hidden="true">{{ tag[g.lang] }}</span></span><span>{{ g.text }}</span></li>
     </ul>

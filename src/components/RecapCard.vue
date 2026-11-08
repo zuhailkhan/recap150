@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ReadyMeta } from '@/core/schema'
-defineProps<{ recap: ReadyMeta['recap'] }>()
+defineProps<{ recap: Omit<ReadyMeta['recap'], 'complexity'> & { complexity?: string } }>()
 </script>
 
 <template>
@@ -8,7 +8,7 @@ defineProps<{ recap: ReadyMeta['recap'] }>()
     <div class="lead">
       <p class="pat">{{ recap.pattern }}</p>
       <p class="key">{{ recap.key }}</p>
-      <p class="cx muted">{{ recap.complexity }}</p>
+      <p v-if="recap.complexity" class="cx muted">{{ recap.complexity }}</p>
     </div>
     <ol class="moves">
       <li v-for="(m, i) in recap.moves" :key="i"><span class="badge">{{ i + 1 }}</span>{{ m }}</li>

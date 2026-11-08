@@ -49,6 +49,22 @@ export const panelSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('heap'), label: z.string().optional(), items: z.array(cell), tones: tones.optional(), max: z.boolean().optional() }),
   z.object({ kind: z.literal('trie'), label: z.string().optional(), words: z.array(z.string()), hot: z.string().optional(), hotTone: tone.optional() }),
   z.object({ kind: z.literal('bits'), label: z.string().optional(), width: z.number().int().optional(), rows: z.array(z.object({ label: z.string(), value: z.number(), tones: tones.optional() })) }),
+  z.object({
+    kind: z.literal('classes'), label: z.string().optional(),
+    classes: z.array(z.object({ name: z.string(), kind: z.enum(['class', 'interface', 'enum']).optional(), fields: z.array(z.string()).optional(), methods: z.array(z.string()).optional(), x: z.number().int().min(0), y: z.number().int().min(0) })),
+    relations: z.array(z.object({ from: z.string(), to: z.string(), kind: z.enum(['inherits', 'implements', 'has', 'uses', 'creates']), label: z.string().optional() })),
+    tones: z.record(z.string(), tone).optional(),
+  }),
+  z.object({
+    kind: z.literal('seq'), label: z.string().optional(), actors: z.array(z.string()).min(1),
+    messages: z.array(z.object({ from: z.string(), to: z.string(), label: z.string(), dashed: z.boolean().optional(), tone: tone.optional() })),
+  }),
+  z.object({
+    kind: z.literal('arch'), label: z.string().optional(),
+    nodes: z.array(z.object({ id: z.string(), label: z.string(), kind: z.enum(['client', 'lb', 'service', 'cache', 'db', 'queue', 'blob', 'cdn', 'worker', 'external']), x: z.number().min(0).max(100), y: z.number().min(0).max(100), sub: z.string().optional() })),
+    edges: z.array(z.object({ from: z.string(), to: z.string(), label: z.string().optional(), dashed: z.boolean().optional(), tone: tone.optional() })),
+    tones: z.record(z.string(), tone).optional(),
+  }),
 ])
 
 const growth = z.enum(['1', 'logn', 'n', 'nlogn', 'n2', 'n3', '2n', 'nk', 'nklogk', 'n2k', 'nm', 'nlogm'])

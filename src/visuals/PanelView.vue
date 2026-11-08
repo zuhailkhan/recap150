@@ -12,6 +12,9 @@ import IntervalsVis from './IntervalsVis.vue'
 import HeapVis from './HeapVis.vue'
 import TrieVis from './TrieVis.vue'
 import BitsVis from './BitsVis.vue'
+import SeqVis from './SeqVis.vue'
+import ClassesVis from './ClassesVis.vue'
+import ArchVis from './ArchVis.vue'
 defineProps<{ panel: Panel }>()
 </script>
 
@@ -31,6 +34,9 @@ defineProps<{ panel: Panel }>()
     <HeapVis v-else-if="panel.kind === 'heap'" :p="panel" />
     <TrieVis v-else-if="panel.kind === 'trie'" :p="panel" />
     <BitsVis v-else-if="panel.kind === 'bits'" :p="panel" />
+    <SeqVis v-else-if="panel.kind === 'seq'" :p="panel" />
+    <ClassesVis v-else-if="panel.kind === 'classes'" :p="panel" />
+    <ArchVis v-else-if="panel.kind === 'arch'" :p="panel" />
   </figure>
 </template>
 

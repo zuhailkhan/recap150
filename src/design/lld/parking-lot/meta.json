@@ -1,0 +1,123 @@
+{
+  "slug": "parking-lot",
+  "title": "Parking Lot",
+  "group": "Booking and reservation",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the software for a parking garage. Vehicles of different sizes arrive, get a free spot they fit in, and leave by paying a fee based on how long they stayed. The garage owner wants to change how spots are chosen and how prices work without rewriting the garage.",
+  "requirements": {
+    "functional": [
+      "Park a motorcycle, car or truck and hand back a ticket.",
+      "A vehicle only takes a spot that is at least as big as itself.",
+      "Choose the spot with a rule the owner can swap: nearest first, or smallest that fits.",
+      "Reject a vehicle when no free spot fits.",
+      "On exit, take the ticket, price the stay by hours rounded up, and free the spot.",
+      "Refuse unknown tickets, and a ticket that was already used."
+    ],
+    "outOfScope": ["Taking payment", "Several gates at once", "Reservations in advance"]
+  },
+  "idea": {
+    "sentence": "Keep what stays the same in the lot, and put each rule that can change behind its own small interface.",
+    "jargon": [
+      { "term": "Strategy pattern", "plain": "Put an algorithm behind an interface so you can swap it without touching the code that uses it." },
+      { "term": "dependency injection", "plain": "An object receives the things it depends on from outside instead of creating them itself." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "SpotStrategy", "kind": "interface", "methods": ["pick(spots, v): Spot | null", "NearestFree, TightestFit"], "x": 0, "y": 0 },
+      { "name": "Pricing", "kind": "interface", "methods": ["fee(ticket, now): number", "HourlyBySize"], "x": 2, "y": 0 },
+      { "name": "ParkingLot", "fields": ["spots: Spot[]", "tickets: Map<id, Ticket>", "strategy: SpotStrategy", "pricing: Pricing"], "methods": ["park(v, now): Ticket | null", "unpark(id, now): fee | null"], "x": 1, "y": 1 },
+      { "name": "Spot", "fields": ["id", "size", "taken"], "x": 0, "y": 2 },
+      { "name": "Ticket", "fields": ["id", "spotId", "vehicle", "enteredAt"], "x": 1, "y": 2 },
+      { "name": "Vehicle", "fields": ["plate", "size"], "x": 2, "y": 2 }
+    ],
+    "relations": [
+      { "from": "ParkingLot", "to": "SpotStrategy", "kind": "uses", "label": "asks" },
+      { "from": "ParkingLot", "to": "Pricing", "kind": "uses", "label": "asks" },
+      { "from": "ParkingLot", "to": "Spot", "kind": "has", "label": "owns" },
+      { "from": "ParkingLot", "to": "Ticket", "kind": "creates" },
+      { "from": "Ticket", "to": "Vehicle", "kind": "has" }
+    ]
+  },
+  "patterns": [
+    { "name": "Strategy", "where": "SpotStrategy and Pricing, each with a few implementations.", "why": "The garage owner changes the rule, not the lot. New rule means a new class, and ParkingLot stays untouched." },
+    { "name": "Dependency injection", "where": "ParkingLot receives both rules in its constructor.", "why": "No hidden globals. Tests can pass a fake strategy or a fixed price." }
+  ],
+  "decisions": [
+    {
+      "question": "Where does the choice of spot live?",
+      "choice": "Behind a SpotStrategy interface",
+      "because": "Owners disagree about this rule, and it will change. The lot only coordinates, so a new rule never touches it.",
+      "instead": "An if/else inside park() that grows with every new rule."
+    },
+    {
+      "question": "Who knows the price?",
+      "choice": "A Pricing interface that gets the ticket and the exit time",
+      "because": "Prices change by time, vehicle and season. The ticket only records facts, and the price is computed on exit.",
+      "instead": "Storing a price on the ticket when it is issued."
+    },
+    {
+      "question": "Is a car a different class from a truck?",
+      "choice": "One Vehicle with a size",
+      "because": "The lot only cares how big a vehicle is. Subclasses would add nothing but a number.",
+      "instead": "Car, Truck and Motorcycle subclasses with the same fields."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two gates park a car at the same moment. What goes wrong?",
+      "answer": "Both can see the same spot as free, then both mark it taken: a check-then-act race. Make pick-and-mark one atomic step with a lock around park and unpark. In Go use a sync.Mutex. For a big lot use a lock per level, or store spots in a database and claim one with a conditional update."
+    },
+    {
+      "ask": "Add electric-vehicle charging spots.",
+      "answer": "Do not subclass Spot. Give a spot a set of capabilities and a vehicle a set of needs, and let the strategy filter by both. The lot, the ticket and the pricing do not change."
+    },
+    {
+      "ask": "Weekend and night pricing.",
+      "answer": "Write another Pricing. The ticket already stores the entry time, so the new rule has what it needs. To combine rules, wrap one Pricing in another, for example a weekend surcharge around the hourly rule."
+    },
+    {
+      "ask": "There are a million spots and scanning is too slow.",
+      "answer": "Keep free spots indexed by size, for example one ordered set of free ids per size. The strategy asks the index instead of scanning. The interface stays the same, only the strategy's insides change."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Sizes are 1 motorcycle, 2 car, 3 truck. Example: [\"ParkingLot\",\"park\"], [[[2,2],\"nearest\"],[\"A\",2,0]]",
+    "presets": [
+      { "label": "Nearest wastes a big spot", "args": [["ParkingLot", "park", "park", "park", "unpark"], [[[3, 2, 1], "nearest"], ["KA-1", 1, 0], ["KA-2", 3, 5], ["KA-3", 2, 10], [1, 130]]] },
+      { "label": "Tightest fit", "args": [["ParkingLot", "park", "park", "park", "unpark"], [[[3, 2, 1], "tightest"], ["KA-1", 1, 0], ["KA-2", 3, 5], ["KA-3", 2, 10], [1, 130]]] },
+      { "label": "Fee rounds up", "args": [["ParkingLot", "park", "unpark"], [[[2], "nearest"], ["KA-9", 2, 0], [1, 61]]] }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Strategy design",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Build the lot", "note": "The lot owns the spots and is handed its two rules. It decides neither itself." },
+        { "n": 2, "title": "Ask the strategy", "note": "The lot asks the SpotStrategy for a free spot that fits. No spot means the lot answers full." },
+        { "n": 3, "title": "Issue a ticket", "note": "Mark the spot taken and return a ticket that remembers the spot, the vehicle and the entry time." },
+        { "n": 4, "title": "Price and release", "note": "On exit ask Pricing for the fee, free the spot and retire the ticket so it cannot be reused." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "Check then act is a race. Two threads can both see a spot free and both take it. Pick and mark must happen under one lock." },
+    { "lang": "General", "text": "Round hours up and keep a one-hour minimum. A stay of 0 minutes still pays for an hour, and 61 minutes pays for two." },
+    { "lang": "TypeScript", "text": "A numeric enum accepts any number, so Size = 7 type-checks. A union of literals (1 | 2 | 3) rejects it at compile time." },
+    { "lang": "Go", "text": "for _, s := range spots gives you a copy when spots holds structs. Setting s.Taken changes the copy. Store pointers (*Spot) so changes stick." },
+    { "lang": "Go", "text": "Return (Ticket, bool) instead of a zero Ticket. A zero Ticket with ID 0 looks like a real one, and callers forget to check." }
+  ],
+  "recap": {
+    "pattern": "Strategy: keep what changes behind an interface",
+    "key": "The lot owns spots and tickets. Where to park and what to charge are strategies passed in.",
+    "moves": ["List what will change: the spot rule and the price rule", "Put each behind a tiny interface", "Keep the lot to coordination: pick, mark taken, issue ticket", "On exit: price it, free the spot, retire the ticket"]
+  }
+}

@@ -2,27 +2,50 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { categoryList, metas } from '@/data/problems'
+import { catalogBySlug, trackGroups, type Track } from '@/data/design'
 import { progress } from '@/recap/store'
 import { dayNumber, isDue, isMastered, isWeak } from '@/recap/sm2'
 
 const emit = defineEmits<{ navigate: [] }>()
 const route = useRoute()
-const open = ref(new Set<string>())
 
-const currentCat = computed(() => {
-  const slug = route.params.slug as string | undefined
-  return slug ? metas.get(slug)?.category ?? categoryList.find((c) => c.entries.some((e) => e.slug === slug))?.name : undefined
+const TRACKS: { id: Track; label: string; hint: string }[] = [
+  { id: 'dsa', label: 'DSA', hint: 'Data structures and algorithms' },
+  { id: 'lld', label: 'LLD', hint: 'Low-level design' },
+  { id: 'hld', label: 'HLD', hint: 'High-level design' },
+]
+const trackFromPath = (p: string): Track | null => (p.startsWith('/lld') ? 'lld' : p.startsWith('/hld') ? 'hld' : p.startsWith('/p/') ? 'dsa' : null)
+const track = ref<Track>(trackFromPath(route.path) ?? 'dsa')
+watch(() => route.path, (p) => { const t = trackFromPath(p); if (t) track.value = t })
+
+interface Row { slug: string; title: string; status: 'ready' | 'draft' | 'todo'; href: string; cardId: string; category: string }
+interface Group { name: string; entries: Row[]; ready: number }
+
+const groups = computed<Group[]>(() => {
+  if (track.value === 'dsa') {
+    return categoryList.map((c) => ({ name: c.name, ready: c.ready, entries: c.entries.map((e) => ({ slug: e.slug, title: e.title, status: e.status, href: `/p/${e.slug}`, cardId: e.slug, category: c.name })) }))
+  }
+  const t = track.value
+  return trackGroups(t).map((g) => ({ name: g.name, ready: g.ready, entries: g.entries.map((e) => ({ slug: e.slug, title: e.title, status: e.status, href: `/${t}/${e.slug}`, cardId: `${t}:${e.slug}`, category: g.name })) }))
 })
-watch(currentCat, (c) => { if (c) open.value.add(c) }, { immediate: true })
+
+const open = ref(new Set<string>())
+const currentGroup = computed(() => {
+  const slug = route.params.slug as string | undefined
+  if (!slug) return undefined
+  if (track.value === 'dsa') return metas.get(slug)?.category ?? categoryList.find((c) => c.entries.some((e) => e.slug === slug))?.name
+  return catalogBySlug(track.value, slug)?.group
+})
+watch([currentGroup, track], () => { if (currentGroup.value) open.value.add(currentGroup.value) }, { immediate: true })
 
 const query = ref('')
 const filter = ref<'all' | 'written' | 'due' | 'weak' | 'todo'>('all')
 const searching = computed(() => query.value.trim() !== '' || filter.value !== 'all')
 
-function keep(e: { slug: string; title: string; category: string; status: string }): boolean {
+function keep(e: Row): boolean {
   const q = query.value.trim().toLowerCase()
   if (q && !(e.title.toLowerCase().includes(q) || e.category.toLowerCase().includes(q) || e.slug.includes(q))) return false
-  const card = progress.cards.get(e.slug)
+  const card = progress.cards.get(e.cardId)
   switch (filter.value) {
     case 'written': return e.status === 'ready'
     case 'todo': return e.status !== 'ready'
@@ -31,16 +54,16 @@ function keep(e: { slug: string; title: string; category: string; status: string
     default: return true
   }
 }
-const shown = computed(() => categoryList.map((c) => ({ ...c, entries: c.entries.filter((e) => keep({ ...e, category: c.name })) })).filter((c) => c.entries.length))
-const matchCount = computed(() => shown.value.reduce((n, c) => n + c.entries.length, 0))
+const shown = computed(() => groups.value.map((g) => ({ ...g, entries: g.entries.filter(keep) })).filter((g) => g.entries.length))
+const matchCount = computed(() => shown.value.reduce((n, g) => n + g.entries.length, 0))
 
 function onToggle(name: string, e: Event) {
   if (searching.value) return
   if ((e.target as HTMLDetailsElement).open) open.value.add(name)
   else open.value.delete(name)
 }
-function dot(slug: string) {
-  const c = progress.cards.get(slug)
+function dot(cardId: string) {
+  const c = progress.cards.get(cardId)
   return !c || c.last === 0 ? 'new' : isMastered(c) ? 'mastered' : 'learning'
 }
 const dotLabel = { new: 'not reviewed yet', learning: 'in review', mastered: 'mastered' }
@@ -56,6 +79,9 @@ const dotLabel = { new: 'not reviewed yet', learning: 'in review', mastered: 'ma
         <router-link class="nav" to="/settings" @click="emit('navigate')">Backup</router-link>
       </div>
     </div>
+    <div class="tracks" role="group" aria-label="Track">
+      <button v-for="t in TRACKS" :key="t.id" type="button" :aria-pressed="track === t.id" :title="t.hint" @click="track = t.id">{{ t.label }}</button>
+    </div>
     <div class="find">
       <label class="sr-only" for="sb-q">Search problems</label>
       <input id="sb-q" v-model="query" type="search" placeholder="Search problems" autocomplete="off" spellcheck="false" />
@@ -66,17 +92,17 @@ const dotLabel = { new: 'not reviewed yet', learning: 'in review', mastered: 'ma
       <p v-if="searching" class="muted small count" role="status">{{ matchCount }} match{{ matchCount === 1 ? '' : 'es' }}</p>
     </div>
     <ul class="cats">
-      <li v-for="c in shown" :key="c.name">
+      <li v-for="c in shown" :key="track + c.name">
         <details :open="searching || open.has(c.name)" @toggle="onToggle(c.name, $event)">
           <summary><span class="cn">{{ c.name }}</span><span class="ct">{{ searching ? c.entries.length : c.ready + '/' + c.entries.length }}</span></summary>
           <ul class="probs">
             <li v-for="p in c.entries" :key="p.slug">
-              <router-link v-if="p.status !== 'todo'" class="prob" :to="`/p/${p.slug}`" @click="emit('navigate')">
-                <span class="dot" :class="dot(p.slug)" role="img" :aria-label="dotLabel[dot(p.slug)]"></span>
+              <router-link v-if="p.status !== 'todo'" class="prob" :to="p.href" @click="emit('navigate')">
+                <span class="dot" :class="dot(p.cardId)" role="img" :aria-label="dotLabel[dot(p.cardId)]"></span>
                 <span class="t">{{ p.title }}</span>
                 <span v-if="p.status === 'draft'" class="tag">draft</span>
               </router-link>
-              <router-link v-else class="prob todo" :to="`/p/${p.slug}`" @click="emit('navigate')">
+              <router-link v-else class="prob todo" :to="p.href" @click="emit('navigate')">
                 <span class="dot none" aria-hidden="true"></span><span class="t">{{ p.title }}</span><span class="tag">soon</span>
               </router-link>
             </li>
@@ -96,6 +122,11 @@ const dotLabel = { new: 'not reviewed yet', learning: 'in review', mastered: 'ma
 .nav { display: inline-grid; place-items: center; min-height: 44px; padding: 0 10px; border-radius: 8px; color: var(--ink-2); text-decoration: none; font-weight: 560; font-size: .92rem; }
 .nav:hover { color: var(--ink); background: var(--surface-2); }
 .nav.router-link-exact-active { color: var(--ink); box-shadow: inset 0 -2px 0 var(--ink); border-radius: 0; }
+/* the track switch: which of the three subjects the list below shows */
+.tracks { display: grid; grid-template-columns: repeat(3, 1fr); margin: 4px 18px 10px; padding: 3px; background: var(--surface-2); border-radius: 9px; gap: 2px; }
+.tracks button { min-height: 40px; border: 0; background: transparent; border-radius: 7px; font: 640 .86rem var(--font-ui); color: var(--ink-2); cursor: pointer; letter-spacing: .01em; }
+.tracks button:hover { color: var(--ink); }
+.tracks button[aria-pressed='true'] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(18 26 35 / 14%), 0 0 0 1px var(--line); }
 .cats, .probs { list-style: none; margin: 0; padding: 0; }
 .cats { padding: 4px 10px 28px; }
 summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 10px; border-radius: 8px; cursor: pointer; font-weight: 640; font-size: .93rem; list-style: none; letter-spacing: -0.005em; }
@@ -113,7 +144,6 @@ summary:hover { background: var(--surface-2); }
 .t { flex: 1; min-width: 0; }
 .tag { font: 500 .68rem var(--font-mono); color: var(--ink-3); }
 .router-link-active .tag { color: inherit; opacity: .7; }
-/* memory state, drawn in ink: hollow = new, half = learning, full = mastered */
 .dot { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid currentColor; flex: none; opacity: .55; }
 .dot.learning { background: linear-gradient(90deg, currentColor 50%, transparent 50%); opacity: .9; }
 .dot.mastered { background: currentColor; opacity: 1; }

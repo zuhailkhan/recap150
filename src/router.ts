@@ -7,6 +7,8 @@ export const router = createRouter({
   routes: [
     { path: '/', component: HomeView },
     { path: '/p/:slug', component: () => import('@/views/ProblemView.vue') },
+    { path: '/lld/:slug', component: () => import('@/views/LldView.vue') },
+    { path: '/hld/:slug', component: () => import('@/views/HldView.vue') },
     { path: '/recap', component: () => import('@/views/RecapHomeView.vue') },
     { path: '/recap/run', component: () => import('@/views/RecapSessionView.vue') },
     { path: '/lab', component: () => import('@/views/LabView.vue') },

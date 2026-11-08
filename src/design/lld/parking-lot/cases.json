@@ -1,0 +1,13 @@
+[
+  {"name":"nearest wastes the big spot","input":[["ParkingLot","park","park"],[[[3,2,1],"nearest"],["A",1,0],["T",3,0]]],"expected":[null,0,-1]},
+  {"name":"tightest saves the big spot","input":[["ParkingLot","park","park"],[[[3,2,1],"tightest"],["A",1,0],["T",3,0]]],"expected":[null,2,0]},
+  {"name":"fee rounds up to whole hours","input":[["ParkingLot","park","unpark"],[[[2],"nearest"],["A",2,0],[1,61]]],"expected":[null,0,4]},
+  {"name":"minimum one hour","input":[["ParkingLot","park","unpark"],[[[1],"nearest"],["A",1,10],[1,10]]],"expected":[null,0,1],"edge":true},
+  {"name":"unknown ticket","input":[["ParkingLot","unpark"],[[[1],"nearest"],[7,5]]],"expected":[null,-1],"edge":true},
+  {"name":"ticket cannot be used twice","input":[["ParkingLot","park","unpark","unpark"],[[[2],"nearest"],["A",2,0],[1,60],[1,90]]],"expected":[null,0,2,-1],"edge":true},
+  {"name":"freed spot is reused","input":[["ParkingLot","park","park","unpark","park"],[[[2],"nearest"],["A",2,0],["B",2,1],[1,30],["B",2,40]]],"expected":[null,0,-1,2,0]},
+  {"name":"truck does not fit small spots","input":[["ParkingLot","park"],[[[1,2],"nearest"],["T",3,0]]],"expected":[null,-1],"edge":true},
+  {"name":"tightest tie goes to the lowest id","input":[["ParkingLot","park","park","park","park","park"],[[[2,2,1,2],"tightest"],["A",2,0],["B",2,0],["C",1,0],["D",2,0],["E",2,0]]],"expected":[null,0,1,2,3,-1]},
+  {"name":"empty lot","input":[["ParkingLot","park"],[[[],"nearest"],["A",2,0]]],"expected":[null,-1],"edge":true},
+  {"name":"trucks pay more per hour","input":[["ParkingLot","park","unpark"],[[[3],"nearest"],["T",3,0],[1,300]]],"expected":[null,0,20]}
+]

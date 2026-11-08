@@ -5,12 +5,15 @@ import { parseArgs } from '@/core/parseInput'
 import PanelView from '@/visuals/PanelView.vue'
 import Legend from '@/visuals/Legend.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   run: (args: unknown[]) => TraceResult
   presets: { label: string; args: unknown[] }[]
-  inputHint: string
-  stages: { n: number; title: string }[]
-}>()
+  inputHint?: string
+  stages?: { n: number; title: string }[]
+  /** false hides the free-text input (used by system design explainers, whose steps are authored data) */
+  customInput?: boolean
+  presetLabel?: string
+}>(), { inputHint: '', stages: () => [], customInput: true, presetLabel: 'Try' })
 
 const presetIdx = ref(0)
 const trace = shallowRef<TraceResult>(props.run(props.presets[0].args))
@@ -79,17 +82,17 @@ watch(() => props.run, () => pick(0))
       <p v-if="atEnd && resultText" class="result"><span class="muted small">returns</span> <code>{{ resultText }}</code></p>
       <p v-if="atEnd && trace.truncated" class="warn small">The run was cut off to keep this readable. Try a smaller input.</p>
       <p v-if="trace.error" class="warn small" role="alert">{{ trace.error }}</p>
-      <ul class="stages" aria-label="Stages in the code">
+      <ul v-if="stages.length" class="stages" aria-label="Stages in the code">
         <li v-for="s in stages" :key="s.n" :class="{ on: s.n === frame.stage }"><span class="n">{{ s.n }}</span>{{ s.title }}</li>
       </ul>
     </div>
 
     <div class="more">
-      <div class="presets" role="group" aria-label="Example inputs">
-        <span class="muted small">Try</span>
+      <div v-if="presets.length > 1" class="presets" role="group" aria-label="Example inputs">
+        <span class="muted small">{{ presetLabel }}</span>
         <button v-for="(p, i) in presets" :key="p.label" type="button" class="btn sm" :aria-pressed="presetIdx === i" @click="pick(i)">{{ p.label }}</button>
       </div>
-      <form class="custom" @submit.prevent="submitCustom">
+      <form v-if="customInput" class="custom" @submit.prevent="submitCustom">
         <label for="custom-in" class="small muted">Your own input. {{ inputHint }}</label>
         <div class="row">
           <input id="custom-in" v-model="custom" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="type here" />

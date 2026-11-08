@@ -42,7 +42,22 @@ export interface TriePanel { kind: "trie"; label?: string; words: string[]; hot?
 /** Rows of binary digits, e.g. a, b and a & b. */
 export interface BitsPanel { kind: "bits"; label?: string; width?: number; rows: { label: string; value: number; tones?: Tones }[] }
 
-export type Panel = ArrayPanel | BucketsPanel | StackPanel | ListPanel | TreePanel | GraphPanel | GridPanel | DpPanel | IntervalsPanel | HeapPanel | TriePanel | BitsPanel
+/** UML-style class box. x and y are grid positions (column, row), not pixels. */
+export interface ClassBox { name: string; kind?: 'class' | 'interface' | 'enum'; fields?: string[]; methods?: string[]; x: number; y: number }
+export interface ClassRel { from: string; to: string; kind: 'inherits' | 'implements' | 'has' | 'uses' | 'creates'; label?: string }
+/** LLD class diagram. tones highlight classes by name. */
+export interface ClassesPanel { kind: 'classes'; label?: string; classes: ClassBox[]; relations: ClassRel[]; tones?: Record<string, Tone> }
+export interface SeqMessage { from: string; to: string; label: string; dashed?: boolean; tone?: Tone }
+/** Sequence diagram: lifelines for the actors and one arrow per message, top to bottom. */
+export interface SeqPanel { kind: 'seq'; label?: string; actors: string[]; messages: SeqMessage[] }
+export type ArchKind = 'client' | 'lb' | 'service' | 'cache' | 'db' | 'queue' | 'blob' | 'cdn' | 'worker' | 'external'
+/** x and y are 0..100 across the canvas. */
+export interface ArchNode { id: string; label: string; kind: ArchKind; x: number; y: number; sub?: string }
+export interface ArchEdge { from: string; to: string; label?: string; dashed?: boolean; tone?: Tone }
+/** HLD architecture diagram. tones highlight nodes by id. */
+export interface ArchPanel { kind: 'arch'; label?: string; nodes: ArchNode[]; edges: ArchEdge[]; tones?: Record<string, Tone> }
+
+export type Panel = ArrayPanel | BucketsPanel | StackPanel | ListPanel | TreePanel | GraphPanel | GridPanel | DpPanel | IntervalsPanel | HeapPanel | TriePanel | BitsPanel | ClassesPanel | SeqPanel | ArchPanel
 
 export interface Frame { stage: number; say: string; panels: Panel[] }
 
@@ -86,3 +101,7 @@ export const listVals = <N extends { val: Cell; next: N | null }>(head: N | null
   for (let n = head; n && out.length < cap; n = n.next) out.push(n.val)
   return out
 }
+
+export const classes = (cs: ClassBox[], relations: ClassRel[], o: Omit<ClassesPanel, 'kind' | 'classes' | 'relations'> = {}): ClassesPanel => ({ kind: 'classes', classes: cs.map((c) => ({ ...c })), relations: relations.map((r) => ({ ...r })), ...o })
+export const seq = (actors: string[], messages: SeqMessage[], o: Omit<SeqPanel, 'kind' | 'actors' | 'messages'> = {}): SeqPanel => ({ kind: 'seq', actors: [...actors], messages: messages.map((m) => ({ ...m })), ...o })
+export const arch = (nodes: ArchNode[], edges: ArchEdge[], o: Omit<ArchPanel, 'kind' | 'nodes' | 'edges'> = {}): ArchPanel => ({ kind: 'arch', nodes: nodes.map((n) => ({ ...n })), edges: edges.map((e) => ({ ...e })), ...o })

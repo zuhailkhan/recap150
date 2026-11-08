@@ -1,0 +1,155 @@
+{
+  "slug": "url-shortener",
+  "title": "URL Shortener",
+  "group": "Storage and lookup",
+  "difficulty": "Easy",
+  "status": "ready",
+  "brief": "Design a service that turns a long web address into a short one, like sho.rt/aZ3k, and sends anyone who opens the short link to the original page. Far more people will open links than create them, and a link must keep working for years.",
+  "requirements": {
+    "functional": [
+      "Create a short link for a long URL.",
+      "Open a short link and be redirected to the long URL.",
+      "Let the creator choose a custom alias.",
+      "Let links expire after a set time.",
+      "Show the owner how many times a link was opened."
+    ],
+    "nonFunctional": [
+      { "name": "Availability", "target": "Redirects work 99.99% of the time" },
+      { "name": "Latency", "target": "A redirect takes under 50 ms at the 99th percentile" },
+      { "name": "Durability", "target": "A link never disappears once created" },
+      { "name": "Codes", "target": "Short, 7 characters, and not guessable one by one" }
+    ],
+    "outOfScope": ["User accounts and billing", "Previews of the target page"]
+  },
+  "estimate": {
+    "note": "Links are tiny, so storage stays small. Traffic shapes the design: far more people open links than create them.",
+    "inputs": [
+      { "id": "writesPerDay", "label": "New links per day", "value": 10000000, "min": 100000, "max": 1000000000, "log": true },
+      { "id": "readsPerWrite", "label": "Opens per link created", "value": 100, "min": 1, "max": 1000, "step": 1 },
+      { "id": "bytesPerLink", "label": "Bytes stored per link", "value": 500, "min": 100, "max": 2000, "step": 50, "unit": "B" },
+      { "id": "years", "label": "Keep links for", "value": 5, "min": 1, "max": 10, "step": 1, "unit": "years" }
+    ],
+    "outputs": [
+      { "id": "writeQps", "label": "Creates per second", "expr": "writesPerDay / 86400", "unit": "per s" },
+      { "id": "readQps", "label": "Opens per second, average", "expr": "writeQps * readsPerWrite", "unit": "per s", "note": "Peak is often 2 to 5 times this." },
+      { "id": "peakQps", "label": "Opens per second at peak", "expr": "readQps * 3", "unit": "per s" },
+      { "id": "totalLinks", "label": "Links stored", "expr": "writesPerDay * 365 * years", "unit": "links" },
+      { "id": "storageTb", "label": "Storage needed", "expr": "totalLinks * bytesPerLink / 1e12", "unit": "TB" },
+      { "id": "codeChars", "label": "Base-62 characters needed", "expr": "ceil(log10(totalLinks) / log10(62))", "unit": "chars", "note": "62 characters: a to z, A to Z, 0 to 9." }
+    ]
+  },
+  "api": [
+    { "call": "POST /links  { url, alias?, expiresAt? }", "does": "Creates a link and returns the short code." },
+    { "call": "GET /{code}", "does": "Redirects to the long URL. 404 if unknown, 410 if expired." },
+    { "call": "GET /links/{code}/stats", "does": "Returns open counts for the owner." }
+  ],
+  "data": [
+    { "entity": "Link", "fields": "code, longUrl, createdAt, expiresAt, ownerId", "store": "Key-value store keyed by code.", "why": "Every read is one lookup by code, with no joins." },
+    { "entity": "ClickCount", "fields": "code, day, count", "store": "Analytics store.", "why": "Written in batches by a worker, never on the redirect path." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Client", "kind": "client", "x": 5, "y": 50, "since": 0 },
+    { "id": "lb", "label": "Load balancer", "kind": "lb", "x": 24, "y": 50, "since": 1 },
+    { "id": "app", "label": "App servers", "kind": "service", "x": 44, "y": 50, "sub": "stateless", "since": 0 },
+    { "id": "db", "label": "Links DB", "kind": "db", "x": 90, "y": 36, "since": 0 },
+    { "id": "cache", "label": "Cache", "kind": "cache", "x": 68, "y": 14, "sub": "hot links", "since": 2 },
+    { "id": "idgen", "label": "ID blocks", "kind": "service", "x": 44, "y": 12, "sub": "unique ranges", "since": 3 },
+    { "id": "db2", "label": "Links DB 2", "kind": "db", "x": 90, "y": 66, "since": 4 },
+    { "id": "queue", "label": "Click events", "kind": "queue", "x": 48, "y": 90, "since": 5 },
+    { "id": "worker", "label": "Stats worker", "kind": "worker", "x": 70, "y": 90, "since": 5 },
+    { "id": "stats", "label": "Stats store", "kind": "db", "x": 91, "y": 90, "since": 5 }
+  ],
+  "edges": [
+    { "from": "client", "to": "app", "since": 0, "until": 1 },
+    { "from": "client", "to": "lb", "since": 1 },
+    { "from": "lb", "to": "app", "since": 1 },
+    { "from": "app", "to": "db", "since": 0 },
+    { "from": "app", "to": "cache", "label": "check first", "since": 2 },
+    { "from": "app", "to": "idgen", "label": "next block", "dashed": true, "since": 3 },
+    { "from": "app", "to": "db2", "since": 4 },
+    { "from": "app", "to": "queue", "label": "click", "dashed": true, "since": 5 },
+    { "from": "queue", "to": "worker", "since": 5 },
+    { "from": "worker", "to": "stats", "since": 5 }
+  ],
+  "evolution": [
+    { "title": "One server", "problem": "Start with the simplest thing that works: one app server and one database.", "change": "Create a code, store code to URL, and look it up on every open." },
+    { "title": "Load balancer", "problem": "One server is a single point of failure, and reads are the heavy part.", "change": "Run several identical stateless app servers behind a load balancer." },
+    { "title": "Cache", "problem": "Opens outnumber creates by 100 to 1, and a few links get most of them.", "change": "Check a cache before the database and fill it on a miss.", "numbers": "most opens end at the cache" },
+    { "title": "Unique codes", "problem": "Two app servers must never hand out the same code.", "change": "An ID service gives each server a block of unused numbers. The code is the number in base 62." },
+    { "title": "Shard the store", "problem": "Terabytes of links will not fit or be served by one database.", "change": "Split links across databases by code so each holds a slice.", "numbers": "the estimator shows how many TB" },
+    { "title": "Count clicks off the path", "problem": "Owners want counts, but writing a count on every open would slow the redirect.", "change": "Drop a click event on a queue. A worker adds them up later." }
+  ],
+  "flows": [
+    {
+      "name": "Create a link",
+      "steps": [
+        { "say": "The client sends the long URL to the service.", "nodes": ["client", "lb"], "edges": [["client", "lb"]] },
+        { "say": "The load balancer picks any app server. They are all the same.", "nodes": ["lb", "app"], "edges": [["lb", "app"]] },
+        { "say": "The server takes the next number from its ID block. No database round trip, no collision.", "nodes": ["app", "idgen"], "edges": [["app", "idgen"]] },
+        { "say": "It writes the number as base 62. That is the short code.", "nodes": ["app"], "edges": [] },
+        { "say": "It stores code to long URL on the shard that owns that code.", "nodes": ["app", "db"], "edges": [["app", "db"]] },
+        { "say": "The short link goes back to the client.", "nodes": ["app", "lb", "client"], "edges": [] }
+      ]
+    },
+    {
+      "name": "Open a link",
+      "steps": [
+        { "say": "A browser asks for sho.rt/aZ3k.", "nodes": ["client", "lb"], "edges": [["client", "lb"]] },
+        { "say": "The load balancer sends it to an app server.", "nodes": ["lb", "app"], "edges": [["lb", "app"]] },
+        { "say": "The server checks the cache first. Most opens end here.", "nodes": ["app", "cache"], "edges": [["app", "cache"]] },
+        { "say": "On a miss it reads the shard that owns this code.", "nodes": ["app", "db"], "edges": [["app", "db"]] },
+        { "say": "It fills the cache so the next open is a hit.", "nodes": ["app", "cache"], "edges": [["app", "cache"]] },
+        { "say": "It drops a click event on the queue and does not wait for it.", "nodes": ["app", "queue"], "edges": [["app", "queue"]] },
+        { "say": "It answers with a redirect to the long URL.", "nodes": ["app", "lb", "client"], "edges": [] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Making the short code",
+      "question": "How do we make a code that is short, never collides and is cheap to create?",
+      "options": [
+        { "name": "Hash the URL, keep a prefix", "pros": "Same URL gives the same code, so duplicates are free to detect.", "cons": "A short prefix collides. Each collision needs a check and a retry." },
+        { "name": "Random code, check it is free", "pros": "Codes cannot be guessed.", "cons": "Every create needs a read to check for a clash. It gets slower as the table fills." },
+        { "name": "Unique number, written in base 62", "pros": "No collisions, no check, very fast.", "cons": "Codes are in order and guessable. Needs an ID service." }
+      ],
+      "pick": "Unique number in base 62",
+      "because": "Creation stays cheap and always succeeds. To stop people guessing the next code, scramble the number with a secret reversible mix before encoding."
+    },
+    {
+      "title": "Which redirect",
+      "question": "Should the redirect be 301 (permanent) or 302 (temporary)?",
+      "options": [
+        { "name": "301 permanent", "pros": "Browsers remember it, so much less traffic reaches us.", "cons": "We never see repeat opens, so click counts are wrong. We cannot change the target." },
+        { "name": "302 temporary", "pros": "Every open reaches us, so counts and edits work.", "cons": "More traffic for the cache to absorb." }
+      ],
+      "pick": "302",
+      "because": "Owners want click counts and the right to change a link. The cache makes the extra traffic cheap."
+    },
+    {
+      "title": "Where links are stored",
+      "question": "Relational database or key-value store?",
+      "options": [
+        { "name": "Relational", "pros": "Familiar, strong guarantees, easy ad hoc queries.", "cons": "Sharding by hand is laborious." },
+        { "name": "Key-value store", "pros": "One-key lookups scale out by adding nodes.", "cons": "Little support for queries across links." }
+      ],
+      "pick": "Key-value store",
+      "because": "Every read and write is by code. There are no joins to lose, and sharding comes built in."
+    }
+  ],
+  "failures": [
+    { "what": "The cache goes down", "impact": "Every open hits the database, so latency jumps and the database may fall over.", "fix": "Run cache replicas. Limit how many misses reach the database at once. Size the database to survive a cold cache for a short while." },
+    { "what": "The ID service is unreachable", "impact": "No new links can be created.", "fix": "Each app server holds a spare block, so short outages go unnoticed. Run the ID service on several nodes." },
+    { "what": "One link goes viral", "impact": "One shard gets hammered by the same code.", "fix": "The cache absorbs most of it. Replicate that key, and add read replicas for the shard." },
+    { "what": "People use it to hide malware", "impact": "Short links hide where they lead, so the service gets abused.", "fix": "Scan new URLs, let people report links, expire suspicious ones, and limit creation per user." }
+  ],
+  "scaling": [
+    { "limit": "A shard outgrows its machine", "lever": "Place codes on shards with consistent hashing, so adding a shard moves only a slice of the codes." },
+    { "limit": "Users are spread across the world", "lever": "Add regional caches and read replicas, and route each user to the nearest one." }
+  ],
+  "recap": {
+    "key": "Opens vastly outnumber creates, so cache hard. Make codes from unique numbers in base 62 so they never collide.",
+    "numbers": "About 100 creates and 10K opens per second. A few TB over 5 years. 7 base-62 characters cover 3.5 trillion links.",
+    "moves": ["Estimate first: reads outnumber writes 100 to 1", "Make codes from an ID block in base 62", "Cache the reads and shard the store by code", "Count clicks through a queue, off the redirect path"]
+  }
+}

@@ -12,7 +12,7 @@ for (const spec of args) {
   page.on('pageerror', (e) => console.log('ERR', e.message))
   page.on('console', (m) => m.type() === 'error' && console.log('CONSOLE', m.text().slice(0, 160)))
   await page.goto(base + '#' + route); await page.waitForSelector('h1'); await page.waitForTimeout(900)
-  if (route.startsWith('/p/') && mode !== 'top') { const next = page.getByRole('button', { name: 'Next', exact: true }); for (let i = 0; i < 4; i++) await next.click() ; await page.waitForTimeout(200) }
+  if (['/p/', '/lld/', '/hld/'].some((p) => route.startsWith(p)) && mode !== 'top') { const next = (sel ? page.locator(sel) : page).getByRole('button', { name: 'Next', exact: true }).first(); for (let i = 0; i < 4; i++) await next.click() ; await page.waitForTimeout(200) }
   if (sel) { await page.locator(sel).first().screenshot({ path: `C:/Users/zuhai/workspace/recap150/screenshots/look-${name}.png` }); await ctx.close(); continue }
   await page.screenshot({ path: `C:/Users/zuhai/workspace/recap150/screenshots/look-${name}.png`, fullPage: mode === 'full' })
   await ctx.close()

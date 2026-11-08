@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Visual gallery used to check every panel kind. Not linked from the navigation. Open /#/lab.
-import { arr, bits, buckets, dp, graph, grid, heap, intervals, list, mark, mark2, stack, tree, trie, type Panel } from '@/core/panels'
+import { arch, arr, bits, classes, seq, buckets, dp, graph, grid, heap, intervals, list, mark, mark2, stack, tree, trie, type Panel } from '@/core/panels'
 import PanelView from '@/visuals/PanelView.vue'
 
 const panels: { name: string; p: Panel }[] = [
@@ -17,6 +17,9 @@ const panels: { name: string; p: Panel }[] = [
   { name: 'intervals', p: intervals([{ start: 1, end: 3 }, { start: 2, end: 6, tone: 'focus' }, { start: 8, end: 10, tone: 'hit' }], { label: 'intervals', marks: [{ at: 5, label: 'now' }] }) },
   { name: 'heap', p: heap([1, 3, 2, 7, 4, 5], { label: 'min-heap', tones: mark(6, { 0: 'hit', 4: 'focus' }) }) },
   { name: 'trie', p: trie(['apple', 'app', 'apt', 'bat'], { label: 'trie', hot: 'app' }) },
+  { name: 'classes', p: classes([{ name: 'Vehicle', kind: 'interface', methods: ['size(): Size'], x: 1, y: 0 }, { name: 'Car', fields: ['plate: string'], methods: ['size()'], x: 0, y: 1 }, { name: 'Truck', fields: ['plate: string'], methods: ['size()'], x: 2, y: 1 }, { name: 'ParkingLot', fields: ['spots: Spot[]'], methods: ['park(v): Ticket', 'unpark(t)'], x: 1, y: 2 }], [{ from: 'Car', to: 'Vehicle', kind: 'implements' }, { from: 'Truck', to: 'Vehicle', kind: 'implements' }, { from: 'ParkingLot', to: 'Vehicle', kind: 'uses', label: 'parks' }], { label: 'class diagram', tones: { ParkingLot: 'focus' } }) },
+  { name: 'seq', p: seq(['Client', 'Lot', 'Strategy'], [{ from: 'Client', to: 'Lot', label: 'park(car)' }, { from: 'Lot', to: 'Strategy', label: 'pick(spots)', tone: 'focus' }, { from: 'Strategy', to: 'Lot', label: 'spot 3', dashed: true }, { from: 'Lot', to: 'Lot', label: 'mark taken' }, { from: 'Lot', to: 'Client', label: 'ticket', dashed: true, tone: 'hit' }], { label: 'sequence' }) },
+  { name: 'arch', p: arch([{ id: 'c', label: 'Client', kind: 'client', x: 6, y: 50 }, { id: 'lb', label: 'Load balancer', kind: 'lb', x: 28, y: 50 }, { id: 'api', label: 'API', kind: 'service', x: 50, y: 25, sub: 'stateless' }, { id: 'cache', label: 'Cache', kind: 'cache', x: 50, y: 75 }, { id: 'db', label: 'Database', kind: 'db', x: 80, y: 50, sub: 'primary' }, { id: 'q', label: 'Queue', kind: 'queue', x: 80, y: 10 }], [{ from: 'c', to: 'lb' }, { from: 'lb', to: 'api', label: 'HTTPS' }, { from: 'api', to: 'cache', label: 'read' }, { from: 'api', to: 'db', label: 'write', tone: 'focus' }, { from: 'api', to: 'q', dashed: true }], { label: 'architecture', tones: { db: 'focus', cache: 'keep' } }) },
   { name: 'bits', p: bits([{ label: 'a', value: 12 }, { label: 'b', value: 10 }, { label: 'a&b', value: 8, tones: mark(8, { 4: 'hit' }) }], { label: 'bits' }) },
 ]
 </script>
