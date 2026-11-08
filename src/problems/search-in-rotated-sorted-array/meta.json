@@ -1,0 +1,71 @@
+{
+  "slug": "search-in-rotated-sorted-array",
+  "title": "Search In Rotated Sorted Array",
+  "category": "Binary Search",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "A sorted array of distinct integers was rotated at some unknown spot, so it is a high run followed by a low run. Given the rotated array and a target, return the target's index, or -1 if it is missing. Aim for O(log n).",
+  "example": {
+    "caption": "The array is not sorted overall, but it is made of two sorted runs. Target 0 sits in the low run at index 4.",
+    "input": [
+      { "kind": "array", "label": "nums", "items": [4, 5, 6, 7, 0, 1, 2] },
+      { "kind": "array", "label": "target", "items": [0] }
+    ],
+    "output": [{ "kind": "array", "label": "index", "items": [4], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "After you pick the middle, one side of it is always in order. Check if the target fits in that ordered side, and keep it or drop it.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "rotated", "plain": "A sorted array cut at one spot with the two pieces swapped. You get a high run, then a low run." },
+      { "term": "ordered side", "plain": "The part of l..r on one side of m whose values simply increase. You can test a target against its two ends." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: a rotated sorted array and a target, e.g. [4,5,6,7,0,1,2] and 0",
+    "presets": [
+      { "label": "In the low run", "args": [[4, 5, 6, 7, 0, 1, 2], 0] },
+      { "label": "In the high run", "args": [[4, 5, 6, 7, 0, 1, 2], 5] },
+      { "label": "Not there", "args": [[4, 5, 6, 7, 0, 1, 2], 3] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of the array" }],
+    "compare": { "brute": "n", "optimal": "logn", "bruteLabel": "Scan from the left", "optimalLabel": "Keep the half that can hold it", "unit": "items looked at (rough)" },
+    "rows": [
+      { "name": "Linear scan", "time": "O(n)", "space": "O(1)", "note": "Always works, but ignores the sorted runs." },
+      { "name": "One-pass binary search", "time": "O(log n)", "space": "O(1)", "note": "Each step finds an ordered side, tests the target against its ends, and drops one half." }
+    ],
+    "takeaway": "Rotation breaks global order, but not local order. One half is always sorted, and a sorted half can answer a range question."
+  },
+  "variants": [
+    { "id": "onepass", "label": "One pass", "tsFn": "search", "goFn": "search", "stages": [
+      { "n": 1, "title": "Live range", "note": "l and r bound the part that could still hold the target." },
+      { "n": 2, "title": "Look at the middle", "note": "While the range is not empty, take the middle m, rounded down." },
+      { "n": 3, "title": "Find the ordered side", "note": "nums[l] <= nums[m] means the left side is in order. Otherwise the right side is." },
+      { "n": 4, "title": "Keep or drop", "note": "If the target fits between the ends of the ordered side, go that way. If not, go the other way." },
+      { "n": 5, "title": "Answer", "note": "If nums[m] is the target, return m. If l passes r, nothing is left: return -1." }
+    ] }
+  ],
+  "goArgs": ["[]int", "int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Not rotated", "input": "[1, 3, 5, 7], target 5", "output": "2", "why": "The left side is always in order, so it behaves like a plain binary search." },
+    { "title": "Single element", "input": "[1], target 0", "output": "-1", "why": "l = r = 0, the middle is not the target, and one drop empties the range." },
+    { "title": "Two elements, middle is l", "input": "[3, 1], target 1", "output": "1", "why": "m = 0 = l, so nums[l] <= nums[m] is true: the left side (just m) is 'ordered'. The target is not in it, so go right. Using <= makes this work." },
+    { "title": "Target in the far low run", "input": "[6, 7, 8, 1, 2, 3], target 2", "output": "4", "why": "The middle 8 has an ordered left side 6..8 that cannot hold 2, so the search jumps into the low run." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Use nums[l] <= nums[m], not <. When l equals m (two cells left) they are the same cell, and with < you would call the right side ordered when it is not." },
+    { "lang": "Go", "text": "The range checks need one strict and one loose end: nums[l] <= target && target < nums[m]. nums[m] was already ruled out, so it must not count as inside." },
+    { "lang": "General", "text": "Test the target against the ordered side only. The unordered side contains the drop, and a range check on its ends tells you nothing." },
+    { "lang": "General", "text": "Check nums[m] == target first, before choosing a side, so the middle is never confused with an end of its own range." }
+  ],
+  "recap": {
+    "pattern": "Binary search on a rotated array",
+    "key": "One side of the middle is always sorted. If the target fits inside that side keep it, otherwise keep the other side.",
+    "complexity": "Time O(log n). Space O(1).",
+    "moves": ["l = 0, r = n - 1. Take m and return it if it matches", "nums[l] <= nums[m]: left is ordered. Else right is ordered", "Target inside the ordered side: go there. Else go the other way", "Range empty: return -1"]
+  }
+}

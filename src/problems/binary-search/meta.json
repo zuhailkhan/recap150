@@ -1,0 +1,70 @@
+{
+  "slug": "binary-search",
+  "title": "Binary Search",
+  "category": "Binary Search",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get an array of distinct integers sorted from small to large, and a target value. Return the index where the target sits, or -1 if it is not there. Your running time should grow with log n, not with n.",
+  "example": {
+    "caption": "Check the middle (3 at index 2), drop the left half, then check again. Target 9 is at index 4.",
+    "input": [
+      { "kind": "array", "label": "nums", "items": [-1, 0, 3, 5, 9, 12] },
+      { "kind": "array", "label": "target", "items": [9] }
+    ],
+    "output": [{ "kind": "array", "label": "index", "items": [4], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "Peek at the middle. That one comparison proves one whole half cannot hold the target, so throw that half away and repeat.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "sorted", "plain": "Every value is bigger than the one before it. This is what makes a single peek so powerful." },
+      { "term": "log n", "plain": "How many times you can halve n before one item is left. A million items need about 20 halvings." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: a sorted array and a target, e.g. [-1,0,3,5,9,12] and 9",
+    "presets": [
+      { "label": "Found", "args": [[-1, 0, 3, 5, 9, 12], 9] },
+      { "label": "Not there", "args": [[-1, 0, 3, 5, 9, 12], 2] },
+      { "label": "Smaller than all", "args": [[2, 4, 6, 8], -5] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of the array" }],
+    "compare": { "brute": "n", "optimal": "logn", "bruteLabel": "Check every item from the left", "optimalLabel": "Halve the live range each time", "unit": "items looked at (rough)" },
+    "rows": [
+      { "name": "Linear scan", "time": "O(n)", "space": "O(1)", "note": "Look at items one by one. It ignores the fact that the array is sorted." },
+      { "name": "Binary search", "time": "O(log n)", "space": "O(1)", "note": "Each look removes half of what is left. Only l, r and m are stored." }
+    ],
+    "takeaway": "Sorted order lets one comparison rule out half the array. Doubling n adds just one more step."
+  },
+  "variants": [
+    { "id": "classic", "label": "l <= r", "tsFn": "search", "goFn": "search", "stages": [
+      { "n": 1, "title": "Live range", "note": "l and r mark the part of the array that could still hold the target. At first that is all of it." },
+      { "n": 2, "title": "Look at the middle", "note": "While the range is not empty, pick m in the middle, rounded down." },
+      { "n": 3, "title": "Drop a half", "note": "Too small means the target is right of m, so l = m + 1. Too big means left of m, so r = m - 1." },
+      { "n": 4, "title": "Answer", "note": "If nums[m] equals the target, return m. If l passes r, every index was ruled out, so return -1." }
+    ] }
+  ],
+  "goArgs": ["[]int", "int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One element, a hit", "input": "[5], target 5", "output": "0", "why": "l = r = 0, so the middle is the only cell. This is why the loop condition is l <= r and not l < r." },
+    { "title": "Smaller than everything", "input": "[2, 4, 6], target 1", "output": "-1", "why": "r keeps moving left until it reaches -1. The loop ends because l (0) is now greater than r." },
+    { "title": "Bigger than everything", "input": "[2, 4, 6], target 9", "output": "-1", "why": "l keeps moving right until it reaches 3, one past the last index. Never read nums[l] after the loop." },
+    { "title": "Two elements, the right one", "input": "[1, 3], target 3", "output": "1", "why": "The middle rounds down to 0. It is too small, so l becomes 1 and the next round finds it." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "(l + r) / 2 is a float in JS. For l = 3 and r = 4 you get 3.5, and nums[3.5] is undefined. Wrap it: l + Math.floor((r - l) / 2)." },
+    { "lang": "Go", "text": "Integer division already rounds down, so l + (r-l)/2 is enough. Go's int is 64-bit, so (l+r)/2 would not overflow in practice, but writing l + (r-l)/2 is a free habit that is safe in every language." },
+    { "lang": "Go", "text": "An empty slice gives r = -1, so the loop never runs and you return -1. No special case and no panic." },
+    { "lang": "General", "text": "Pick one loop style and keep all its parts. With while l <= r you must write l = m + 1 and r = m - 1. Mixing in r = m can loop forever." }
+  ],
+  "recap": {
+    "pattern": "Binary search: halve the live range",
+    "key": "Compare the middle with the target. The comparison tells you which half to throw away. Repeat until found or the range is empty.",
+    "complexity": "Time O(log n). Space O(1).",
+    "moves": ["Set l = 0 and r = n - 1", "While l <= r, take m = l + (r - l) / 2", "Equal: return m. Too small: l = m + 1. Too big: r = m - 1", "Range empty: return -1"]
+  }
+}

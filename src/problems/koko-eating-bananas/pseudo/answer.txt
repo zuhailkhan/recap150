@@ -1,0 +1,15 @@
+function minEatingSpeed(piles, h)
+  l = 1                              # [1] candidate speeds: 1 .. biggest pile
+  r = max(piles)                     # [1]
+  best = r                           # [1] the biggest pile always works
+  while l <= r                       # [2] speeds in l..r are undecided
+    m = l + (r - l) / 2              # [2] try the middle speed
+    hours = 0
+    for each pile p in piles
+      hours = hours + ceil(p / m)    # [3] hours this pile takes at speed m
+    if hours <= h
+      best = m                       # [4] fast enough: keep it, try slower
+      r = m - 1
+    else
+      l = m + 1                      # [4] too slow: try faster
+  return best                        # [5] slowest speed that works

@@ -1,0 +1,10 @@
+function findMin(nums)
+  l = 0                          # [1] the minimum is always inside nums[l..r]
+  r = length(nums) - 1           # [1]
+  while l < r                    # [2] more than one candidate left
+    m = l + (r - l) / 2          # [2] middle, rounded down
+    if nums[m] > nums[r]
+      l = m + 1                  # [3] m is in the high part: minimum is right of m
+    else
+      r = m                      # [4] m is in the low part: minimum is m or left of m
+  return nums[l]                 # [5] one candidate left: the minimum

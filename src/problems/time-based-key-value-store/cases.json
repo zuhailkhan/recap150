@@ -1,0 +1,12 @@
+[
+  {"name":"classic","input":[["TimeMap","set","get","get","set","get","get"],[[],["foo","bar",1],["foo",1],["foo",3],["foo","bar2",4],["foo",4],["foo",5]]],"expected":[null,null,"bar","bar",null,"bar2","bar2"]},
+  {"name":"two keys","input":[["TimeMap","set","set","get","get"],[[],["a","x",1],["b","y",2],["a",5],["b",5]]],"expected":[null,null,null,"x","y"]},
+  {"name":"between two times","input":[["TimeMap","set","set","set","get","get"],[[],["a","x",1],["a","y",5],["a","z",9],["a",7],["a",0]]],"expected":[null,null,null,null,"y",""]},
+  {"name":"many updates","input":[["TimeMap","set","set","set","set","set","get","get","get"],[[],["k","v1",2],["k","v2",4],["k","v3",6],["k","v4",8],["k","v5",10],["k",5],["k",8],["k",11]]],"expected":[null,null,null,null,null,null,"v2","v4","v5"]},
+  {"name":"unknown key","input":[["TimeMap","get"],[[],["nope",5]]],"expected":[null,""],"edge":true},
+  {"name":"asked before first set","input":[["TimeMap","set","get"],[[],["a","x",10],["a",5]]],"expected":[null,null,""],"edge":true},
+  {"name":"exact timestamp","input":[["TimeMap","set","get"],[[],["a","x",5],["a",5]]],"expected":[null,null,"x"],"edge":true},
+  {"name":"far in the future","input":[["TimeMap","set","get"],[[],["a","x",5],["a",1000]]],"expected":[null,null,"x"],"edge":true},
+  {"name":"key set again later","input":[["TimeMap","set","get","set","get","get"],[[],["love","high",10],["love",15],["love","low",20],["love",5],["love",25]]],"expected":[null,null,"high",null,"","low"]},
+  {"name":"large timestamps","input":[["TimeMap","set","set","get","get"],[[],["t","a",1],["t","b",1000000],["t",999999],["t",1000000]]],"expected":[null,null,null,"a","b"]}
+]

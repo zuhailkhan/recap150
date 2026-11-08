@@ -1,0 +1,69 @@
+{
+  "slug": "time-based-key-value-store",
+  "title": "Time Based Key Value Store",
+  "category": "Binary Search",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Design a store where one key can hold many values over time. set(key, value, timestamp) records a value, and later times for a key are always bigger. get(key, timestamp) returns the value saved at the latest time that is not after the asked time, or an empty string if there is none.",
+  "example": {
+    "caption": "foo was set to bar at time 1 and bar2 at time 4. Asking at time 3 gives bar, the newest value that existed by then.",
+    "input": [{ "kind": "buckets", "label": "store", "keyLabel": "key", "buckets": [{ "key": "foo", "items": ["1:bar", "4:bar2"] }] }],
+    "output": [{ "kind": "array", "label": "get(foo, 3)", "items": ["bar"], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "Keep each key's pairs in the order they arrive. Time only grows, so the list is already sorted, and a binary search finds the latest pair that is not too new.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "design problem", "plain": "You write a small class with methods. The tests replay a list of method calls and compare what each call returns." },
+      { "term": "floor lookup", "plain": "Find the largest stored value that is less than or equal to the query, not only an exact match." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the method names and their arguments, e.g. [\"TimeMap\",\"set\",\"get\"] and [[],[\"foo\",\"bar\",1],[\"foo\",1]]",
+    "presets": [
+      { "label": "Classic", "args": [["TimeMap", "set", "get", "get", "set", "get", "get"], [[], ["foo", "bar", 1], ["foo", 1], ["foo", 3], ["foo", "bar2", 4], ["foo", 4], ["foo", 5]]] },
+      { "label": "Too early, no key", "args": [["TimeMap", "set", "set", "get", "get", "get"], [[], ["love", "high", 10], ["love", "low", 20], ["love", 5], ["love", 25], ["nope", 10]]] },
+      { "label": "Between two times", "args": [["TimeMap", "set", "set", "set", "get", "get"], [[], ["a", "x", 1], ["a", "y", 5], ["a", "z", 9], ["a", 7], ["a", 0]]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of values stored under one key" }],
+    "compare": { "brute": "n", "optimal": "logn", "bruteLabel": "Scan the key's list for get", "optimalLabel": "Binary search the key's list", "unit": "pairs looked at per get (rough)" },
+    "rows": [
+      { "name": "Scan on get", "time": "set O(1), get O(n)", "space": "O(n)", "note": "Walk the list from the newest end until a timestamp fits. Simple, but slow with many values." },
+      { "name": "Binary search on get", "time": "set O(1), get O(log n)", "space": "O(n)", "note": "The list is sorted by construction, so no sorting step is needed. Space is one pair per set call." }
+    ],
+    "takeaway": "Appending in time order keeps the list sorted for free. That buys a fast get without any extra structure."
+  },
+  "variants": [
+    { "id": "timeline", "label": "List per key", "tsFn": "run", "goFn": "runOps", "stages": [
+      { "n": 1, "title": "A list per key", "note": "A map from key to its list of (timestamp, value) pairs. A new key starts with an empty list." },
+      { "n": 2, "title": "set appends", "note": "Push the pair at the end. Timestamps only grow, so the list stays sorted." },
+      { "n": 3, "title": "get: search range", "note": "l and r cover the key's list. best starts as an empty string." },
+      { "n": 4, "title": "Candidate or too new", "note": "Timestamp at most the query: save its value and look right. Otherwise it is too new: look left." },
+      { "n": 5, "title": "Return best", "note": "The last saved candidate is the newest value not after the query, or an empty string if there was none." }
+    ] }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "edges": [
+    { "title": "Unknown key", "input": "get(\"nope\", 5)", "output": "\"\"", "why": "A missing key has no list. Reading a missing key gives an empty list in both languages, so the loop is skipped and best stays empty." },
+    { "title": "Asked before the first set", "input": "set(a, x, 10); get(a, 5)", "output": "\"\"", "why": "Every stored time is too new. r walks to -1 and best was never set." },
+    { "title": "Exact timestamp", "input": "set(a, x, 5); get(a, 5)", "output": "\"x\"", "why": "The comparison is <=, not <. A stored time equal to the query is a valid answer." },
+    { "title": "Far in the future", "input": "set(a, x, 5); get(a, 1000)", "output": "\"x\"", "why": "The newest pair is the answer. Every middle is a candidate, so l runs off the right end." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "map.get(key) is undefined for a missing key. Use ?? [] before indexing, or list.length throws a TypeError." },
+    { "lang": "TypeScript", "text": "Return an empty string, not undefined or null, for no value. Tests compare the result exactly, and null is reserved for methods that return nothing." },
+    { "lang": "Go", "text": "Reading a missing map key gives a nil slice, and len(nil) is 0, so no existence check is needed. But do not store through a nil map: Constructor must make the map." },
+    { "lang": "Go", "text": "JSON numbers decode into any as float64. The test driver converts them with int(a[2].(float64)). A plain a[2].(int) panics." },
+    { "lang": "General", "text": "Save the candidate and keep searching right (l = m + 1). Stopping at the first fit would return an older value, not the latest one." }
+  ],
+  "recap": {
+    "pattern": "Binary search on a sorted history",
+    "key": "Append pairs in time order so each key's list is sorted. For get, binary search for the last pair whose time is at most the query.",
+    "complexity": "set O(1). get O(log n). Space O(total sets).",
+    "moves": ["Map each key to a list of [timestamp, value]", "set appends to the key's list", "get: if time[m] <= query, save its value and go right. Else go left", "Return the saved value, or an empty string"]
+  }
+}

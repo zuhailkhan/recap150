@@ -1,0 +1,23 @@
+function findMedianSortedArrays(nums1, nums2)
+  a = the shorter of nums1, nums2         # [1] so b is never too short for the cut
+  b = the longer one
+  total = length(a) + length(b)
+  half = (total + 1) / 2                  # [1] items that go on the left side
+  l = 0                                   # [2] cut positions in a: 0 .. length(a)
+  r = length(a)                           # [2]
+  while l <= r
+    i = l + (r - l) / 2                   # [3] cut a after i items
+    j = half - i                          # [3] cut b after j items
+    aLeft, aRight = item just left / right of a's cut, or -inf / +inf at an end   # [3]
+    bLeft, bRight = item just left / right of b's cut, or -inf / +inf at an end   # [3]
+    tooFar = aLeft > bRight               # [4] a's left item beats b's right item
+    tooShort = bLeft > aRight             # [4] b's left item beats a's right item
+    if tooFar
+      r = i - 1                           # [4] move a's cut left
+    else if tooShort
+      l = i + 1                           # [4] move a's cut right
+    else
+      leftMax = max(aLeft, bLeft)         # [5] the median is built from the items beside the cuts
+      if total is odd
+        return leftMax
+      return (leftMax + min(aRight, bRight)) / 2

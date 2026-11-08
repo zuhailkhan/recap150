@@ -1,0 +1,72 @@
+{
+  "slug": "koko-eating-bananas",
+  "title": "Koko Eating Bananas",
+  "category": "Binary Search",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "There are piles of bananas and h hours. Each hour Koko picks one pile and eats up to k bananas from it; leftovers in that pile wait, and she never switches piles mid-hour. Find the smallest whole speed k that finishes every pile within h hours.",
+  "example": {
+    "caption": "At speed 3 the piles need 1 + 2 + 3 + 4 = 10 hours, too many. At speed 4 they need 1 + 2 + 2 + 3 = 8 hours. So 4 is the answer.",
+    "input": [
+      { "kind": "array", "label": "piles", "items": [3, 6, 7, 11] },
+      { "kind": "array", "label": "h", "items": [8] }
+    ],
+    "output": [{ "kind": "array", "label": "min speed", "items": [4], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "Do not search the piles, search the speeds. A speed is either too slow or fast enough, and that answer never flips back as speed grows.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "binary search on the answer", "plain": "Instead of looking for a value inside an array, look for the best number in a range, and use a yes/no check to decide which half to drop." },
+      { "term": "monotone", "plain": "Only changes one way. If speed 5 is fast enough, so is every speed above 5." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the piles and the hours, e.g. [3,6,7,11] and 8. Keep piles small so the speed line stays readable.",
+    "presets": [
+      { "label": "Classic", "args": [[3, 6, 7, 11], 8] },
+      { "label": "One hour per pile", "args": [[30, 11, 23, 4, 20], 5] },
+      { "label": "Plenty of time", "args": [[5, 9, 2], 12] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of piles" }, { "sym": "m", "meaning": "size of the biggest pile" }],
+    "compare": { "brute": "nm", "optimal": "nlogm", "bruteLabel": "Try speeds 1, 2, 3 ... until one fits", "optimalLabel": "Binary search the speed", "unit": "pile visits (rough)" },
+    "rows": [
+      { "name": "Try every speed", "time": "O(n * m)", "space": "O(1)", "note": "Up to m speeds, and each check walks all n piles." },
+      { "name": "Binary search on speed", "time": "O(n * log m)", "space": "O(1)", "note": "About log m speeds are checked, each in one pass over the piles." }
+    ],
+    "takeaway": "The check is a plain loop. Binary search only decides which speed to check next, and that cuts m tries down to log m."
+  },
+  "variants": [
+    { "id": "answer", "label": "Search the speed", "tsFn": "minEatingSpeed", "goFn": "minEatingSpeed", "stages": [
+      { "n": 1, "title": "Speed range", "note": "Speeds run from 1 to the biggest pile. The biggest pile always works, so it is the first best." },
+      { "n": 2, "title": "Try a middle speed", "note": "While some speeds are undecided, pick the middle one." },
+      { "n": 3, "title": "Count the hours", "note": "Each pile takes ceil(pile / speed) hours. Add them up." },
+      { "n": 4, "title": "Keep or raise", "note": "Within h hours: save it and try slower, r = m - 1. Over h: too slow, so l = m + 1." },
+      { "n": 5, "title": "Answer", "note": "When the range is empty, best holds the slowest speed that still finishes in time." }
+    ] }
+  ],
+  "goArgs": ["[]int", "int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Hours equal piles", "input": "[3, 6, 7, 11], h = 4", "output": "11", "why": "One hour per pile means she must finish the biggest pile in one hour. That is the top of the range." },
+    { "title": "Lots of time", "input": "[1, 1, 1], h = 1000", "output": "1", "why": "Speed 1 already works, so the search must be able to settle on the very bottom of the range." },
+    { "title": "Single pile", "input": "[10], h = 3", "output": "4", "why": "At speed 3 the pile needs 4 hours. At speed 4 it needs 3. Rounding up is what makes 4 the answer." },
+    { "title": "Huge pile", "input": "[1000000000], h = 2", "output": "500000000", "why": "Speeds go up to a billion, but only about 30 are tested. The hour total can also get large with many piles." }
+  ],
+  "gotchas": [
+    { "lang": "TypeScript", "text": "Math.ceil(p / m) is right. Math.floor(p / m) or integer-style division drops the leftover bananas and under-counts the hours." },
+    { "lang": "TypeScript", "text": "Math.max(...piles) pushes every pile onto the call stack. It is fine for the usual limits, but a huge array can throw a RangeError. A reduce loop has no such limit." },
+    { "lang": "Go", "text": "Ceiling division on ints is (p + m - 1) / m. Dividing floats just to call math.Ceil is slower and can round wrongly for large values." },
+    { "lang": "Go", "text": "The hour total can reach about 10^13 with many big piles. That fits in Go's 64-bit int, but would overflow a 32-bit one." },
+    { "lang": "General", "text": "Save the speed when it works (best = m) and keep searching left. Returning at the first working speed gives a speed that is fast enough, not the smallest." }
+  ],
+  "recap": {
+    "pattern": "Binary search on the answer",
+    "key": "Search the range of possible answers. A yes/no check that never flips back lets you drop half the range each time.",
+    "complexity": "Time O(n log m). Space O(1).",
+    "moves": ["Range l = 1, r = biggest pile", "Take the middle speed m and total ceil(pile / m) over all piles", "Hours <= h: save m and go left. Otherwise go right", "Return the saved best"]
+  }
+}

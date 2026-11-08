@@ -1,0 +1,15 @@
+[
+  {"name":"classic hit","input":[[[1,3,5,7],[10,11,16,20],[23,30,34,60]],3],"expected":true},
+  {"name":"middle row","input":[[[1,3,5,7],[10,11,16,20],[23,30,34,60]],11],"expected":true},
+  {"name":"missing in gap","input":[[[1,3,5,7],[10,11,16,20],[23,30,34,60]],13],"expected":false},
+  {"name":"first cell","input":[[[1,3,5,7],[10,11,16,20],[23,30,34,60]],1],"expected":true},
+  {"name":"last cell","input":[[[1,3,5,7],[10,11,16,20],[23,30,34,60]],60],"expected":true},
+  {"name":"below everything","input":[[[1,3,5,7],[10,11,16,20],[23,30,34,60]],0],"expected":false},
+  {"name":"above everything","input":[[[1,3,5,7],[10,11,16,20],[23,30,34,60]],100],"expected":false},
+  {"name":"single cell hit","input":[[[5]],5],"expected":true,"edge":true},
+  {"name":"single cell miss","input":[[[5]],2],"expected":false,"edge":true},
+  {"name":"one row","input":[[[1,3,5]],4],"expected":false,"edge":true},
+  {"name":"one column","input":[[[1],[3],[5]],3],"expected":true,"edge":true},
+  {"name":"between two rows","input":[[[1,3],[5,7]],4],"expected":false,"edge":true},
+  {"name":"empty matrix","input":[[],1],"expected":false,"edge":true}
+]

@@ -1,0 +1,21 @@
+class TimeMap
+  store = empty map: key -> list of (timestamp, value)    # [1] every key owns a list
+
+  set(key, value, timestamp)
+    if key is not in store
+      store[key] = empty list                             # [1] first time: new list
+    append (timestamp, value) to store[key]               # [2] timestamps only grow: list stays sorted
+
+  get(key, timestamp)
+    list = store[key], or an empty list if missing
+    l = 0                                                 # [3] binary search the list
+    r = length(list) - 1                                  # [3]
+    best = ""                                             # [3] "" = nothing at or before this time
+    while l <= r
+      m = l + (r - l) / 2
+      if list[m].timestamp <= timestamp
+        best = list[m].value                              # [4] a candidate: look right for a newer one
+        l = m + 1
+      else
+        r = m - 1                                         # [4] too new: look left
+    return best                                           # [5] last candidate, or ""

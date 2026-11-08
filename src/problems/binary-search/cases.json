@@ -1,0 +1,13 @@
+[
+  {"name":"classic hit","input":[[-1,0,3,5,9,12],9],"expected":4},
+  {"name":"classic miss","input":[[-1,0,3,5,9,12],2],"expected":-1},
+  {"name":"first element","input":[[1,3,5,7,9],1],"expected":0},
+  {"name":"last element","input":[[1,3,5,7,9],9],"expected":4},
+  {"name":"negatives","input":[[-10,-7,-3,-1],-3],"expected":2},
+  {"name":"single hit","input":[[5],5],"expected":0,"edge":true},
+  {"name":"single miss","input":[[5],3],"expected":-1,"edge":true},
+  {"name":"smaller than all","input":[[2,4,6],1],"expected":-1,"edge":true},
+  {"name":"bigger than all","input":[[2,4,6],9],"expected":-1,"edge":true},
+  {"name":"two elements, right one","input":[[1,3],3],"expected":1,"edge":true},
+  {"name":"large values","input":[[-1000000000,-5,0,999999999,1000000000],999999999],"expected":3}
+]

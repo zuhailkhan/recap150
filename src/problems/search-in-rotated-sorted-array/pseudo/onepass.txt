@@ -1,0 +1,17 @@
+function search(nums, target)
+  l = 0                                   # [1] the live range is nums[l..r]
+  r = length(nums) - 1                    # [1]
+  while l <= r                            # [2] something is still live
+    m = l + (r - l) / 2                   # [2] middle, rounded down
+    if nums[m] == target
+      return m                            # [5] found it: that is the answer
+    leftSorted = nums[l] <= nums[m]       # [3] which side of m is in order?
+    if leftSorted
+      goLeft = nums[l] <= target and target < nums[m]      # [4] left side ordered: target inside it?
+    else
+      goLeft = not (nums[m] < target and target <= nums[r])  # [4] right side ordered: not inside it means go left
+    if goLeft
+      r = m - 1                           # [4] drop the middle and everything right of it
+    else
+      l = m + 1                           # [4] drop the middle and everything left of it
+  return -1                               # [5] live range is empty: not found
