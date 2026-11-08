@@ -1,0 +1,69 @@
+{
+  "slug": "serialize-and-deserialize-binary-tree",
+  "title": "Serialize And Deserialize Binary Tree",
+  "category": "Trees",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "Write two functions. serialize turns a binary tree into a string, and deserialize turns that string back into the same tree. You choose the format. The only rule is that deserialize(serialize(tree)) gives back an identical tree, including empty spots.",
+  "example": {
+    "caption": "Preorder with a # for every missing child. Reading the string left to right rebuilds the tree.",
+    "input": [{ "kind": "tree", "label": "tree", "nodes": [1, 2, 3, null, null, 4] }],
+    "output": [{ "kind": "array", "label": "serialized string, split at the commas", "items": ["1", "2", "#", "#", "3", "4", "#", "#", "#"], "tones": [null, null, "miss", "miss", null, null, "miss", "miss", "miss"] }]
+  },
+  "idea": {
+    "sentence": "Write the tree in preorder and put a marker for every missing child, so the string alone says exactly where each subtree ends.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "serialize", "plain": "Turn an in-memory structure into text (or bytes) that you could store or send." },
+      { "term": "marker (#)", "plain": "A placeholder written for a missing child. Without it, the string would not say which side a lone child is on." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the tree as a level-order list. The driver serializes it, deserializes the string, and shows the rebuilt tree as a list. It should equal the input.",
+    "presets": [
+      { "label": "Four nodes", "args": [[1, 2, 3, null, null, 4]] },
+      { "label": "Left chain", "args": [[1, 2, null, 3]] },
+      { "label": "Single node", "args": [[5]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Join strings with + on every node", "optimalLabel": "Collect tokens, join once", "unit": "characters copied (a long chain)" },
+    "rows": [
+      { "name": "Append to one growing string", "time": "O(n^2)", "space": "O(n)", "note": "In languages where a string append copies, each append re-copies the text so far." },
+      { "name": "Preorder tokens with #", "time": "O(n)", "space": "O(n)", "note": "n nodes and n + 1 markers give 2n + 1 tokens. Both functions touch each token once." }
+    ],
+    "takeaway": "A tree with n nodes has n + 1 empty spots. Preorder plus a marker for each is one token per spot or node, read back in the same order."
+  },
+  "variants": [
+    { "id": "codec", "label": "Preorder with #", "tsFn": "roundTripDriver", "goFn": "roundTripDriver", "stages": [
+      { "n": 1, "title": "Write # for empty", "note": "A missing child is written as #. This is what lets the reader know a subtree has ended." },
+      { "n": 2, "title": "Write node, left, right", "note": "Write the node's value, then serialize the left subtree, then the right subtree." },
+      { "n": 3, "title": "Join the tokens", "note": "Join all tokens with commas to get the final string." },
+      { "n": 4, "title": "Split into tokens", "note": "deserialize starts by splitting the string at the commas and keeping a position next." },
+      { "n": 5, "title": "Read a token", "note": "Take the next token. # means null. Otherwise make a node, then read its left subtree, then its right subtree. The order is the same as when writing." }
+    ] }
+  ],
+  "goArgs": ["[]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty tree", "input": "[]", "output": "[]", "why": "serialize gives just \"#\". deserialize reads that single marker and returns null." },
+    { "title": "Single node", "input": "[1]", "output": "[1]", "why": "The string is \"1,#,#\": the node and one marker for each missing child." },
+    { "title": "Left chain", "input": "[1, 2, null, 3]", "output": "[1, 2, null, 3]", "why": "The markers keep every child on the right side, so a lone left child stays a left child." },
+    { "title": "Negative values", "input": "[-1, -2, -3]", "output": "[-1, -2, -3]", "why": "The comma is the separator, so \"-1\" is one token. A minus sign never clashes with the # marker." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Preorder alone is not enough. Without markers, 1,2,3 could be many different trees. The # tokens are what make the string unambiguous." },
+    { "lang": "General", "text": "Read in the same order you wrote: node, then left, then right. Reading right before left would build a mirror image." },
+    { "lang": "General", "text": "Use a separator. Without commas, the values 1 and 23 would look like 12 and 3." },
+    { "lang": "TypeScript", "text": "Number(token) converts \"-5\" correctly. Check for '#' before converting, because Number('#') is NaN and would sneak in as a value." },
+    { "lang": "Go", "text": "strconv.Atoi returns an error as its second value. Ignoring it is fine here only because the tokens came from serialize. Real input would need checking." }
+  ],
+  "recap": {
+    "pattern": "Preorder with null markers",
+    "key": "Write node, left, right with # for empty. Read the tokens back in the same order with a shared position.",
+    "complexity": "Time O(n). Space O(n).",
+    "moves": ["serialize: # for null, else value, left, right", "Join with commas", "deserialize: split, keep a shared next position", "Read a token: # is null, else node, left, right"]
+  }
+}

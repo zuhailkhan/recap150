@@ -1,0 +1,8 @@
+function invertTree(root)
+  if root is null                      # [1] nothing here, nothing to flip
+    return null
+  left = invertTree(root.right)        # [2] the flipped right side becomes the new left
+  right = invertTree(root.left)        # [2] the flipped left side becomes the new right
+  root.left = left                     # [3] swap: both sides are already flipped
+  root.right = right
+  return root                          # [3] hand the finished subtree back to the parent

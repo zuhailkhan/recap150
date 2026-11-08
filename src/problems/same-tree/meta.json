@@ -1,0 +1,69 @@
+{
+  "slug": "same-tree",
+  "title": "Same Tree",
+  "category": "Trees",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get the roots of two binary trees. Say whether they are the same: they must have exactly the same shape, and every pair of nodes in the same position must hold the same value.",
+  "example": {
+    "caption": "Same shape, but the last leaf is 3 in one tree and 4 in the other. Not the same.",
+    "input": [
+      { "kind": "tree", "label": "p", "nodes": [1, 2, 3] },
+      { "kind": "tree", "label": "q", "nodes": [1, 2, 4], "tones": [null, null, "miss"] }
+    ],
+    "output": [{ "kind": "array", "label": "same?", "items": ["false"], "tones": ["miss"] }]
+  },
+  "idea": {
+    "sentence": "Walk both trees in step: at each spot the two nodes must both be missing or both hold the same value, and then both sides must match too.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "shape", "plain": "Which positions have a node and which are empty, ignoring the values." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: tree p and tree q, each a level-order array with null for a missing child, e.g. [1,2,3] and [1,2,3]",
+    "presets": [
+      { "label": "One value differs", "args": [[1, 2, 3], [1, 2, 4]] },
+      { "label": "Identical", "args": [[1, 2, 3, 4], [1, 2, 3, 4]] },
+      { "label": "Shape differs", "args": [[1, 2, 3], [1, 2, null, 3]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes in the smaller tree" }],
+    "compare": { "brute": "n", "optimal": "n", "bruteLabel": "Write both trees out as lists, then compare the lists", "optimalLabel": "Compare node pairs directly and stop at the first difference", "unit": "node visits, worst case" },
+    "rows": [
+      { "name": "Serialize both, compare", "time": "O(n)", "space": "O(n)", "note": "Needs a marker for empty spots, or different shapes can give the same list." },
+      { "name": "Recursive pair walk", "time": "O(n)", "space": "O(h)", "note": "Stops at the first mismatch. Memory is the call stack, one path deep." }
+    ],
+    "takeaway": "Both are linear in the worst case. The pair walk needs no extra copy and quits the moment it finds a difference."
+  },
+  "variants": [
+    { "id": "recursive", "label": "Recursive", "tsFn": "isSameTreeDriver", "goFn": "isSameTreeDriver", "stages": [
+      { "n": 1, "title": "Both empty", "note": "Two missing nodes at the same spot match. Return true." },
+      { "n": 2, "title": "Mismatch", "note": "If only one node exists, or the two values differ, the trees are different. Return false." },
+      { "n": 3, "title": "Match, go deeper", "note": "This pair is equal. Both left sides must match and both right sides must match." }
+    ] }
+  ],
+  "goArgs": ["[]any", "[]any"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Both empty", "input": "[] and []", "output": "true", "why": "Two empty trees are the same. The first check handles it." },
+    { "title": "One empty", "input": "[1] and []", "output": "false", "why": "One node exists and the other does not. This is the shape mismatch." },
+    { "title": "Same values, different shape", "input": "[1, 2] and [1, null, 2]", "output": "false", "why": "Both hold 1 and 2, but 2 is a left child in one and a right child in the other." },
+    { "title": "Difference far down", "input": "[1, 2, 3, 4, 5] and [1, 2, 3, 4, 6]", "output": "false", "why": "The top matches. You only find the mismatch by going all the way to the leaves." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Check both-empty first. If you check one-empty first, two empty nodes are wrongly called a mismatch." },
+    { "lang": "General", "text": "Comparing only the values (say, in-order lists) is not enough. Different shapes can give the same value list." },
+    { "lang": "TypeScript", "text": "Missing children are null. Test with !p, never with p.val, which throws on null." },
+    { "lang": "Go", "text": "Compare pointers to nil before reading p.Val. Reading a field of a nil pointer panics." },
+    { "lang": "General", "text": "Use && so the right side is skipped once the left side is false. That is the early exit." }
+  ],
+  "recap": {
+    "pattern": "Tree recursion: two trees in step",
+    "key": "At each spot: both empty is a match, one empty or unequal values is a mismatch, otherwise both sides must match.",
+    "complexity": "Time O(n). Space O(h) call stack.",
+    "moves": ["Both null: return true", "One null or values differ: return false", "Compare the two left subtrees", "And the two right subtrees"]
+  }
+}

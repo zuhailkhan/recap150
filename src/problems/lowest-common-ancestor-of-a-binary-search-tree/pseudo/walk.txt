@@ -1,0 +1,10 @@
+function lowestCommonAncestor(root, p, q)
+  node = root                          # [1] start at the top
+  while node is not null
+    if p < node.val and q < node.val   # [2] both are smaller, so both live on the left
+      node = node.left
+    else if p > node.val and q > node.val   # [3] both are bigger, so both live on the right
+      node = node.right
+    else                               # [4] the paths split here, or this node is one of them
+      return node
+  return null

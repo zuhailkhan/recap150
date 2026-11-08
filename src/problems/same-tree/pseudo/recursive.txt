@@ -1,0 +1,8 @@
+function isSameTree(p, q)
+  if p is null and q is null           # [1] both are empty here: they match
+    return true
+  if p is null or q is null            # [2] only one has a node: different shapes
+    return false
+  if p.val != q.val                    # [2] same spot, different values
+    return false
+  return isSameTree(p.left, q.left) and isSameTree(p.right, q.right)   # [3] both sides must match

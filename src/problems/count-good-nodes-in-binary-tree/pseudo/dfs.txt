@@ -1,0 +1,8 @@
+function goodNodes(root)
+  return count(root, -infinity)              # [1] nothing above the root, so the root is always good
+
+function count(node, highest)
+  if node is null: return 0
+  good = 1 if node.val >= highest else 0     # [2] good when nothing above it is bigger
+  best = max(highest, node.val)              # [3] the bar the children must reach
+  return good + count(node.left, best) + count(node.right, best)   # [4] add up this subtree

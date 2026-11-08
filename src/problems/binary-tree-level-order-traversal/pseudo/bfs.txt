@@ -1,0 +1,17 @@
+function levelOrder(root)
+  result = empty list
+  if root is null                      # [1] nothing to visit
+    return result
+  queue = [root]                       # [1] nodes waiting their turn, front first
+  while queue is not empty
+    size = length of queue             # [2] freeze the level: this many nodes belong to it
+    level = empty list
+    repeat size times
+      node = remove from the front of queue   # [3] take the front node
+      append node.val to level                # [3] record it in this level
+      if node.left is not null                # [3] its children wait for the next level
+        add node.left to the back of queue
+      if node.right is not null
+        add node.right to the back of queue
+    append level to result             # [4] the level is complete
+  return result

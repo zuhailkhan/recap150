@@ -1,0 +1,68 @@
+{
+  "slug": "lowest-common-ancestor-of-a-binary-search-tree",
+  "title": "Lowest Common Ancestor of a Binary Search Tree",
+  "category": "Trees",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a binary search tree and two values p and q that are both in it. Return the value of the lowest node that has both of them in its subtree. A node counts as being in its own subtree, so it can be an ancestor of itself.",
+  "example": {
+    "caption": "For 3 and 5, both are bigger than 2 and smaller than 6. Their paths split at 4, so 4 is the answer.",
+    "input": [{ "kind": "tree", "label": "BST, p = 3, q = 5", "nodes": [6, 2, 8, 0, 4, 7, 9, null, null, 3, 5], "tones": [null, null, null, null, null, null, null, null, null, "keep", "keep"] }],
+    "output": [{ "kind": "tree", "label": "lowest common ancestor", "nodes": [6, 2, 8, 0, 4, 7, 9, null, null, 3, 5], "tones": [null, null, null, null, "hit", null, null, null, null, "keep", "keep"] }]
+  },
+  "idea": {
+    "sentence": "Walk down from the root: while p and q are both smaller go left, while both are bigger go right, and the first node where they part ways is the answer.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "binary search tree (BST)", "plain": "A tree where everything in a node's left subtree is smaller than the node, and everything in its right subtree is bigger." },
+      { "term": "lowest common ancestor", "plain": "The deepest node that sits above (or is) both p and q." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Three arguments: the BST as a level-order array, then p, then q (both must be in the tree). e.g. [6,2,8,0,4,7,9,null,null,3,5], 3, 5",
+    "presets": [
+      { "label": "Split below the root", "args": [[6, 2, 8, 0, 4, 7, 9, null, null, 3, 5], 3, 5] },
+      { "label": "Right side", "args": [[6, 2, 8, 0, 4, 7, 9, null, null, 3, 5], 7, 9] },
+      { "label": "One is the ancestor", "args": [[6, 2, 8, 0, 4, 7, 9, null, null, 3, 5], 2, 4] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }, { "sym": "h", "meaning": "height of the tree" }],
+    "compare": { "brute": "n", "optimal": "logn", "bruteLabel": "Search the whole tree as if it had no order", "optimalLabel": "Follow one path down using the BST order", "unit": "nodes visited, for a balanced tree" },
+    "rows": [
+      { "name": "Plain tree search (ignores order)", "time": "O(n)", "space": "O(h)", "note": "Works on any binary tree, but looks at nodes it could have skipped." },
+      { "name": "BST walk", "time": "O(h)", "space": "O(1)", "note": "One step down per level, no recursion. h is about log n when balanced, n when it is a chain." }
+    ],
+    "takeaway": "The BST order tells you which side to go, so you never search both. A simple loop with no stack is enough."
+  },
+  "variants": [
+    { "id": "walk", "label": "Walk down", "tsFn": "lowestCommonAncestorDriver", "goFn": "lowestCommonAncestorDriver", "stages": [
+      { "n": 1, "title": "Start at the root", "note": "Every common ancestor lies on the path from the root, so begin there." },
+      { "n": 2, "title": "Both smaller: go left", "note": "If p and q are both smaller than this node, they are both in the left subtree. The answer is in there." },
+      { "n": 3, "title": "Both bigger: go right", "note": "If p and q are both bigger, they are both in the right subtree. Move right." },
+      { "n": 4, "title": "They split: found it", "note": "One is on each side, or this node equals one of them. No lower node can hold both, so return this node." }
+    ] }
+  ],
+  "goArgs": ["[]any", "int", "int"],
+  "goRet": "*int",
+  "compare": "exact",
+  "edges": [
+    { "title": "One is the ancestor", "input": "p = 2, q = 4 under node 2", "output": "2", "why": "A node can be its own ancestor. At 2, p equals the node, so the condition 'both smaller' fails and we stop." },
+    { "title": "p is the root", "input": "p = 6, q = 9", "output": "6", "why": "The very first node already equals p. The walk returns the root." },
+    { "title": "Two-node tree", "input": "[2, 1], p = 1, q = 2", "output": "2", "why": "At the root, 1 is smaller and 2 is equal. They are not both smaller, so the root is the answer." },
+    { "title": "p bigger than q", "input": "p = 9, q = 7", "output": "8", "why": "The order of p and q does not matter. Each check compares both values to the node." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Use strict < and >. If a value equals the node, that is a split and the node is the answer. Using <= would walk past it." },
+    { "lang": "General", "text": "This only works on a BST. In a plain binary tree the values give no hint about which side holds them, and you must search both sides." },
+    { "lang": "TypeScript", "text": "p and q arrive as numbers, so < and > are correct. If you ever read them from text, convert first: as strings, 10 sorts before 9." },
+    { "lang": "Go", "text": "The loop ends with nil only if the values are not in the tree. For valid input it always returns inside the loop." },
+    { "lang": "General", "text": "On a chain-shaped BST the walk takes n steps. The cost is the height, not log n, unless the tree is balanced." }
+  ],
+  "recap": {
+    "pattern": "BST: follow the order",
+    "key": "Go left while both targets are smaller, right while both are bigger. The first node that is neither is the answer.",
+    "complexity": "Time O(h). Space O(1).",
+    "moves": ["Start at the root", "Both smaller: go left", "Both bigger: go right", "Otherwise return this node"]
+  }
+}

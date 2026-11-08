@@ -1,0 +1,13 @@
+function kthSmallest(root, k)
+  stack = []
+  cur = root                       # [1] cur is where we are, the stack holds the nodes we still owe a visit
+  count = 0
+  while cur is not null or stack is not empty
+    while cur is not null          # [2] dive left, leaving a trail of nodes to come back to
+      push cur on stack
+      cur = cur.left
+    node = pop from stack          # [3] nothing smaller is left, so this is the next smallest
+    count = count + 1
+    if count == k
+      return node.val              # [4] the count reached k
+    cur = node.right               # [5] then everything in this node's right subtree

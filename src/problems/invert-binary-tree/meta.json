@@ -1,0 +1,67 @@
+{
+  "slug": "invert-binary-tree",
+  "title": "Invert Binary Tree",
+  "category": "Trees",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get the root of a binary tree. Mirror it: every node swaps its left and right child, all the way down. Return the root of the mirrored tree. The tree can be empty.",
+  "example": {
+    "caption": "Every node swapped its two sides, so the picture is a mirror image.",
+    "input": [{ "kind": "tree", "label": "root", "nodes": [4, 2, 7, 1, 3, 6, 9] }],
+    "output": [{ "kind": "tree", "label": "mirrored", "nodes": [4, 7, 2, 9, 6, 3, 1], "tones": ["hit", "hit", "hit", "hit", "hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "A mirror image is just every node swapping its two children, so solve each child first and then swap at this node.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "recursion", "plain": "A function that calls itself on a smaller piece. For a tree, the smaller pieces are the left and right subtrees." },
+      { "term": "subtree", "plain": "A node together with everything hanging below it. It is a small tree of its own." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the tree as a level-order array, null for a missing child, e.g. [4,2,7,1,3]",
+    "presets": [
+      { "label": "Small tree", "args": [[4, 2, 7, 1, 3]] },
+      { "label": "Lopsided", "args": [[1, 2]] },
+      { "label": "Right chain", "args": [[2, null, 3, null, 4]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }, { "sym": "h", "meaning": "height of the tree" }],
+    "compare": { "brute": "n", "optimal": "logn", "bruteLabel": "Build a second, mirrored copy of the tree", "optimalLabel": "Swap in place (stack depth is the height)", "unit": "extra memory cells, for a balanced tree" },
+    "rows": [
+      { "name": "Build a mirrored copy", "time": "O(n)", "space": "O(n)", "note": "Allocates a whole new tree just to throw the old one away." },
+      { "name": "Swap in place, recursive", "time": "O(n)", "space": "O(h)", "note": "Each node is touched once. The only extra memory is the call stack." }
+    ],
+    "takeaway": "You must visit every node once, so O(n) time is the floor. Swapping in place keeps the extra memory down to the height of the tree."
+  },
+  "variants": [
+    { "id": "recursive", "label": "Recursive", "tsFn": "invertTreeDriver", "goFn": "invertTreeDriver", "stages": [
+      { "n": 1, "title": "Empty spot", "note": "A missing child has nothing to flip. Return null and let the parent carry on." },
+      { "n": 2, "title": "Flip both sides first", "note": "Call the function on the right child and on the left child. Each call returns a finished, mirrored subtree." },
+      { "n": 3, "title": "Swap and return", "note": "Put the flipped right subtree on the left and the flipped left subtree on the right. Return this node." }
+    ] }
+  ],
+  "goArgs": ["[]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty tree", "input": "[]", "output": "[]", "why": "The root is null, so the very first check returns null." },
+    { "title": "Single node", "input": "[5]", "output": "[5]", "why": "Both children are empty. Swapping two nulls changes nothing." },
+    { "title": "Only one child", "input": "[1, 2]", "output": "[1, null, 2]", "why": "The swap still happens. A real child trades places with an empty slot." },
+    { "title": "Long chain", "input": "[1, null, 2, null, 3]", "output": "[1, 2, null, 3]", "why": "The whole chain leans the other way. Recursion goes as deep as the tree is tall." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Swap even when one child is missing. Skipping the swap for a node with one child leaves it leaning the wrong way." },
+    { "lang": "General", "text": "Do not write root.left = root.right and then root.right = root.left. The second line reads the value you just overwrote. Use temporaries, or recurse first as here." },
+    { "lang": "TypeScript", "text": "Children are TreeNode | null. Test with if (!root), and never with root === undefined, because a missing child is null." },
+    { "lang": "Go", "text": "Touching root.Left when root is nil panics. The nil check must come before any field access." },
+    { "lang": "Go", "text": "root.Left, root.Right = left, right is a safe parallel assignment, so Go needs no temporary for a plain swap." }
+  ],
+  "recap": {
+    "pattern": "Tree recursion: act after the children",
+    "key": "Mirror each subtree, then swap the two sides at this node. Return the node.",
+    "complexity": "Time O(n). Space O(h) call stack.",
+    "moves": ["Empty node: return null", "Recurse into the right child and the left child", "Assign them crosswise: left gets the flipped right", "Return the node"]
+  }
+}

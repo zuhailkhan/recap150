@@ -1,0 +1,14 @@
+function buildTree(preorder, inorder)
+  where = map from each inorder value to its position   # [1] value -> its position in inorder
+  next = 0                                              # [1] preorder lists the next root first
+  return build(0, length(inorder) - 1)                  # [5] the first call built the root
+
+function build(lo, hi)                                  # lo..hi is a window of inorder
+  if lo > hi: return null
+  val = preorder[next]                                  # [2] the next unused preorder value is the root of this range
+  next = next + 1
+  mid = where[val]
+  node = new node(val)
+  node.left = build(lo, mid - 1)                        # [3] values left of the root in inorder form the left subtree
+  node.right = build(mid + 1, hi)                       # [4] values right of the root form the right subtree
+  return node

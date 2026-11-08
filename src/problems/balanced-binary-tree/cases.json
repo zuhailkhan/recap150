@@ -1,0 +1,10 @@
+[
+  {"name":"classic balanced","input":[[3,9,20,null,null,15,7]],"expected":true},
+  {"name":"classic unbalanced","input":[[1,2,2,3,3,null,null,4,4]],"expected":false},
+  {"name":"empty tree","input":[[]],"expected":true,"edge":true},
+  {"name":"single node","input":[[1]],"expected":true,"edge":true},
+  {"name":"equal heights hide a bad child","input":[[1,2,2,3,null,null,3,4,null,null,4]],"expected":false,"edge":true},
+  {"name":"left chain of three","input":[[1,2,null,3]],"expected":false},
+  {"name":"one level difference","input":[[1,2,3,4]],"expected":true},
+  {"name":"deep bad node on the right","input":[[1,2,3,null,null,4,null,5]],"expected":false,"edge":true}
+]

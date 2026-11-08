@@ -1,0 +1,69 @@
+{
+  "slug": "subtree-of-another-tree",
+  "title": "Subtree of Another Tree",
+  "category": "Trees",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get a big binary tree and a smaller pattern tree. Say whether the big tree contains a node whose whole subtree, shape and values, is exactly the pattern. Matching only part of a subtree does not count.",
+  "example": {
+    "caption": "The node 4 in the big tree, with its children 1 and 2, is an exact copy of the pattern.",
+    "input": [
+      { "kind": "tree", "label": "big tree", "nodes": [3, 4, 5, 1, 2], "tones": [null, "hit", null, "hit", "hit"] },
+      { "kind": "tree", "label": "pattern", "nodes": [4, 1, 2] }
+    ],
+    "output": [{ "kind": "array", "label": "contains it?", "items": ["true"], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "Try every node of the big tree as a starting point, and at each one ask the Same Tree question against the pattern.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "subtree", "plain": "A node plus everything below it, all the way to the leaves. You cannot stop early." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the big tree and the pattern, each a level-order array with null for a missing child",
+    "presets": [
+      { "label": "Close but not equal", "args": [[3, 4, 5, 1, 2], [4, 1, 3]] },
+      { "label": "Found", "args": [[3, 4, 5, 1, 2], [4, 1, 2]] },
+      { "label": "Same values, wrong shape", "args": [[1, 1], [1, null, 1]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "nodes in the big tree" }, { "sym": "m", "meaning": "nodes in the pattern" }],
+    "compare": { "brute": "nm", "optimal": "nm", "bruteLabel": "Try every node with a full comparison (worst case)", "optimalLabel": "Same, but each comparison stops at the first difference", "unit": "node comparisons, worst case" },
+    "rows": [
+      { "name": "Try every node + Same Tree", "time": "O(n * m)", "space": "O(h)", "note": "n start points. Each comparison walks up to m nodes. It usually quits far sooner." },
+      { "name": "Serialize both, search the text", "time": "O(n + m)", "space": "O(n + m)", "note": "Faster in theory with a linear string search, but it needs careful empty-spot markers." }
+    ],
+    "takeaway": "The simple version reuses Same Tree and is fast enough in practice because most comparisons fail on the first node."
+  },
+  "variants": [
+    { "id": "recursive", "label": "Recursive", "tsFn": "isSubtreeDriver", "goFn": "isSubtreeDriver", "stages": [
+      { "n": 1, "title": "Base cases", "note": "An empty pattern fits anywhere. If the big tree runs out, there is no match down this path." },
+      { "n": 2, "title": "Try matching here", "note": "Check whether the subtree starting at this node is identical to the pattern, using the same pair-walk as Same Tree." },
+      { "n": 3, "title": "Search deeper", "note": "No match here, so try the left child, then the right child, as new starting points." }
+    ] }
+  ],
+  "goArgs": ["[]any", "[]any"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Pattern is the whole tree", "input": "[1, 2, 3] and [1, 2, 3]", "output": "true", "why": "The root itself is a starting point, and it matches." },
+    { "title": "Extra node below", "input": "[3, 4, 5, 1, 2, null, null, null, null, 0] and [4, 1, 2]", "output": "false", "why": "Node 4 matches the pattern at the top, but node 2 has an extra child 0. A subtree includes everything below." },
+    { "title": "Same values, wrong shape", "input": "[1, 1] and [1, null, 1]", "output": "false", "why": "Matching values is not enough. The shape must match too." },
+    { "title": "Pattern larger than the tree", "input": "[1, 2] and [1, 2, 3]", "output": "false", "why": "The pattern has a node the big tree cannot supply." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Do not stop at the first matching root value. 4 matching 4 only means this is a candidate. The full comparison decides." },
+    { "lang": "General", "text": "Run the comparison at every node, not only at nodes whose value equals the pattern's root. It is simpler and cannot miss a match." },
+    { "lang": "General", "text": "The comparison is Same Tree, not 'pattern is contained in': a leaf in the pattern must also be a leaf in the big tree." },
+    { "lang": "TypeScript", "text": "Use ||, not |, so a found match returns immediately without searching the right side." },
+    { "lang": "Go", "text": "Check subRoot == nil before root == nil. If both are nil the answer is true, because an empty pattern always matches." }
+  ],
+  "recap": {
+    "pattern": "Tree recursion: try each start",
+    "key": "At every node of the big tree, run the Same Tree check against the pattern. If none matches, the answer is false.",
+    "complexity": "Time O(n * m). Space O(h) call stack.",
+    "moves": ["Empty pattern: true. Empty big tree: false", "If the tree here equals the pattern, return true", "Otherwise try the left child", "Then try the right child"]
+  }
+}

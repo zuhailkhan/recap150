@@ -1,0 +1,25 @@
+# Format: preorder, comma separated, "#" for a missing child. Example: "1,2,#,#,3,4,#,#,#"
+function serialize(root)
+  out = []
+  function walk(node)
+    if node is null
+      out.add("#")                           # [1] a marker for "no child here"
+      return
+    out.add(text of node.val)                # [2] write the node, then its left side, then its right side
+    walk(node.left)
+    walk(node.right)
+  walk(root)
+  return out joined with ","                 # [3] one string
+
+function deserialize(data)
+  tokens = data split at ","                 # [4] back to tokens
+  next = 0
+  function read()
+    token = tokens[next]                     # [5] take the next token. # means no node, otherwise make a node, then read its left, then its right
+    next = next + 1
+    if token == "#": return null
+    node = new node(number from token)
+    node.left = read()
+    node.right = read()
+    return node
+  return read()

@@ -1,0 +1,69 @@
+{
+  "slug": "binary-tree-level-order-traversal",
+  "title": "Binary Tree Level Order Traversal",
+  "category": "Trees",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get the root of a binary tree. Return its values grouped by level: first the root alone, then its children left to right, then the next row, and so on, as a list of lists. An empty tree gives an empty list.",
+  "example": {
+    "caption": "Row by row from the top: [3], then [9, 20], then [15, 7].",
+    "input": [{ "kind": "tree", "label": "root", "nodes": [3, 9, 20, null, null, 15, 7], "tones": ["focus", "keep", "keep", null, null, "dim", "dim"] }],
+    "output": [{ "kind": "array", "label": "result", "items": ["[3]", "[9,20]", "[15,7]"], "tones": ["hit", "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Use a queue, and before each round freeze its size: exactly that many nodes are the current level, and their children line up behind them.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "queue", "plain": "A line where you add at the back and take from the front: first in, first out." },
+      { "term": "BFS (breadth-first search)", "plain": "Visit everything one step away, then everything two steps away, and so on, level by level." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the tree as a level-order array, null for a missing child, e.g. [3,9,20,null,null,15,7]",
+    "presets": [
+      { "label": "Three levels", "args": [[3, 9, 20, null, null, 15, 7]] },
+      { "label": "Full tree", "args": [[1, 2, 3, 4, 5, 6, 7]] },
+      { "label": "Left chain", "args": [[1, 2, null, 3]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }, { "sym": "w", "meaning": "widest level" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "For each depth d, search the whole tree for nodes at depth d", "optimalLabel": "One queue pass over all nodes", "unit": "node visits, for a skinny tree" },
+    "rows": [
+      { "name": "Re-scan for each depth", "time": "O(n * h)", "space": "O(h)", "note": "Walks the whole tree once per level. Slow on a tall tree." },
+      { "name": "Queue (BFS)", "time": "O(n)", "space": "O(w)", "note": "Each node enters and leaves the queue once. The queue holds at most one widest level plus its children." }
+    ],
+    "takeaway": "A queue makes the tree come out in rows by itself. Freezing its size at the start of a round tells you where one row ends and the next begins."
+  },
+  "variants": [
+    { "id": "bfs", "label": "Queue (BFS)", "tsFn": "levelOrderDriver", "goFn": "levelOrderDriver", "stages": [
+      { "n": 1, "title": "Queue the root", "note": "An empty tree returns an empty result. Otherwise the queue starts with just the root." },
+      { "n": 2, "title": "Freeze the level size", "note": "At the start of a round, everything in the queue is one level. Remember how many nodes that is." },
+      { "n": 3, "title": "Take a node, queue its kids", "note": "Remove the front node, record its value, and add its children to the back. They belong to the next level." },
+      { "n": 4, "title": "Level complete", "note": "After exactly that many nodes, add the finished row to the result. The queue now holds the next level." }
+    ] }
+  ],
+  "goArgs": ["[]any"],
+  "goRet": "[][]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty tree", "input": "[]", "output": "[]", "why": "Return an empty list of levels, not a list holding one empty level." },
+    { "title": "Single node", "input": "[1]", "output": "[[1]]", "why": "One round, one node, and no children to queue." },
+    { "title": "Left chain", "input": "[1, 2, null, 3]", "output": "[[1], [2], [3]]", "why": "Every level has exactly one node. The queue never holds more than one." },
+    { "title": "Gaps in the middle", "input": "[1, 2, 3, null, 4, 5]", "output": "[[1], [2, 3], [4, 5]]", "why": "Missing children are skipped, so 4 and 5 sit side by side in the same level." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Read the queue size before the inner loop, not inside its condition. The queue grows while you loop, so a live length would swallow the next level." },
+    { "lang": "General", "text": "Push children only if they exist. Pushing null makes the next round crash when it reads node.val." },
+    { "lang": "TypeScript", "text": "queue.shift() is O(n) in theory, but V8 handles small arrays well. For huge trees keep a head index instead of shifting." },
+    { "lang": "TypeScript", "text": "shift() is typed as returning TreeNode | undefined. The non-null ! is safe here because the loop only runs while the queue has items." },
+    { "lang": "Go", "text": "queue = queue[1:] drops the front without copying. Return a non-nil empty [][]int for an empty tree so JSON shows [], not null." },
+    { "lang": "Go", "text": "Make a fresh level slice each round. If you reuse one slice and append to it, earlier rows in result change too." }
+  ],
+  "recap": {
+    "pattern": "BFS with a queue",
+    "key": "Queue the root. Each round, take exactly queue-length nodes (one level), record them, and queue their children.",
+    "complexity": "Time O(n). Space O(w) for the widest level.",
+    "moves": ["Queue the root", "size = queue length, make an empty level", "Pop size nodes: record each, push its children", "Add the level to the result and repeat"]
+  }
+}

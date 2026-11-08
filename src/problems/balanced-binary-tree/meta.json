@@ -1,0 +1,69 @@
+{
+  "slug": "balanced-binary-tree",
+  "title": "Balanced Binary Tree",
+  "category": "Trees",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get the root of a binary tree. Say whether it is height-balanced: at every node, the heights of the left and right subtrees differ by at most 1. An empty tree counts as balanced.",
+  "example": {
+    "caption": "Node 20 has two leaves, and node 3 has heights 1 and 2. Every node differs by at most 1, so the tree is balanced.",
+    "input": [{ "kind": "tree", "label": "root", "nodes": [3, 9, 20, null, null, 15, 7], "tones": ["hit", "hit", "hit", null, null, "hit", "hit"] }],
+    "output": [{ "kind": "array", "label": "balanced?", "items": ["true"], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "Compute each node's height, and while you are there, check that its two sides differ by at most 1.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "height-balanced", "plain": "No node has one side more than 1 level taller than the other. It is a rule about every node, not just the root." },
+      { "term": "height", "plain": "How many nodes are on the longest path from a node down to a leaf. A lone leaf is 1." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the tree as a level-order array, null for a missing child, e.g. [3,9,20,null,null,15,7]",
+    "presets": [
+      { "label": "Balanced", "args": [[3, 9, 20, null, null, 15, 7]] },
+      { "label": "Leaning left", "args": [[1, 2, null, 3]] },
+      { "label": "Perfect", "args": [[1, 2, 3]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Measure both subtrees from scratch at every node", "optimalLabel": "One pass: height and check together", "unit": "node visits, for a skinny tree" },
+    "rows": [
+      { "name": "Measure at every node", "time": "O(n^2)", "space": "O(h)", "note": "Each node calls a separate height function that walks its whole subtree." },
+      { "name": "Height and check in one pass", "time": "O(n)", "space": "O(h)", "note": "Each node is visited once. The child heights come back from the recursion." }
+    ],
+    "takeaway": "Asking for a height and then asking again at the parent repeats work. Return the height once and check on the way up."
+  },
+  "variants": [
+    { "id": "recursive", "label": "Recursive", "tsFn": "isBalancedDriver", "goFn": "isBalancedDriver", "stages": [
+      { "n": 1, "title": "Start balanced", "note": "balanced is true until some node proves otherwise. It lives outside the recursion." },
+      { "n": 2, "title": "Empty spot", "note": "An empty child has height 0." },
+      { "n": 3, "title": "Heights below", "note": "Recurse left and right. Each call returns the height of its subtree." },
+      { "n": 4, "title": "Compare the sides", "note": "If the two heights differ by more than 1, this node is lopsided. Set balanced to false." },
+      { "n": 5, "title": "Report up", "note": "Return 1 + the taller side as this node's height. At the end, balanced is the answer." }
+    ] }
+  ],
+  "goArgs": ["[]any"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty tree", "input": "[]", "output": "true", "why": "There is no node to be lopsided." },
+    { "title": "Single node", "input": "[1]", "output": "true", "why": "Both sides have height 0. The difference is 0." },
+    { "title": "Equal at the top, bad below", "input": "[1, 2, 2, 3, null, null, 3, 4, null, null, 4]", "output": "false", "why": "The root sees heights 4 and 4, which look fine. Node 2 on the left has heights 3 and 0. You must check every node." },
+    { "title": "Leaning chain", "input": "[1, 2, null, 3]", "output": "false", "why": "Node 1 has a left height of 2 and a right height of 0. A difference of 2 is too much." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Checking only the root is wrong. A tree can have equal heights at the root and still hide a lopsided node deeper down." },
+    { "lang": "General", "text": "The limit is 1, so a difference of exactly 1 is fine. Use > 1, not >= 1." },
+    { "lang": "General", "text": "Calling a separate height function at every node works but costs O(n^2) on a skinny tree. Return the height from the same recursion instead." },
+    { "lang": "TypeScript", "text": "Math.abs(left - right) is clear. If you write left - right > 1 alone you miss the case where right is taller." },
+    { "lang": "Go", "text": "Go has no integer abs in the standard library. Compare with left-right > 1 || right-left > 1." }
+  ],
+  "recap": {
+    "pattern": "Tree recursion: height + answer",
+    "key": "Return the height, and clear a balanced flag whenever the two side heights differ by more than 1.",
+    "complexity": "Time O(n). Space O(h) call stack.",
+    "moves": ["balanced = true outside the recursion", "height(empty) = 0", "left, right = heights of the two children", "If they differ by more than 1, balanced = false. Return 1 + max(left, right)"]
+  }
+}

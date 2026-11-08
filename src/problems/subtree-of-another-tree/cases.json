@@ -1,0 +1,11 @@
+[
+  {"name":"found","input":[[3,4,5,1,2],[4,1,2]],"expected":true},
+  {"name":"close but extra node","input":[[3,4,5,1,2,null,null,null,null,0],[4,1,2]],"expected":false,"edge":true},
+  {"name":"whole tree","input":[[1,2,3],[1,2,3]],"expected":true,"edge":true},
+  {"name":"single leaf","input":[[1,2,3],[3]],"expected":true},
+  {"name":"same values, wrong shape","input":[[1,1],[1,null,1]],"expected":false,"edge":true},
+  {"name":"not present","input":[[3,4,5,1,2],[4,1,3]],"expected":false},
+  {"name":"deep match","input":[[1,2,3,4,5,6,7,8,9],[4,8,9]],"expected":true},
+  {"name":"sub bigger than tree","input":[[1,2],[1,2,3]],"expected":false},
+  {"name":"repeated values","input":[[2,2,2,2],[2,2]],"expected":true}
+]

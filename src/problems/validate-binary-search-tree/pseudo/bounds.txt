@@ -1,0 +1,10 @@
+function isValidBST(root)
+  return check(root, none, none)             # [1] the root may be any value
+
+function check(node, low, high)              # none means no limit on that side
+  if node is null: return true
+  if node.val <= low or node.val >= high     # [2] must sit strictly between the two bounds
+    return false
+  if not check(node.left, low, node.val)     # [3] left subtree: the upper bound becomes this value
+    return false
+  return check(node.right, node.val, high)   # [4] right subtree: the lower bound becomes this value

@@ -1,0 +1,11 @@
+function rightSideView(root)
+  view = []
+  level = [root] if root exists, else []     # [1] the current row, starting with the root
+  while level is not empty
+    next = []
+    for node in level                        # [2] walk the row left to right
+      if node.left: next.add(node.left)      # [3] queue the children for the next row
+      if node.right: next.add(node.right)
+    view.add(last(level).val)                # [4] the last node in the row is the one you see
+    level = next
+  return view                                # [5] one value per row

@@ -1,0 +1,69 @@
+{
+  "slug": "binary-tree-right-side-view",
+  "title": "Binary Tree Right Side View",
+  "category": "Trees",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Imagine standing to the right of a binary tree and looking at it. Some nodes hide behind others. Return the values of the nodes you can see, from the top row to the bottom row. The tree may be empty.",
+  "example": {
+    "caption": "From the right you see 1, then 3, then 4. The 2 and the 5 are hidden behind them.",
+    "input": [{ "kind": "tree", "label": "root", "nodes": [1, 2, 3, null, 5, null, 4] }],
+    "output": [{ "kind": "tree", "label": "visible from the right", "nodes": [1, 2, 3, null, 5, null, 4], "tones": ["hit", "dim", "hit", null, "dim", null, "hit"] }]
+  },
+  "idea": {
+    "sentence": "Walk the tree one row at a time and keep only the last node of each row, because that is the one nothing can hide.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "row (level)", "plain": "All nodes at the same distance from the root. The root alone is row 1, its children are row 2, and so on." },
+      { "term": "queue", "plain": "A line where you add at the back and take from the front. Here a plain list holds one row at a time." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the tree as a level-order list, null for a missing child, e.g. [1,2,3,null,5,null,4]",
+    "presets": [
+      { "label": "Classic", "args": [[1, 2, 3, null, 5, null, 4]] },
+      { "label": "Left side is deeper", "args": [[1, 2, 3, 4]] },
+      { "label": "Left chain", "args": [[1, 2, null, 3]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }, { "sym": "w", "meaning": "the widest row of the tree" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Search the whole tree again for every row", "optimalLabel": "One pass, row by row", "unit": "nodes looked at (a tree that is a long chain)" },
+    "rows": [
+      { "name": "Rescan for each row", "time": "O(n * h)", "space": "O(1)", "note": "h is the height. For every row, walk down to find its last node." },
+      { "name": "Row by row (BFS)", "time": "O(n)", "space": "O(w)", "note": "Each node is looked at once. The list holds at most one row plus the next." }
+    ],
+    "takeaway": "Every node is visited once. The last node of each row goes into the answer, and the memory needed is the width of the tree."
+  },
+  "variants": [
+    { "id": "bfs", "label": "Row by row", "tsFn": "rightSideViewDriver", "goFn": "rightSideViewDriver", "stages": [
+      { "n": 1, "title": "Start with the root's row", "note": "The first row is a list that holds just the root. An empty tree gives an empty list." },
+      { "n": 2, "title": "Walk the row", "note": "Go through the current row from left to right." },
+      { "n": 3, "title": "Collect the next row", "note": "Add each node's left child, then its right child, to a new list. That list is the next row." },
+      { "n": 4, "title": "Keep the last node", "note": "The last node of the row is the one visible from the right. Put its value in the answer, then move to the next row." },
+      { "n": 5, "title": "Return the view", "note": "When there are no more rows, the answer holds one value per row." }
+    ] }
+  ],
+  "goArgs": ["[]any"],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty tree", "input": "[]", "output": "[]", "why": "The first row is empty, so the loop never runs and the answer stays empty." },
+    { "title": "Left side is deeper", "input": "[1, 2, 3, 4]", "output": "[1, 3, 4]", "why": "Row 3 has only a left node, 4. Nothing is in front of it, so it is visible. Following only right children would miss it." },
+    { "title": "Left chain", "input": "[1, 2, null, 3]", "output": "[1, 2, 3]", "why": "Every row has one node, so every node is visible, even though none of them is a right child." },
+    { "title": "Negative values", "input": "[5, -1, -2, -3]", "output": "[5, -2, -3]", "why": "Values play no part. Only the position in the row matters." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Do not just walk down the right children. A row whose last node is a left child (the right side is shorter) would be missed." },
+    { "lang": "General", "text": "Take the last node of the row, not the largest value. Position decides what you can see, not the number inside the node." },
+    { "lang": "TypeScript", "text": "Use level.length to split rows. A single shared queue with shift() does not tell you where a row ends, and shift() is O(n) on big arrays." },
+    { "lang": "Go", "text": "Start the answer as []int{}, not var view []int. A nil slice encodes to null in JSON, while an empty tree should give []." },
+    { "lang": "Go", "text": "next = append(next, ...) on a fresh nil slice each row is fine. Do not reuse level's backing array for next, or you overwrite the row you are still walking." }
+  ],
+  "recap": {
+    "pattern": "BFS by rows",
+    "key": "Process one row at a time. The last node of each row is what you see from the right.",
+    "complexity": "Time O(n). Space O(w) for the widest row.",
+    "moves": ["level = [root]", "For each node in the row, collect its children", "Answer gets the last node of the row", "level = children. Repeat until empty"]
+  }
+}

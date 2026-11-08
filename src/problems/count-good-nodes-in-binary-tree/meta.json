@@ -1,0 +1,68 @@
+{
+  "slug": "count-good-nodes-in-binary-tree",
+  "title": "Count Good Nodes In Binary Tree",
+  "category": "Trees",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "A node is good if no node on the path from the root down to it has a bigger value. The root is always good. Given a binary tree, count its good nodes. The tree may be empty.",
+  "example": {
+    "caption": "3 is good (the root). 1 is not (3 is above it). 4 is good. The lower 3 is good. The lower 1 is not (3 and 4 are above it).",
+    "input": [{ "kind": "tree", "label": "root", "nodes": [3, 1, 4, 3, null, 1, 5] }],
+    "output": [{ "kind": "tree", "label": "good nodes in green", "nodes": [3, 1, 4, 3, null, 1, 5], "tones": ["hit", "miss", "hit", "hit", null, "miss", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Walk down the tree and carry the biggest value seen on the path so far. A node is good if it is at least that big.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "path from the root", "plain": "The chain of nodes you pass going straight down from the root to a node. Only ancestors count, never siblings or cousins." },
+      { "term": "DFS", "plain": "Depth-first search. Go all the way down one side, then come back and try the other side." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the tree as a level-order list, null for a missing child, e.g. [3,1,4,3,null,1,5]",
+    "presets": [
+      { "label": "Classic", "args": [[3, 1, 4, 3, null, 1]] },
+      { "label": "Falling values", "args": [[5, 4, null, 3]] },
+      { "label": "Tie counts as good", "args": [[2, 2, 2]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }, { "sym": "h", "meaning": "height of the tree" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Re-walk the path from the root for every node", "optimalLabel": "Carry the max down while walking", "unit": "comparisons (a tree that is a long chain)" },
+    "rows": [
+      { "name": "Re-check every path", "time": "O(n * h)", "space": "O(h)", "note": "For each node, climb or walk the path to find the biggest value above it." },
+      { "name": "Carry the max (DFS)", "time": "O(n)", "space": "O(h)", "note": "Each node does one comparison. The call stack is as deep as the tree." }
+    ],
+    "takeaway": "The biggest value on the path is all a node needs to know. Pass it down as one number and never look back up."
+  },
+  "variants": [
+    { "id": "dfs", "label": "DFS with max", "tsFn": "goodNodesDriver", "goFn": "goodNodesDriver", "stages": [
+      { "n": 1, "title": "Start with no bar", "note": "Nothing is above the root, so the starting bar is the smallest possible number. The root always passes." },
+      { "n": 2, "title": "Compare with the bar", "note": "The node is good if its value is at least the biggest value above it. A tie counts." },
+      { "n": 3, "title": "Raise the bar", "note": "The children must beat the larger of the old bar and this node's value." },
+      { "n": 4, "title": "Add up", "note": "Count for this node, plus the good nodes on the left, plus the good nodes on the right. An empty spot counts 0." }
+    ] }
+  ],
+  "goArgs": ["[]any"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty tree", "input": "[]", "output": "0", "why": "There is no root to count. The empty spot returns 0." },
+    { "title": "Equal values", "input": "[2, 2, 2]", "output": "3", "why": "Good means no bigger value above it. A node equal to the bar is not beaten, so it is good." },
+    { "title": "Falling chain", "input": "[5, 4, null, 3]", "output": "1", "why": "Only the root is good. Every lower node has the 5 above it." },
+    { "title": "Bigger than parent only", "input": "[3, 1, null, 2]", "output": "1", "why": "2 beats its parent 1 but not the root 3. Comparing with the parent alone would count it wrongly." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Compare with the biggest value on the whole path, not with the parent. A node can beat its parent and still lose to a grandparent." },
+    { "lang": "General", "text": "Use >= so that a tie is good. With > the equal-value tree [2,2,2] would give 1." },
+    { "lang": "General", "text": "Pass the new bar to both children. Do not change one shared variable, or the left side's bar would leak into the right side." },
+    { "lang": "TypeScript", "text": "-Infinity is a valid number in JavaScript, so it works as the 'nothing yet' bar. Starting from 0 would wrongly reject trees with only negative values." },
+    { "lang": "Go", "text": "Use math.MinInt as the starting bar. Writing 0 would reject a tree whose values are all negative." }
+  ],
+  "recap": {
+    "pattern": "DFS carrying state down",
+    "key": "Pass the biggest value on the path as an argument. A node is good when it is at least that big.",
+    "complexity": "Time O(n). Space O(h) for the call stack.",
+    "moves": ["count(node, highest). Null returns 0", "Good if node.val >= highest", "New bar = max(highest, node.val)", "Return good + count(left) + count(right)"]
+  }
+}

@@ -1,0 +1,10 @@
+[
+  {"name":"classic","input":[[1,2,3,4,5]],"expected":3},
+  {"name":"empty tree","input":[[]],"expected":0,"edge":true},
+  {"name":"single node","input":[[1]],"expected":0,"edge":true},
+  {"name":"two nodes","input":[[1,2]],"expected":1,"edge":true},
+  {"name":"longest path skips the root","input":[[1,2,3,4,5,null,null,6,null,null,7]],"expected":4,"edge":true},
+  {"name":"left chain","input":[[1,2,null,3,null,4]],"expected":3},
+  {"name":"full seven","input":[[1,2,3,4,5,6,7]],"expected":4},
+  {"name":"lopsided with a bend","input":[[1,null,2,3,4,5,null,null,6]],"expected":4}
+]

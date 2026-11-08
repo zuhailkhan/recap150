@@ -1,0 +1,67 @@
+{
+  "slug": "maximum-depth-of-binary-tree",
+  "title": "Maximum Depth of Binary Tree",
+  "category": "Trees",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get the root of a binary tree. Return how many levels it has: the number of nodes on the longest path from the root down to a leaf. An empty tree has depth 0.",
+  "example": {
+    "caption": "The longest way down is 3 -> 20 -> 15 (or 7). That is 3 nodes, so the depth is 3.",
+    "input": [{ "kind": "tree", "label": "root", "nodes": [3, 9, 20, null, null, 15, 7], "tones": ["hit", null, "hit", null, null, "hit", null] }],
+    "output": [{ "kind": "array", "label": "depth", "items": [3], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "The depth of a tree is 1 plus the deeper of its two subtrees, and an empty tree has depth 0.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "depth (height)", "plain": "How many nodes are on the longest path from a node down to a leaf. A lone leaf is 1." },
+      { "term": "leaf", "plain": "A node with no children." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the tree as a level-order array, null for a missing child, e.g. [3,9,20,null,null,15,7]",
+    "presets": [
+      { "label": "Classic", "args": [[3, 9, 20, null, null, 15, 7]] },
+      { "label": "Right chain", "args": [[1, null, 2, null, 3]] },
+      { "label": "Two nodes", "args": [[1, 2]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }, { "sym": "h", "meaning": "height of the tree" }],
+    "compare": { "brute": "n", "optimal": "logn", "bruteLabel": "Keep a queue of a whole level at once (level by level)", "optimalLabel": "Recursion, only the current path on the stack", "unit": "extra memory cells, for a balanced tree" },
+    "rows": [
+      { "name": "Level by level (BFS)", "time": "O(n)", "space": "O(n)", "note": "Count how many levels you walk. The queue can hold a whole wide level." },
+      { "name": "Recursion (DFS)", "time": "O(n)", "space": "O(h)", "note": "Every node is visited once. The call stack holds one root-to-node path." }
+    ],
+    "takeaway": "Every node must be looked at once, so time is O(n). Recursion only remembers one path at a time, which is the height."
+  },
+  "variants": [
+    { "id": "recursive", "label": "Recursive", "tsFn": "maxDepthDriver", "goFn": "maxDepthDriver", "stages": [
+      { "n": 1, "title": "Empty spot", "note": "No node means no levels. Return 0." },
+      { "n": 2, "title": "Ask both sides", "note": "Call the function on the left child and on the right child. Each call hands back its own depth." },
+      { "n": 3, "title": "Add one level", "note": "Take the deeper side and add 1 for this node. Return that to the parent." }
+    ] }
+  ],
+  "goArgs": ["[]any"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty tree", "input": "[]", "output": "0", "why": "The root is null. The empty case returns 0, not 1." },
+    { "title": "Single node", "input": "[1]", "output": "1", "why": "Two empty sides give 0 each. 1 + max(0, 0) = 1." },
+    { "title": "Chain", "input": "[1, null, 2, null, 3]", "output": "3", "why": "One side is always empty, so the depth is just the number of nodes." },
+    { "title": "Deep on one side only", "input": "[1, 2, 3, null, null, 4, 5, null, null, 6]", "output": "4", "why": "Take the max of the two sides. Adding them would count two branches at once." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Return 0 for an empty tree. Returning 1 there makes every depth off by one." },
+    { "lang": "General", "text": "Use max of the two sides, not the sum and not the left side only. Only the deeper side decides the answer." },
+    { "lang": "TypeScript", "text": "Math.max(left, right) is fine for two numbers. Do not spread a big array into Math.max: very long arrays overflow the argument limit." },
+    { "lang": "Go", "text": "The built-in max needs Go 1.21 or newer. On older versions write a tiny helper function." },
+    { "lang": "General", "text": "A very tall, skinny tree makes recursion very deep. For millions of nodes use a level-by-level loop instead." }
+  ],
+  "recap": {
+    "pattern": "Tree recursion: answer from children",
+    "key": "depth(node) = 1 + max(depth(left), depth(right)), and depth(empty) = 0.",
+    "complexity": "Time O(n). Space O(h) call stack.",
+    "moves": ["Empty node: return 0", "Get the depth of the left and right sides", "Take the larger and add 1", "Return it to the parent"]
+  }
+}

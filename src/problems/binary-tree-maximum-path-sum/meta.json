@@ -1,0 +1,69 @@
+{
+  "slug": "binary-tree-maximum-path-sum",
+  "title": "Binary Tree Maximum Path Sum",
+  "category": "Trees",
+  "difficulty": "Hard",
+  "status": "ready",
+  "statement": "A path is a chain of connected nodes that never visits a node twice. It may start and end anywhere and does not need to pass through the root. Its sum is the total of the node values on it. Return the largest path sum in a non-empty binary tree. Values can be negative.",
+  "example": {
+    "caption": "The best path is 15, 20, 7. It bends at 20 and never touches the root. Sum 42.",
+    "input": [{ "kind": "tree", "label": "root", "nodes": [-10, 9, 20, null, null, 15, 7] }],
+    "output": [{ "kind": "tree", "label": "best path, sum 42", "nodes": [-10, 9, 20, null, null, 15, 7], "tones": [null, null, "hit", null, null, "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Every call returns the best one-sided gain it can pass up. The best path may instead bend at the node, using both sides, and negative gains are dropped.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "gain", "plain": "The best sum of a path that starts at a node and goes down through at most one child. This is what a node offers its parent." },
+      { "term": "bend", "plain": "A path that goes up to a node and down the other side. It uses two children, so it can never be extended upward." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the tree as a level-order list, null for a missing child, e.g. [-10,9,20,null,null,15,7]",
+    "presets": [
+      { "label": "Skips the root", "args": [[-10, 9, 20, null, null, 15, 7]] },
+      { "label": "All negative", "args": [[-3, -2, -1]] },
+      { "label": "Drop a negative branch", "args": [[2, -1, 3]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }, { "sym": "h", "meaning": "height of the tree" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Sum the path between every pair of nodes", "optimalLabel": "One walk, each node returns its gain", "unit": "paths or steps examined" },
+    "rows": [
+      { "name": "Try every pair of nodes", "time": "O(n^2)", "space": "O(n)", "note": "Every path has two ends. Check each pair and sum the nodes between them." },
+      { "name": "Gain per node (DFS)", "time": "O(n)", "space": "O(h)", "note": "Each node is handled once and answers with one number. The stack is as deep as the tree." }
+    ],
+    "takeaway": "Treat each node as the top of a bend, and let it return only a one-sided gain. Both facts come out of one walk."
+  },
+  "variants": [
+    { "id": "gain", "label": "Gain from each side", "tsFn": "maxPathSumDriver", "goFn": "maxPathSumDriver", "stages": [
+      { "n": 1, "title": "Best so far", "note": "Start best at minus infinity. Any real path will beat it, even an all-negative one." },
+      { "n": 2, "title": "Ask both children", "note": "Each child returns its gain. A negative gain would only hurt, so it is replaced by 0 (skip that branch)." },
+      { "n": 3, "title": "Try the bend", "note": "A path that bends here is left gain + node + right gain. Update best if it is larger." },
+      { "n": 4, "title": "Return one side", "note": "A path going up to the parent can use only one child. Return the node plus the larger gain." },
+      { "n": 5, "title": "Return best", "note": "After the walk, best holds the largest sum seen at any bend." }
+    ] }
+  ],
+  "goArgs": ["[]any"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Single negative node", "input": "[-3]", "output": "-3", "why": "A path must have at least one node. Both children offer 0, so the bend is -3 + 0 + 0." },
+    { "title": "All negative", "input": "[-3, -2, -1]", "output": "-1", "why": "Joining nodes only makes it worse. The best path is the single largest node. Do not start best at 0." },
+    { "title": "Path skips the root", "input": "[-10, 9, 20, null, null, 15, 7]", "output": "42", "why": "The root is -10. The best path 15 + 20 + 7 lies wholly inside the right subtree." },
+    { "title": "Drop a negative branch", "input": "[2, -1]", "output": "2", "why": "The left child offers -1, which is clamped to 0. The path is just the node 2." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Return one side, but score both. The bend (left + node + right) goes into best. Only node + max(left, right) goes up to the parent. A path cannot fork." },
+    { "lang": "General", "text": "Start best at minus infinity, not 0. With 0 an all-negative tree would wrongly report 0, which is no path at all." },
+    { "lang": "General", "text": "Clamp child gains at 0 with max(0, gain). A negative branch is skipped, not added." },
+    { "lang": "TypeScript", "text": "Math.max(best, bend) with best = -Infinity is fine. Do not use Number.MIN_VALUE as the start. It is the tiny positive number 5e-324, not the lowest value." },
+    { "lang": "Go", "text": "Use math.MinInt for the start. It is only ever compared with max, never added to, so it cannot overflow." }
+  ],
+  "recap": {
+    "pattern": "DFS returning a gain",
+    "key": "Each node returns node + max(left, right). Meanwhile it scores node + left + right as a bend. Negative gains count as 0.",
+    "complexity": "Time O(n). Space O(h).",
+    "moves": ["best = -infinity", "left = max(0, gain(left)). Same for right", "best = max(best, node + left + right)", "Return node + max(left, right)"]
+  }
+}

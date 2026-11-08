@@ -1,0 +1,11 @@
+[
+  {"name":"identical","input":[[1,2,3],[1,2,3]],"expected":true},
+  {"name":"value differs","input":[[1,2,3],[1,2,4]],"expected":false},
+  {"name":"shape differs","input":[[1,2],[1,null,2]],"expected":false,"edge":true},
+  {"name":"both empty","input":[[],[]],"expected":true,"edge":true},
+  {"name":"one empty","input":[[1],[]],"expected":false,"edge":true},
+  {"name":"same values, different shape","input":[[1,2,2],[1,2,null,null,2]],"expected":false},
+  {"name":"deeper identical","input":[[1,2,3,4,null,null,5],[1,2,3,4,null,null,5]],"expected":true},
+  {"name":"difference far down","input":[[1,2,3,4,5],[1,2,3,4,6]],"expected":false},
+  {"name":"single equal","input":[[7],[7]],"expected":true,"edge":true}
+]

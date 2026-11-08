@@ -1,0 +1,10 @@
+[
+  {"name":"first of a small tree","input":[[3,1,4,null,2],1],"expected":1},
+  {"name":"third","input":[[5,3,6,2,4,null,null,1],3],"expected":3},
+  {"name":"single node","input":[[1],1],"expected":1,"edge":true},
+  {"name":"largest value","input":[[5,3,6,2,4],5],"expected":6,"edge":true},
+  {"name":"right chain","input":[[1,null,2,null,3],2],"expected":2},
+  {"name":"negatives","input":[[0,-3,3,-5,-1],2],"expected":-3},
+  {"name":"left chain, k = 1","input":[[4,3,null,2,null,1],1],"expected":1},
+  {"name":"sixth of seven","input":[[4,2,6,1,3,5,7],6],"expected":6}
+]

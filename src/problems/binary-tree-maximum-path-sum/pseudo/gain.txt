@@ -1,0 +1,12 @@
+function maxPathSum(root)
+  best = -infinity                             # [1] the best path found anywhere so far
+
+  function gain(node)                          # best sum of a path that starts at node and goes down one side
+    if node is null: return 0
+    left = max(0, gain(node.left))             # [2] what each child offers upward, never less than 0
+    right = max(0, gain(node.right))
+    best = max(best, node.val + left + right)  # [3] a path may bend here: left side + node + right side
+    return node.val + max(left, right)         # [4] going up, the path may continue through only one child
+
+  gain(root)
+  return best                                  # [5]

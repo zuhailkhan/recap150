@@ -1,0 +1,69 @@
+{
+  "slug": "construct-binary-tree-from-preorder-and-inorder-traversal",
+  "title": "Construct Binary Tree From Preorder And Inorder Traversal",
+  "category": "Trees",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get two lists that came from the same binary tree with all-different values: its preorder walk (node, left, right) and its inorder walk (left, node, right). Rebuild the tree and return its root.",
+  "example": {
+    "caption": "Preorder starts with the root 3. Inorder puts 9 on its left and 15, 20, 7 on its right.",
+    "input": [{ "kind": "array", "label": "preorder", "items": [3, 9, 20, 15, 7] }, { "kind": "array", "label": "inorder", "items": [9, 3, 15, 20, 7] }],
+    "output": [{ "kind": "tree", "label": "rebuilt tree", "nodes": [3, 9, 20, null, null, 15, 7], "tones": ["hit", "hit", "hit", null, null, "hit", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Preorder tells you each root in turn, and the root's position in inorder splits the values into a left part and a right part.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "preorder", "plain": "Visit the node first, then the whole left subtree, then the whole right subtree. The first value is always the root." },
+      { "term": "inorder", "plain": "Visit the left subtree, then the node, then the right subtree. Values left of the root in this list are exactly its left subtree." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the preorder list and the inorder list, e.g. [3,9,20,15,7] and [9,3,15,20,7]",
+    "presets": [
+      { "label": "Classic", "args": [[3, 9, 20, 15, 7], [9, 3, 15, 20, 7]] },
+      { "label": "Left chain", "args": [[1, 2, 3], [3, 2, 1]] },
+      { "label": "Right child only", "args": [[1, 2], [1, 2]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Search inorder for the root every time", "optimalLabel": "Look the root up in a map", "unit": "steps (a tree that is a long chain)" },
+    "rows": [
+      { "name": "Scan for the root", "time": "O(n^2)", "space": "O(n)", "note": "Each node scans the inorder list to find its root position. The space is the call stack." },
+      { "name": "Value to index map", "time": "O(n)", "space": "O(n)", "note": "The map costs O(n) once. Then every node finds its split in one lookup." }
+    ],
+    "takeaway": "Preorder gives roots in order. One map from value to inorder position turns each split into a single lookup."
+  },
+  "variants": [
+    { "id": "split", "label": "Map and ranges", "tsFn": "buildTreeDriver", "goFn": "buildTreeDriver", "stages": [
+      { "n": 1, "title": "Index inorder", "note": "Store each value's position in inorder in a map. Keep a pointer next into preorder, starting at 0." },
+      { "n": 2, "title": "Take the root", "note": "The value at next in preorder is the root of the current inorder window. Move next forward and look up the root's position." },
+      { "n": 3, "title": "Build the left subtree", "note": "The window part to the left of the root belongs to the left subtree. Build it first, because preorder lists the left side first." },
+      { "n": 4, "title": "Build the right subtree", "note": "The window part to the right of the root belongs to the right subtree. Build it second." },
+      { "n": 5, "title": "Return the root", "note": "The outer call returns the root of the whole tree." }
+    ] }
+  ],
+  "goArgs": ["[]int", "[]int"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty lists", "input": "[], []", "output": "[]", "why": "The window is empty from the start, so the first call returns null." },
+    { "title": "Single node", "input": "[-1], [-1]", "output": "[-1]", "why": "The root splits an empty left part and an empty right part. Both calls return null at once." },
+    { "title": "Left chain", "input": "[1, 2, 3], [3, 2, 1]", "output": "[1, 2, null, 3]", "why": "Each root sits at the right end of its window, so the right part is empty every time." },
+    { "title": "Right chain", "input": "[1, 2, 3], [1, 2, 3]", "output": "[1, null, 2, null, 3]", "why": "Each root sits at the left end of its window, so the left part is empty every time." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Build the left subtree before the right. Preorder lists the left values first, so next has to walk through them in that order." },
+    { "lang": "General", "text": "Slicing the arrays for each call works but costs O(n) per call. Pass index bounds (lo, hi) instead, and keep one shared next pointer." },
+    { "lang": "General", "text": "This only works when all values are different. With duplicates a value no longer names one position in inorder." },
+    { "lang": "TypeScript", "text": "next must live outside the recursive function and be incremented inside it. A parameter would be copied and the left call's progress would be lost." },
+    { "lang": "Go", "text": "Recursive closures need the var build func(...) declaration first, then the assignment. Writing build := func... cannot call itself." }
+  ],
+  "recap": {
+    "pattern": "Tree from traversals",
+    "key": "Preorder gives the next root. Its inorder position splits the window into left and right. Build left, then right.",
+    "complexity": "Time O(n). Space O(n) for the map.",
+    "moves": ["Map each inorder value to its index", "Root = preorder[next]. Then next = next + 1", "Left = build(lo, mid-1). Right = build(mid+1, hi)", "An empty window returns null"]
+  }
+}

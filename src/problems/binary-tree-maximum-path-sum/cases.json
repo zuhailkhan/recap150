@@ -1,0 +1,12 @@
+[
+  {"name":"bend at the root","input":[[1,2,3]],"expected":6},
+  {"name":"classic","input":[[-10,9,20,null,null,15,7]],"expected":42},
+  {"name":"single negative","input":[[-3]],"expected":-3,"edge":true},
+  {"name":"negative child","input":[[-2,-1]],"expected":-1,"edge":true},
+  {"name":"drop the negative branch","input":[[2,-1]],"expected":2},
+  {"name":"path skips the root","input":[[5,4,8,11,null,13,4,7,2,null,null,null,1]],"expected":48},
+  {"name":"all negative","input":[[-3,-2,-1]],"expected":-1,"edge":true},
+  {"name":"skip the negative child","input":[[1,-2,3]],"expected":4},
+  {"name":"deep bend","input":[[9,6,-3,null,null,-6,2,null,null,2,null,-6,-6,-6]],"expected":16},
+  {"name":"best path hangs below a negative root","input":[[-100,50,60,30,null,null,40]],"expected":100}
+]

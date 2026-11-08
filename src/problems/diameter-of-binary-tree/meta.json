@@ -1,0 +1,70 @@
+{
+  "slug": "diameter-of-binary-tree",
+  "title": "Diameter of Binary Tree",
+  "category": "Trees",
+  "difficulty": "Easy",
+  "status": "ready",
+  "statement": "You get the root of a binary tree. Return the length of the longest path between any two nodes, counted in edges. The path may or may not pass through the root. An empty tree and a single node both give 0.",
+  "example": {
+    "caption": "The longest path is 4 -> 2 -> 1 -> 3. It uses 3 edges.",
+    "input": [{ "kind": "tree", "label": "root", "nodes": [1, 2, 3, 4, 5], "tones": ["hit", "hit", "hit", "hit", null] }],
+    "output": [{ "kind": "array", "label": "diameter", "items": [3], "tones": ["hit"] }]
+  },
+  "idea": {
+    "sentence": "Compute each node's height, and while you are there, check the longest path that bends at that node (left height plus right height).",
+    "demo": "custom",
+    "jargon": [
+      { "term": "diameter", "plain": "The number of edges on the longest path between any two nodes in the tree." },
+      { "term": "height", "plain": "How many nodes are on the longest path from a node down to a leaf. A lone leaf is 1." },
+      { "term": "edge", "plain": "One link between a parent and a child." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: the tree as a level-order array, null for a missing child, e.g. [1,2,3,4,5]",
+    "presets": [
+      { "label": "Classic", "args": [[1, 2, 3, 4, 5]] },
+      { "label": "Best path skips the root", "args": [[1, 2, null, 3, 4, 5, null, null, 6]] },
+      { "label": "Two nodes", "args": [[1, 2]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Recompute both heights from scratch at every node", "optimalLabel": "One pass: height and best path together", "unit": "node visits, for a skinny tree" },
+    "rows": [
+      { "name": "Heights recomputed per node", "time": "O(n^2)", "space": "O(h)", "note": "Every node walks down its whole subtree again to measure it." },
+      { "name": "Height and answer in one pass", "time": "O(n)", "space": "O(h)", "note": "Each node is visited once. The heights it needs were just returned by its children." }
+    ],
+    "takeaway": "The height you must return to the parent is the same number you need for the path check, so one walk does both jobs."
+  },
+  "variants": [
+    { "id": "recursive", "label": "Recursive", "tsFn": "diameterDriver", "goFn": "diameterDriver", "stages": [
+      { "n": 1, "title": "Start best at 0", "note": "best remembers the longest path seen so far. It lives outside the recursion." },
+      { "n": 2, "title": "Empty spot", "note": "An empty child has height 0." },
+      { "n": 3, "title": "Heights below", "note": "Recurse left and right. Each call returns the height of its subtree." },
+      { "n": 4, "title": "Check the bend", "note": "A path that turns at this node uses both sides: left height + right height edges. Keep it if it beats best." },
+      { "n": 5, "title": "Report up", "note": "Return 1 + the taller side as this node's height. When the recursion ends, best is the answer." }
+    ] }
+  ],
+  "goArgs": ["[]any"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Empty tree", "input": "[]", "output": "0", "why": "No nodes, no path. best never moves from 0." },
+    { "title": "Single node", "input": "[1]", "output": "0", "why": "A path from a node to itself has no edges." },
+    { "title": "Skips the root", "input": "[1, 2, null, 3, 4, 5, null, null, 6]", "output": "4", "why": "The longest path bends at node 2, below the root. Checking only the root's two heights gives 3." },
+    { "title": "Chain", "input": "[1, 2, null, 3, null, 4]", "output": "3", "why": "One side is empty everywhere, so the path is the whole chain: edges, not nodes." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The answer is not the root's left height plus right height. The best bend can be at any node. Update best at every node." },
+    { "lang": "General", "text": "Count edges, not nodes. With heights counted in nodes, left + right already equals the edge count of the bend." },
+    { "lang": "General", "text": "Two different numbers leave each call: the height you return, and the path length you save into best. Do not return the path length." },
+    { "lang": "TypeScript", "text": "best is captured by the inner arrow function, which is fine. If you passed it as a number parameter instead, the update would be lost on return." },
+    { "lang": "Go", "text": "A closure that calls itself must be declared first: var height func(*TreeNode) int, then assigned. height := func... cannot refer to itself." }
+  ],
+  "recap": {
+    "pattern": "Tree recursion: height + answer",
+    "key": "Return the height, and update a running best with left height + right height at every node.",
+    "complexity": "Time O(n). Space O(h) call stack.",
+    "moves": ["best = 0 outside the recursion", "height(empty) = 0", "left, right = heights of the two children", "best = max(best, left + right). Return 1 + max(left, right)"]
+  }
+}

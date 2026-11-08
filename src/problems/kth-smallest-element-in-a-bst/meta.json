@@ -1,0 +1,69 @@
+{
+  "slug": "kth-smallest-element-in-a-bst",
+  "title": "Kth Smallest Element In a Bst",
+  "category": "Trees",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get the root of a binary search tree and a number k. Return the k-th smallest value in the tree, counting from 1. Assume k is between 1 and the number of nodes.",
+  "example": {
+    "caption": "Sorted order is 1, 2, 3, 4, 5, 6. With k = 3 the answer is 3.",
+    "input": [{ "kind": "tree", "label": "BST, k = 3", "nodes": [5, 3, 6, 2, 4, null, null, 1] }],
+    "output": [{ "kind": "tree", "label": "3rd smallest is 3", "nodes": [5, 3, 6, 2, 4, null, null, 1], "tones": [null, "hit", null, "dim", null, null, null, "dim"] }]
+  },
+  "idea": {
+    "sentence": "Visiting a search tree in order (left, node, right) gives the values sorted, so stop at the k-th visit.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "in-order traversal", "plain": "Visit the whole left subtree, then the node itself, then the whole right subtree. In a search tree that lists values from smallest to largest." },
+      { "term": "explicit stack", "plain": "A list you manage yourself to remember the nodes you must come back to, instead of letting recursion remember them." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the tree as a level-order list (null for a missing child), then k. e.g. [5,3,6,2,4,null,null,1] and 3",
+    "presets": [
+      { "label": "Third of six", "args": [[5, 3, 6, 2, 4, null, null, 1], 3] },
+      { "label": "Smallest value", "args": [[3, 1, 4, null, 2], 1] },
+      { "label": "Right chain", "args": [[1, null, 2, null, 3], 2] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of nodes" }, { "sym": "h", "meaning": "height of the tree" }, { "sym": "k", "meaning": "which smallest value you want" }],
+    "compare": { "brute": "nlogn", "optimal": "n", "bruteLabel": "Collect all values, sort, pick the k-th", "optimalLabel": "Walk in order and stop at k", "unit": "steps (worst case, k near n)" },
+    "rows": [
+      { "name": "Collect and sort", "time": "O(n log n)", "space": "O(n)", "note": "Ignores that the tree is already ordered." },
+      { "name": "Iterative in-order", "time": "O(h + k)", "space": "O(h)", "note": "Dive to the leftmost node (h steps), then visit k nodes. The stack holds one path." }
+    ],
+    "takeaway": "The tree is already sorted if you read it in order. Stop at the k-th node instead of reading everything."
+  },
+  "variants": [
+    { "id": "inorder", "label": "Iterative in-order", "tsFn": "kthSmallestDriver", "goFn": "kthSmallestDriver", "stages": [
+      { "n": 1, "title": "Start at the root", "note": "cur is the node we are exploring. The stack is empty and the count is 0." },
+      { "n": 2, "title": "Dive left", "note": "Push each node and move to its left child until there is none. The top of the stack is the smallest unvisited value." },
+      { "n": 3, "title": "Pop and count", "note": "Pop the top node. It is the next value in sorted order, so add 1 to the count." },
+      { "n": 4, "title": "Reached k", "note": "If the count equals k, this node's value is the answer. Return it." },
+      { "n": 5, "title": "Go right", "note": "After a node, everything in its right subtree comes next. Move cur to the right child and dive left again." }
+    ] }
+  ],
+  "goArgs": ["[]any", "int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Single node", "input": "[1], k = 1", "output": "1", "why": "Dive pushes the node, the pop makes the count 1, and 1 equals k." },
+    { "title": "k is the largest", "input": "[5, 3, 6, 2, 4], k = 5", "output": "6", "why": "You visit every node. The loop ends only at the last one, so it never stops early." },
+    { "title": "Left chain", "input": "[4, 3, null, 2, null, 1], k = 1", "output": "1", "why": "The first dive pushes all four nodes. The first pop is the deepest one, which is the smallest." },
+    { "title": "Negative values", "input": "[0, -3, 3, -5, -1], k = 2", "output": "-3", "why": "Sorted order is -5, -3, -1, 0, 3. Negative values are ordered like any other." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Pop first, then check the count, then go right. If you move to the right child before counting, you skip the node itself." },
+    { "lang": "General", "text": "The loop must run while cur is set OR the stack is not empty. After finishing a leaf, cur is null but the stack still has work." },
+    { "lang": "General", "text": "k counts from 1, not from 0. Check count == k after incrementing." },
+    { "lang": "TypeScript", "text": "stack.pop() returns TreeNode | undefined. Here the stack is never empty at that point, so a non-null assertion (!) is fine." },
+    { "lang": "Go", "text": "stack[:len(stack)-1] shrinks the slice but keeps the old node reachable in the backing array. It is harmless for a short-lived stack." }
+  ],
+  "recap": {
+    "pattern": "Iterative in-order",
+    "key": "In-order on a search tree is sorted. Dive left with a stack, pop, count, go right. Stop at k.",
+    "complexity": "Time O(h + k). Space O(h).",
+    "moves": ["Dive: push cur, move to cur.left", "Pop a node and add 1 to count", "If count == k return its value", "cur = node.right and repeat"]
+  }
+}

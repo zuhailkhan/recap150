@@ -1,0 +1,11 @@
+[
+  {"name":"classic","input":[[1,2,3,null,null,4,5]],"expected":[1,2,3,null,null,4,5]},
+  {"name":"empty tree","input":[[]],"expected":[],"edge":true},
+  {"name":"single node","input":[[1]],"expected":[1],"edge":true},
+  {"name":"right child only","input":[[1,null,2]],"expected":[1,null,2]},
+  {"name":"negatives","input":[[-1,-2,-3]],"expected":[-1,-2,-3]},
+  {"name":"left chain","input":[[1,2,null,3,null,4]],"expected":[1,2,null,3,null,4],"edge":true},
+  {"name":"search tree","input":[[10,5,15,3,7,null,18]],"expected":[10,5,15,3,7,null,18]},
+  {"name":"big values","input":[[1000,-1000,null,999]],"expected":[1000,-1000,null,999]},
+  {"name":"zero values","input":[[0,0,0,null,0]],"expected":[0,0,0,null,0]}
+]
