@@ -1,0 +1,11 @@
+[
+  {"name":"classic","input":[[2,3,1,1,4]],"expected":2},
+  {"name":"single cell needs no jump","input":[[0]],"expected":0,"edge":true},
+  {"name":"one big jump","input":[[5,1,1,1,1,1]],"expected":1},
+  {"name":"greedy landing matters","input":[[2,3,0,1,4]],"expected":2},
+  {"name":"two cells","input":[[1,1]],"expected":1,"edge":true},
+  {"name":"all ones","input":[[1,1,1,1,1]],"expected":4},
+  {"name":"best landing is not the farthest cell","input":[[3,4,3,2,5,4,3]],"expected":3},
+  {"name":"zeros that are jumped over","input":[[3,0,0,1,1]],"expected":2},
+  {"name":"last cell overshoot","input":[[10,1,1]],"expected":1,"edge":true}
+]

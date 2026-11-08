@@ -1,0 +1,12 @@
+function isNStraightHand(hand, groupSize)
+  if length(hand) mod groupSize != 0
+    return false                    # [1] cannot split evenly
+  count = map: card -> copies       # [1] count each value in the hand
+  cards = sorted distinct values    # [2] smallest first
+  for each x in cards
+    while count[x] > 0              # [3] x is the smallest left: it starts a group
+      for k from 0 to groupSize - 1 # [4] take x, x+1, ... one copy each
+        if count[x + k] == 0
+          return false
+        count[x + k] = count[x + k] - 1
+  return true

@@ -1,0 +1,9 @@
+function mergeTriplets(triplets, target)
+  hit = [false, false, false]       # [1] slots matched by a usable triplet
+  for each tri in triplets
+    if tri[0] > target[0] or tri[1] > target[1] or tri[2] > target[2]
+      continue                      # [2] too big in a slot: discard it
+    for j from 0 to 2
+      if tri[j] == target[j]        # [3] this safe triplet fills slot j
+        hit[j] = true
+  return hit[0] and hit[1] and hit[2]   # [4] all three slots matched

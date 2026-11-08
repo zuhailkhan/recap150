@@ -1,0 +1,68 @@
+{
+  "slug": "valid-parenthesis-string",
+  "title": "Valid Parenthesis String",
+  "category": "Greedy",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "A string holds only (, ) and *. Each * may be read as (, as ), or as nothing. Decide whether some choice for the stars makes the whole string balanced: every ( closed by a later ), no ) left over, none left open.",
+  "example": {
+    "caption": "Read the * as nothing, or as ). Either way the string balances.",
+    "input": [{ "kind": "array", "label": "s", "items": ["(", "*", ")"] }],
+    "output": [{ "kind": "array", "label": "valid. * read as nothing", "items": ["(", "*", ")"], "tones": ["hit", "dim", "hit"] }]
+  },
+  "idea": {
+    "sentence": "Track the whole range of how many ( could be open: the fewest (lo) and the most (hi). Stars stretch the range, and the string is valid if 0 is still reachable at the end.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "balanced", "plain": "Every opener has a closer after it, and no closer comes with nothing open." },
+      { "term": "range [lo, hi]", "plain": "Every count between lo and hi can be the number of open brackets for some choice of stars." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a string of ( ) and *, e.g. \"(*))\"",
+    "presets": [
+      { "label": "Stars help", "args": ["*(*))"] },
+      { "label": "Closer first", "args": [")("] },
+      { "label": "Clamp trap", "args": ["*("] },
+      { "label": "Too many openers", "args": ["(((*"] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "length of the string" }],
+    "compare": { "brute": "2n", "optimal": "n", "bruteLabel": "Try every way to read the stars", "optimalLabel": "One pass, two numbers", "unit": "readings or characters (rough; brute force is really 3ᵏ for k stars)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(3ᵏ · n)", "space": "O(n)", "note": "Try every choice of ( ) or empty for each of the k stars. Shown as 2ⁿ, the closest shape." },
+      { "name": "Range [lo, hi]", "time": "O(n)", "space": "O(1)", "note": "One pass. Two integers are all the state." }
+    ],
+    "takeaway": "You never pick a reading for any star. The range of open counts covers every reading at once, so one pass decides."
+  },
+  "variants": [
+    { "id": "range", "label": "Open-count range", "tsFn": "checkValidString", "goFn": "checkValidString", "stages": [
+      { "n": 1, "title": "Range [0, 0]", "note": "lo is the fewest open openers possible. hi is the most. Both are 0 before any character." },
+      { "n": 2, "title": "Update the range", "note": "( raises both. ) lowers both. * lowers lo and raises hi. If hi drops below 0, even the best reading has too many closers, so return false." },
+      { "n": 3, "title": "Clamp lo at 0", "note": "A negative count is impossible. Readings that go there are dead, so set lo back to 0." },
+      { "n": 4, "title": "Is 0 possible?", "note": "After the last character, the string is valid only if lo is 0." }
+    ] }
+  ],
+  "goArgs": ["string"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Closer first", "input": "\")(\"", "output": "false", "why": "After the first ) the best case is hi = -1. No star could rescue it, so the answer is false right away." },
+    { "title": "Clamp trap", "input": "\"*(\"", "output": "false", "why": "Without clamping, the * would drag lo to -1, and the ( would bring it back to 0, wrongly saying yes. Clamped, lo is 1 and the answer is false." },
+    { "title": "Lone star", "input": "\"*\"", "output": "true", "why": "Read it as nothing. lo = -1 is clamped to 0, and 0 is possible." },
+    { "title": "Too many closers", "input": "\"())*\"", "output": "false", "why": "The ) after () is already unmatched. Here hi = -1 after the second ), so the later star cannot help." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Clamp lo at 0 after every character, not only at the end. A negative lo that later climbs back to 0 gives a false yes, as in *(." },
+    { "lang": "General", "text": "Check hi < 0 before clamping lo, and return at once. A dead hi cannot be repaired by later characters." },
+    { "lang": "Go", "text": "for _, ch := range s gives runes, so compare with '(' (a rune literal) in the switch. It works because the characters are ASCII." },
+    { "lang": "TypeScript", "text": "s[i] is a one-character string, so compare with '(' and not with a char code. A switch on s[i] also works." }
+  ],
+  "recap": {
+    "pattern": "Greedy: range of open counts",
+    "key": "Keep lo and hi, the fewest and most open brackets over all star readings. Clamp lo at 0, fail if hi < 0, and accept if lo is 0 at the end.",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": ["lo = 0, hi = 0", "( raises both, ) lowers both, * lowers lo and raises hi", "If hi < 0 return false", "If lo < 0 set lo = 0. At the end return lo == 0"]
+  }
+}

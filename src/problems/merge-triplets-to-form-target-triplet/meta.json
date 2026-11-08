@@ -1,0 +1,71 @@
+{
+  "slug": "merge-triplets-to-form-target-triplet",
+  "title": "Merge Triplets to Form Target Triplet",
+  "category": "Greedy",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of triplets (three numbers each) and a target triplet. You may merge any two triplets into one that keeps the larger value in each slot, as often as you like. Can you end up with a triplet equal to the target?",
+  "example": {
+    "caption": "Skip [1, 8, 4], which is too big in the middle. Merging [2, 5, 3] and [1, 7, 5] gives [2, 7, 5].",
+    "input": [
+      { "kind": "grid", "label": "triplets", "cells": [[2, 5, 3], [1, 8, 4], [1, 7, 5]] },
+      { "kind": "array", "label": "target", "items": [2, 7, 5] }
+    ],
+    "output": [{ "kind": "grid", "label": "used triplets", "cells": [[2, 5, 3], [1, 8, 4], [1, 7, 5]], "tones": [["hit", null, null], ["miss", "miss", "miss"], [null, "hit", "hit"]] }]
+  },
+  "idea": {
+    "sentence": "Throw away every triplet that is bigger than the target in any slot. If the rest can hit each target slot at least once, merging them gives the target.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "slot", "plain": "One of the three positions in a triplet: first, second or third." },
+      { "term": "merge", "plain": "Take the larger value in each slot of two triplets. Values only ever go up." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: a list of triplets, then the target, e.g. [[2,5,3],[1,8,4],[1,7,5]], [2,7,5]",
+    "presets": [
+      { "label": "Classic", "args": [[[2, 5, 3], [1, 8, 4], [1, 7, 5]], [2, 7, 5]] },
+      { "label": "One slot never hit", "args": [[[3, 4, 5], [4, 5, 6], [1, 1, 5]], [3, 2, 5]] },
+      { "label": "Each slot from another", "args": [[[2, 1, 1], [1, 7, 1], [1, 1, 5]], [2, 7, 5]] },
+      { "label": "All too big", "args": [[[9, 9, 9], [8, 8, 8], [7, 9, 1]], [1, 1, 1]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of triplets" }],
+    "compare": { "brute": "2n", "optimal": "n", "bruteLabel": "Try every subset to merge", "optimalLabel": "One pass over the triplets", "unit": "subsets or triplets checked (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(2ⁿ · n)", "space": "O(1)", "note": "Merge every possible subset and compare with the target." },
+      { "name": "Filter and match", "time": "O(n)", "space": "O(1)", "note": "Each triplet is tested once against the target and three flags." }
+    ],
+    "takeaway": "Merging only raises values, so a too-big triplet is poison and every other triplet is harmless. Merge all the harmless ones and look at the result."
+  },
+  "variants": [
+    { "id": "discard", "label": "Discard and match", "tsFn": "mergeTriplets", "goFn": "mergeTriplets", "stages": [
+      { "n": 1, "title": "Three flags", "note": "One flag per slot: does some usable triplet equal the target there?" },
+      { "n": 2, "title": "Discard too-big triplets", "note": "If a triplet exceeds the target in any slot, skip it. Merging it would spoil that slot for good." },
+      { "n": 3, "title": "Mark matched slots", "note": "For a usable triplet, any slot equal to the target is matched. Other slots are lower, so they cannot hurt." },
+      { "n": 4, "title": "All flags set?", "note": "If every slot is matched, merging the usable triplets gives the target exactly." }
+    ] }
+  ],
+  "goArgs": ["[][]int", "[]int"],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    { "title": "Single exact triplet", "input": "[[1, 2, 3]], [1, 2, 3]", "output": "true", "why": "The one triplet already equals the target. All three slots match." },
+    { "title": "Single triplet too big", "input": "[[4, 2, 3]], [3, 2, 3]", "output": "false", "why": "The 4 is above 3, so it is discarded. Nothing is left to match." },
+    { "title": "One slot never hit", "input": "[[3, 4, 5], [4, 5, 6]], [3, 2, 5]", "output": "false", "why": "Slot 1 needs a 2, but no usable triplet has one. A larger value cannot be lowered." },
+    { "title": "Matches from different triplets", "input": "[[2, 1, 1], [1, 7, 1], [1, 1, 5]], [2, 7, 5]", "output": "true", "why": "Each triplet supplies a different slot. Merging all three combines them." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "A slot being lower than the target is fine, because merging can raise it. Only values above the target are fatal. Do not discard on a mismatch, only on exceeding." },
+    { "lang": "General", "text": "Check the three slots across different triplets. A single triplet does not need to match everywhere." },
+    { "lang": "TypeScript", "text": "Do not compare arrays with ===. [1, 2] === [1, 2] is false because they are different objects. Compare slot by slot." },
+    { "lang": "Go", "text": "A [3]bool array is a value type and starts all false. That is exactly what we want here, and no make or init is needed." }
+  ],
+  "recap": {
+    "pattern": "Greedy: filter, then cover slots",
+    "key": "Skip any triplet with a slot above the target. Among the rest, record which slots equal the target. All three slots matched means yes.",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": ["Keep three flags, one per slot", "Skip a triplet that exceeds the target anywhere", "Set flag j if the triplet equals the target at slot j", "Return true if all flags are set"]
+  }
+}

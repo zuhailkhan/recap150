@@ -1,0 +1,10 @@
+function canJump(nums)
+  last = length(nums) - 1
+  far = 0                           # [1] farthest index reachable so far
+  for i from 0 to last
+    if i > far                      # [2] beyond the reach: stuck
+      return false
+    far = max(far, i + nums[i])     # [3] standing on i, extend the reach
+    if far >= last                  # [4] goal is within reach
+      return true
+  return true

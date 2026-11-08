@@ -1,0 +1,10 @@
+function maxSubArray(nums)
+  best = nums[0]                  # [1] best sum so far (a real element, not 0)
+  run = 0                         # [1] sum of the run ending at this index
+  for each x in nums
+    if run < 0                    # [2] a negative run only hurts: drop it
+      run = 0
+    run = run + x                 # [3] extend the run with x
+    if run > best                 # [4] new best sum
+      best = run
+  return best

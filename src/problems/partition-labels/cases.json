@@ -1,0 +1,11 @@
+[
+  {"name":"classic","input":["ababcbacadefegdehijhklij"],"expected":[9,7,8]},
+  {"name":"all distinct","input":["abcdef"],"expected":[1,1,1,1,1,1]},
+  {"name":"one letter repeated","input":["aaaa"],"expected":[4],"edge":true},
+  {"name":"single letter","input":["z"],"expected":[1],"edge":true},
+  {"name":"one big part","input":["abcabc"],"expected":[6]},
+  {"name":"letter spanning the string","input":["abcdefa"],"expected":[7],"edge":true},
+  {"name":"short pairs","input":["aabbcc"],"expected":[2,2,2]},
+  {"name":"nested letters","input":["abcba"],"expected":[5]},
+  {"name":"one outer letter swallows the rest","input":["eccbbbbdec"],"expected":[10]}
+]

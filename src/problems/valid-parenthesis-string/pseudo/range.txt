@@ -1,0 +1,18 @@
+function checkValidString(s)
+  lo = 0                            # [1] fewest possible open "("
+  hi = 0                            # [1] most possible open "("
+  for each ch in s
+    if ch == "("                    # [2] opener: both go up
+      lo = lo + 1
+      hi = hi + 1
+    else if ch == ")"               # [2] closer: both go down
+      lo = lo - 1
+      hi = hi - 1
+    else                            # [2] star: ")" or "(" or empty
+      lo = lo - 1
+      hi = hi + 1
+    if hi < 0                       # [2] more ")" than even the best reading
+      return false
+    if lo < 0                       # [3] below 0 is impossible: clamp
+      lo = 0
+  return lo == 0                    # [4] can zero be open at the end?

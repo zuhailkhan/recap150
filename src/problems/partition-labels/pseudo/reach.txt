@@ -1,0 +1,11 @@
+function partitionLabels(s)
+  last = map: letter -> index of its last occurrence    # [1]
+  sizes = empty list
+  start = 0                         # where the current part began
+  end = 0                           # [2] farthest last occurrence in this part
+  for i from 0 to length(s) - 1
+    end = max(end, last[s[i]])      # [2] the letter drags the part's end out
+    if i == end                     # [3] nothing in the part reaches past i: cut
+      append (end - start + 1) to sizes
+      start = i + 1
+  return sizes

@@ -1,0 +1,71 @@
+{
+  "slug": "gas-station",
+  "title": "Gas Station",
+  "category": "Greedy",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "Stations sit on a circular road. Station i gives you gas[i] fuel, and driving from it to the next station burns cost[i]. You start with an empty tank at one station. Return the index to start from so you can drive all the way round, or -1 if no start works. If an answer exists it is unique.",
+  "example": {
+    "caption": "Starting at station 3 the tank never goes below zero on the whole lap.",
+    "input": [
+      { "kind": "array", "label": "gas", "items": [1, 2, 3, 4, 5] },
+      { "kind": "array", "label": "cost", "items": [3, 4, 5, 1, 2] }
+    ],
+    "output": [{ "kind": "array", "label": "gas − cost", "items": [-2, -2, -2, 3, 3], "tones": [null, null, null, "hit", "hit"], "pointers": [{ "name": "start", "at": 3, "tone": "hit" }] }]
+  },
+  "idea": {
+    "sentence": "Drive on while the tank holds. When it goes negative, no station up to here can be the start, so restart just after this one. Enough gas overall means the last restart works.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "tank", "plain": "Fuel left since the current start. It must never drop below zero." },
+      { "term": "total", "plain": "Sum of gas minus cost over every station. If it is negative the lap is impossible from anywhere." }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: gas then cost, e.g. [1,2,3,4,5], [3,4,5,1,2]",
+    "presets": [
+      { "label": "Classic", "args": [[1, 2, 3, 4, 5], [3, 4, 5, 1, 2]] },
+      { "label": "Not enough gas", "args": [[2, 3, 4], [3, 4, 3]] },
+      { "label": "Dip then recover", "args": [[3, 2, 1, 4, 2], [1, 1, 6, 1, 1]] },
+      { "label": "Start at zero", "args": [[5, 1, 2], [1, 3, 4]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of stations" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Simulate a lap from every start", "optimalLabel": "One pass with a restart rule", "unit": "legs driven (rough)" },
+    "rows": [
+      { "name": "Brute force", "time": "O(n²)", "space": "O(1)", "note": "Try each start and drive until the tank runs dry or the lap ends." },
+      { "name": "One pass", "time": "O(n)", "space": "O(1)", "note": "Each station is visited once. Three numbers are kept." }
+    ],
+    "takeaway": "A failed start proves that every station between the start and the failure also fails. Skipping them all is what makes one pass enough."
+  },
+  "variants": [
+    { "id": "restart", "label": "Restart on dry tank", "tsFn": "canCompleteCircuit", "goFn": "canCompleteCircuit", "stages": [
+      { "n": 1, "title": "Start at 0", "note": "total sums every station. tank sums the current trip. start is where the trip began." },
+      { "n": 2, "title": "Drive one leg", "note": "Add gas[i] − cost[i] to both total and tank." },
+      { "n": 3, "title": "Dry tank: restart", "note": "If tank is below zero, the trip from start failed. No station in between could do better. Restart at i + 1 with an empty tank." },
+      { "n": 4, "title": "Enough overall?", "note": "If total is negative, return -1. Otherwise the last restart is the answer." }
+    ] }
+  ],
+  "goArgs": ["[]int", "[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Not enough gas", "input": "[2, 3, 4], [3, 4, 3]", "output": "-1", "why": "The costs add up to more than the gas. total is negative, so the restart index means nothing." },
+    { "title": "One station", "input": "[5], [4]", "output": "0", "why": "A single station is the whole lap. It works when gas covers cost, and -1 when not." },
+    { "title": "Exactly enough", "input": "[2, 3, 4], [3, 4, 2]", "output": "2", "why": "total is exactly 0, which is fine. Only a negative total fails." },
+    { "title": "Start at the end", "input": "[1, 1, 5], [2, 2, 1]", "output": "2", "why": "Stations 0 and 1 run dry, so start jumps to 2. The surplus there pays for the earlier legs." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "The answer is unique when it exists, so returning the last restart is safe. The proof needs total >= 0: the surplus after the restart covers the deficit before it." },
+    { "lang": "General", "text": "Reset tank to 0, not to the gain at i + 1. The next loop turn adds that station's gain for you." },
+    { "lang": "Go", "text": "start = i + 1 can equal len(gas) on the last station. That only happens when total is negative, and then you return -1 before using it." },
+    { "lang": "TypeScript", "text": "When the last station causes the restart, start becomes gas.length, an out-of-range index. Check total < 0 first, so it is never returned." }
+  ],
+  "recap": {
+    "pattern": "Greedy: restart after a dry tank",
+    "key": "Run total and tank. If tank goes negative at i, restart at i + 1. If total is negative, return -1, else return the last restart.",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": ["total = 0, tank = 0, start = 0", "Add gas[i] − cost[i] to both", "If tank < 0: start = i + 1, tank = 0", "Return -1 if total < 0, else start"]
+  }
+}

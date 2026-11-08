@@ -1,0 +1,16 @@
+[
+  {"name":"plain balanced","input":["()"],"expected":true},
+  {"name":"star as empty","input":["(*)"],"expected":true},
+  {"name":"stars balance both ways","input":["(*))"],"expected":true},
+  {"name":"lone star","input":["*"],"expected":true,"edge":true},
+  {"name":"close first","input":[")("],"expected":false,"edge":true},
+  {"name":"star then open (clamp trap)","input":["*("],"expected":false,"edge":true},
+  {"name":"star star close open","input":["**)("],"expected":false,"edge":true},
+  {"name":"star must close","input":["(*"],"expected":true},
+  {"name":"only stars","input":["***"],"expected":true},
+  {"name":"too many closers","input":["())*"],"expected":false,"edge":true},
+  {"name":"stars cannot fix the order","input":[")*("],"expected":false},
+  {"name":"long mix","input":["(((**)))*(*)"],"expected":true},
+  {"name":"open run with enough stars","input":["((**"],"expected":true},
+  {"name":"not enough stars","input":["(((*"],"expected":false}
+]

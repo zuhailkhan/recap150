@@ -1,0 +1,10 @@
+[
+  {"name":"classic reachable","input":[[2,3,1,1,4]],"expected":true},
+  {"name":"stuck at zero","input":[[3,2,1,0,4]],"expected":false,"edge":true},
+  {"name":"single cell","input":[[0]],"expected":true,"edge":true},
+  {"name":"zero start, longer","input":[[0,1]],"expected":false,"edge":true},
+  {"name":"long jump first","input":[[5,0,0,0,0,0]],"expected":true},
+  {"name":"zero in the middle is skipped","input":[[2,0,0]],"expected":true},
+  {"name":"one step each","input":[[1,1,1,1]],"expected":true},
+  {"name":"trap before the end","input":[[1,2,0,0,5]],"expected":false}
+]

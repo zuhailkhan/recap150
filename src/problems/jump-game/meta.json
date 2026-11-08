@@ -1,0 +1,267 @@
+{
+  "slug": "jump-game",
+  "title": "Jump Game",
+  "category": "Greedy",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You stand on the first cell of a row of non-negative numbers. A number tells you the longest jump you may make from that cell, and you may also jump any shorter distance. Decide whether you can land exactly on the last cell.",
+  "example": {
+    "caption": "From 2 you can reach the 3, and from the 3 you can reach past the end. Yes.",
+    "input": [
+      {
+        "kind": "array",
+        "label": "nums",
+        "items": [
+          2,
+          3,
+          1,
+          1,
+          4
+        ]
+      }
+    ],
+    "output": [
+      {
+        "kind": "array",
+        "label": "reachable",
+        "items": [
+          2,
+          3,
+          1,
+          1,
+          4
+        ],
+        "tones": [
+          "keep",
+          "keep",
+          "keep",
+          "keep",
+          "hit"
+        ],
+        "window": [
+          0,
+          4
+        ]
+      }
+    ]
+  },
+  "idea": {
+    "sentence": "Keep the farthest index you can reach. Every cell up to it is reachable, and a cell beyond it is not, so you only ever compare against that one number.",
+    "demo": "custom",
+    "jargon": [
+      {
+        "term": "greedy",
+        "plain": "Keep only the best summary (here: the farthest reach) instead of exploring every path."
+      },
+      {
+        "term": "reachable",
+        "plain": "You can land there by some sequence of allowed jumps."
+      }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of jump lengths, e.g. [2,3,1,1,4]",
+    "presets": [
+      {
+        "label": "Reachable",
+        "args": [
+          [
+            2,
+            3,
+            1,
+            1,
+            4
+          ]
+        ]
+      },
+      {
+        "label": "Stuck at a zero",
+        "args": [
+          [
+            3,
+            2,
+            1,
+            0,
+            4
+          ]
+        ]
+      },
+      {
+        "label": "Early finish",
+        "args": [
+          [
+            5,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      {
+        "label": "Zero at the start",
+        "args": [
+          [
+            0,
+            1
+          ]
+        ]
+      }
+    ]
+  },
+  "fast": {
+    "vars": [
+      {
+        "sym": "n",
+        "meaning": "number of cells"
+      }
+    ],
+    "compare": {
+      "brute": "n2",
+      "optimal": "n",
+      "bruteLabel": "Try every jump from every cell",
+      "optimalLabel": "One pass, one number",
+      "unit": "cells visited (rough)"
+    },
+    "rows": [
+      {
+        "name": "Brute force search",
+        "time": "O(n²)",
+        "space": "O(n)",
+        "note": "Explore every jump length from every reachable cell. Plain recursion without memory is exponential."
+      },
+      {
+        "name": "Farthest reach",
+        "time": "O(n)",
+        "space": "O(1)",
+        "note": "One pass keeping far."
+      },
+      {
+        "name": "Goal moves backward",
+        "time": "O(n)",
+        "space": "O(1)",
+        "note": "Same cost, scanned right to left."
+      }
+    ],
+    "takeaway": "Reachable cells form one unbroken stretch from index 0. One number, the end of that stretch, is all the state you need."
+  },
+  "variants": [
+    {
+      "id": "farthest",
+      "label": "Farthest reach",
+      "tsFn": "canJump",
+      "goFn": "canJump",
+      "stages": [
+        {
+          "n": 1,
+          "title": "Start with far = 0",
+          "note": "Before moving, index 0 is the only cell you can stand on."
+        },
+        {
+          "n": 2,
+          "title": "Is this cell reachable?",
+          "note": "If the index is beyond far, no earlier cell can land here. Stop with false."
+        },
+        {
+          "n": 3,
+          "title": "Stretch the reach",
+          "note": "From this cell you can reach index + value. Keep the larger of that and far."
+        },
+        {
+          "n": 4,
+          "title": "Goal inside reach",
+          "note": "If far covers the last index, the answer is true. You can stop early."
+        }
+      ]
+    },
+    {
+      "id": "goal",
+      "label": "Goal moves back",
+      "tsFn": "canJumpGoal",
+      "goFn": "canJumpGoal",
+      "stages": [
+        {
+          "n": 1,
+          "title": "Goal is the last cell",
+          "note": "The cell you still need to be able to reach."
+        },
+        {
+          "n": 2,
+          "title": "Scan right to left",
+          "note": "Visit each earlier cell once."
+        },
+        {
+          "n": 3,
+          "title": "Pull the goal back",
+          "note": "If this cell can reach the goal, reaching this cell is enough. The goal moves here."
+        },
+        {
+          "n": 4,
+          "title": "Goal at index 0?",
+          "note": "If the goal was pulled all the way to the start, the answer is true."
+        }
+      ]
+    }
+  ],
+  "goArgs": [
+    "[]int"
+  ],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    {
+      "title": "Single cell",
+      "input": "[0]",
+      "output": "true",
+      "why": "You already stand on the last cell. A zero here does not matter."
+    },
+    {
+      "title": "Zero blocks the way",
+      "input": "[3, 2, 1, 0, 4]",
+      "output": "false",
+      "why": "Every path funnels into the 0 at index 3. From there far stays 3, and index 4 is beyond it."
+    },
+    {
+      "title": "Zero at the start",
+      "input": "[0, 1]",
+      "output": "false",
+      "why": "Index 0 can reach only itself. At index 1, 1 > far = 0, so you are stuck."
+    },
+    {
+      "title": "A zero in the middle is harmless",
+      "input": "[2, 0, 0]",
+      "output": "true",
+      "why": "The first jump flies over both zeros and lands on the end. Zeros only matter if you must stand on them."
+    }
+  ],
+  "gotchas": [
+    {
+      "lang": "General",
+      "text": "Check i > far before using nums[i]. Standing on a cell you cannot reach would wrongly extend far."
+    },
+    {
+      "lang": "General",
+      "text": "Compare with i + nums[i], not nums[i] alone. The jump length is relative to the current cell."
+    },
+    {
+      "lang": "Go",
+      "text": "The built-in max needs Go 1.21 or newer. On older versions write the if by hand."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "Reading nums[i] past the end gives undefined, and Math.max with undefined is NaN. Every comparison with NaN is false, so far silently stops working. Keep i inside the array."
+    }
+  ],
+  "recap": {
+    "pattern": "Greedy: farthest reachable index",
+    "key": "Keep far, the farthest index reachable so far. If an index is beyond far you are stuck. Otherwise widen far with i + nums[i].",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": [
+      "far = 0",
+      "For each i, if i > far return false",
+      "far = max(far, i + nums[i])",
+      "If far reaches the last index, return true"
+    ]
+  }
+}

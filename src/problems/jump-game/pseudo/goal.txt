@@ -1,0 +1,6 @@
+function canJumpGoal(nums)
+  goal = length(nums) - 1           # [1] the cell I must still reach
+  for i from length(nums) - 2 down to 0   # [2] each earlier cell, right to left
+    if i + nums[i] >= goal          # [3] i reaches the goal: move the goal back to i
+      goal = i
+  return goal == 0                  # [4] did the goal reach the start?

@@ -1,0 +1,11 @@
+function jump(nums)
+  last = length(nums) - 1
+  jumps = 0                         # [1] jumps taken so far
+  end = 0                           # [1] end of the current window
+  far = 0                           # [1] farthest reach with one more jump
+  for i from 0 to last - 1          # the last cell starts no jump
+    far = max(far, i + nums[i])     # [2] best reach from inside the window
+    if i == end                     # [3] window used up: jump
+      jumps = jumps + 1
+      end = far                     # [4] next window ends at far
+  return jumps

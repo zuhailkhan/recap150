@@ -1,0 +1,14 @@
+function canCompleteCircuit(gas, cost)
+  total = 0                         # [1] gas minus cost over the whole circle
+  tank = 0                          # [1] fuel since the current start
+  start = 0                         # [1] station we are trying to start from
+  for i from 0 to length(gas) - 1
+    gain = gas[i] - cost[i]         # [2] fuel gained minus fuel for the next leg
+    total = total + gain
+    tank = tank + gain
+    if tank < 0                     # [3] ran dry: skip every start up to i
+      start = i + 1
+      tank = 0
+  if total < 0
+    return -1                       # [4] not enough gas overall
+  return start                      # [4] the last restart works

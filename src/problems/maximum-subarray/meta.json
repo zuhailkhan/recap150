@@ -1,0 +1,251 @@
+{
+  "slug": "maximum-subarray",
+  "title": "Maximum Subarray",
+  "category": "Greedy",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a list of integers, positive or negative. Pick one stretch of neighbouring elements (at least one) so that its sum is as large as possible. Return that sum. The list is never empty.",
+  "example": {
+    "caption": "The stretch 4, -1, 2, 1 adds up to 6. No other stretch beats it.",
+    "input": [
+      {
+        "kind": "array",
+        "label": "nums",
+        "items": [
+          -2,
+          1,
+          -3,
+          4,
+          -1,
+          2,
+          1,
+          -5,
+          4
+        ]
+      }
+    ],
+    "output": [
+      {
+        "kind": "array",
+        "label": "best stretch",
+        "items": [
+          -2,
+          1,
+          -3,
+          4,
+          -1,
+          2,
+          1,
+          -5,
+          4
+        ],
+        "tones": [
+          null,
+          null,
+          null,
+          "hit",
+          "hit",
+          "hit",
+          "hit",
+          null,
+          null
+        ],
+        "window": [
+          3,
+          6
+        ]
+      }
+    ]
+  },
+  "idea": {
+    "sentence": "Keep the sum of the stretch that ends here. When that sum is below zero, throw it away, because starting fresh is always at least as good.",
+    "demo": "custom",
+    "jargon": [
+      {
+        "term": "subarray",
+        "plain": "A run of neighbouring elements. Not a pick-and-choose subset."
+      },
+      {
+        "term": "greedy",
+        "plain": "Make the locally best choice now and never look back. It works only when you can prove the choice cannot hurt."
+      },
+      {
+        "term": "running sum",
+        "plain": "The sum of the stretch that ends at the current index. Called Kadane's algorithm."
+      }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a non-empty list, e.g. [-2,1,-3,4,-1,2,1,-5,4]",
+    "presets": [
+      {
+        "label": "Classic",
+        "args": [
+          [
+            -2,
+            1,
+            -3,
+            4,
+            -1,
+            2,
+            1,
+            -5,
+            4
+          ]
+        ]
+      },
+      {
+        "label": "All negative",
+        "args": [
+          [
+            -3,
+            -1,
+            -2
+          ]
+        ]
+      },
+      {
+        "label": "Negative start",
+        "args": [
+          [
+            -5,
+            2,
+            3
+          ]
+        ]
+      },
+      {
+        "label": "Best in the middle",
+        "args": [
+          [
+            2,
+            3,
+            -10,
+            4,
+            1
+          ]
+        ]
+      }
+    ]
+  },
+  "fast": {
+    "vars": [
+      {
+        "sym": "n",
+        "meaning": "number of integers in the list"
+      }
+    ],
+    "compare": {
+      "brute": "n2",
+      "optimal": "n",
+      "bruteLabel": "Sum every stretch",
+      "optimalLabel": "One pass, one running sum",
+      "unit": "additions (rough)"
+    },
+    "rows": [
+      {
+        "name": "Brute force",
+        "time": "O(n²)",
+        "space": "O(1)",
+        "note": "Try every start and extend the end, adding as you go."
+      },
+      {
+        "name": "Running sum (Kadane)",
+        "time": "O(n)",
+        "space": "O(1)",
+        "note": "Two numbers: the run ending here and the best so far."
+      }
+    ],
+    "takeaway": "A negative running sum can never help a later stretch, so dropping it is safe. That one rule turns n² into n."
+  },
+  "variants": [
+    {
+      "id": "kadane",
+      "label": "Running sum",
+      "tsFn": "maxSubArray",
+      "goFn": "maxSubArray",
+      "stages": [
+        {
+          "n": 1,
+          "title": "Two numbers",
+          "note": "run is the sum of the stretch ending here. best is the largest sum seen. best starts at the first element."
+        },
+        {
+          "n": 2,
+          "title": "Drop a negative run",
+          "note": "If run is below zero, reset it to 0. Continuing from it would only lower any later sum."
+        },
+        {
+          "n": 3,
+          "title": "Extend the run",
+          "note": "Add the current number to run. This is the best stretch that ends at this index."
+        },
+        {
+          "n": 4,
+          "title": "Update the best",
+          "note": "If run beats best, remember it. The answer is best after the last index."
+        }
+      ]
+    }
+  ],
+  "goArgs": [
+    "[]int"
+  ],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    {
+      "title": "All negative",
+      "input": "[-3, -1, -2]",
+      "output": "-1",
+      "why": "You must pick at least one element, so the answer is the largest single element, not 0. Do not start best at 0."
+    },
+    {
+      "title": "Single element",
+      "input": "[5]",
+      "output": "5",
+      "why": "The only stretch is the element itself."
+    },
+    {
+      "title": "Negative start",
+      "input": "[-5, 2, 3]",
+      "output": "5",
+      "why": "The -5 is dropped as soon as it becomes the running sum, then 2 and 3 build 5."
+    },
+    {
+      "title": "Best is not at the end",
+      "input": "[5, 4, -1, 7, 8, -20, 3]",
+      "output": "23",
+      "why": "The running sum falls later. best keeps the peak, so a late dip cannot erase it."
+    }
+  ],
+  "gotchas": [
+    {
+      "lang": "General",
+      "text": "Starting best at 0 is wrong. With all negative input it returns 0, an empty stretch the problem does not allow. Start from nums[0]."
+    },
+    {
+      "lang": "General",
+      "text": "Whether you reset at run < 0 or run <= 0 does not change the answer. A run of exactly 0 neither helps nor hurts."
+    },
+    {
+      "lang": "Go",
+      "text": "var best int silently starts at 0, the same all-negative bug in disguise. Set best := nums[0] on purpose."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "Starting from -Infinity also works. Just never start from 0. Sums are doubles, so they stay exact up to 2^53 - 1."
+    }
+  ],
+  "recap": {
+    "pattern": "Greedy: reset a negative running sum",
+    "key": "Keep the sum of the stretch ending here. If it is negative, restart. Track the best sum seen, starting from nums[0].",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": [
+      "best = nums[0], run = 0",
+      "If run < 0, set run = 0",
+      "Add the current number to run",
+      "If run > best, update best"
+    ]
+  }
+}

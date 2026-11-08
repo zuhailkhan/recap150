@@ -1,0 +1,270 @@
+{
+  "slug": "hand-of-straights",
+  "title": "Hand of Straights",
+  "category": "Greedy",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You hold a hand of numbered cards and a group size. Can you split every card into groups of exactly that size, where each group is made of consecutive values (like 4, 5, 6)? Every card must be used once. Return true or false.",
+  "example": {
+    "caption": "Group size 3: the hand splits into 1-2-3, 2-3-4 and 6-7-8.",
+    "input": [
+      {
+        "kind": "array",
+        "label": "hand",
+        "items": [
+          1,
+          2,
+          3,
+          6,
+          2,
+          3,
+          4,
+          7,
+          8
+        ]
+      },
+      {
+        "kind": "array",
+        "label": "groupSize",
+        "items": [
+          3
+        ]
+      }
+    ],
+    "output": [
+      {
+        "kind": "buckets",
+        "keyLabel": "group",
+        "buckets": [
+          {
+            "key": "1",
+            "items": [
+              1,
+              2,
+              3
+            ],
+            "tone": "hit"
+          },
+          {
+            "key": "2",
+            "items": [
+              2,
+              3,
+              4
+            ],
+            "tone": "hit"
+          },
+          {
+            "key": "3",
+            "items": [
+              6,
+              7,
+              8
+            ],
+            "tone": "hit"
+          }
+        ]
+      }
+    ]
+  },
+  "idea": {
+    "sentence": "Always start the next group at the smallest card left. Nothing smaller can pull it into an earlier group, so it can only be the first card of its group.",
+    "demo": "custom",
+    "jargon": [
+      {
+        "term": "straight",
+        "plain": "A group of cards whose values are consecutive, such as 5, 6, 7."
+      },
+      {
+        "term": "count map",
+        "plain": "A table from card value to how many copies are still in the hand."
+      }
+    ]
+  },
+  "watch": {
+    "inputHint": "Two arguments: the hand, then the group size, e.g. [1,2,3,6,2,3,4,7,8], 3",
+    "presets": [
+      {
+        "label": "Classic",
+        "args": [
+          [
+            1,
+            2,
+            3,
+            6,
+            2,
+            3,
+            4,
+            7,
+            8
+          ],
+          3
+        ]
+      },
+      {
+        "label": "Run breaks",
+        "args": [
+          [
+            1,
+            1,
+            2,
+            2,
+            3,
+            4
+          ],
+          3
+        ]
+      },
+      {
+        "label": "Repeated cards",
+        "args": [
+          [
+            1,
+            1,
+            2,
+            2,
+            3,
+            3
+          ],
+          3
+        ]
+      },
+      {
+        "label": "Group size one",
+        "args": [
+          [
+            5,
+            1,
+            3
+          ],
+          1
+        ]
+      }
+    ]
+  },
+  "fast": {
+    "vars": [
+      {
+        "sym": "n",
+        "meaning": "number of cards in the hand"
+      },
+      {
+        "sym": "w",
+        "meaning": "group size"
+      }
+    ],
+    "compare": {
+      "brute": "n2",
+      "optimal": "nlogn",
+      "bruteLabel": "Search for a partner card in the hand each time",
+      "optimalLabel": "Sort the distinct values, then count down",
+      "unit": "steps (rough)"
+    },
+    "rows": [
+      {
+        "name": "Brute force",
+        "time": "O(n²)",
+        "space": "O(n)",
+        "note": "Sort the hand and, for each smallest card, scan the list to find and remove its successors."
+      },
+      {
+        "name": "Sorted count map",
+        "time": "O(n log n)",
+        "space": "O(n)",
+        "note": "Sorting the distinct values costs n log n. Each card is then removed once, in O(1) per card."
+      }
+    ],
+    "takeaway": "The smallest card left has exactly one possible role, so there is never a choice to undo. That is what makes the greedy rule safe."
+  },
+  "variants": [
+    {
+      "id": "smallest",
+      "label": "Smallest card first",
+      "tsFn": "isNStraightHand",
+      "goFn": "isNStraightHand",
+      "stages": [
+        {
+          "n": 1,
+          "title": "Count the cards",
+          "note": "If the hand cannot split into equal groups, stop. Otherwise count the copies of each value."
+        },
+        {
+          "n": 2,
+          "title": "Sort the values",
+          "note": "Visit distinct values from smallest to largest, so the smallest card left is always at hand."
+        },
+        {
+          "n": 3,
+          "title": "Start a group",
+          "note": "While a value still has copies, that value is the smallest card left, so it starts a group."
+        },
+        {
+          "n": 4,
+          "title": "Take the run",
+          "note": "Take one copy of x, x+1, up to x+size-1. A missing value means the answer is false."
+        }
+      ]
+    }
+  ],
+  "goArgs": [
+    "[]int",
+    "int"
+  ],
+  "goRet": "bool",
+  "compare": "exact",
+  "edges": [
+    {
+      "title": "Cannot split evenly",
+      "input": "[1, 2, 3, 4, 5], 4",
+      "output": "false",
+      "why": "Five cards cannot form groups of four. This check also saves work later."
+    },
+    {
+      "title": "Group size one",
+      "input": "[5, 1, 3], 1",
+      "output": "true",
+      "why": "Every card is its own group. Nothing has to be consecutive."
+    },
+    {
+      "title": "Two runs share a card",
+      "input": "[1, 2, 3, 3, 4, 5], 3",
+      "output": "true",
+      "why": "Two 3s: the first group is 1-2-3, and the second group starts at the other 3 as 3-4-5."
+    },
+    {
+      "title": "Not enough copies",
+      "input": "[1, 1, 2, 2, 3, 4], 3",
+      "output": "false",
+      "why": "After 1-2-3 is taken, the second 1 and second 2 need a 3 to finish, but the only 3 is gone."
+    }
+  ],
+  "gotchas": [
+    {
+      "lang": "General",
+      "text": "Do not start a group from just any card. Starting from a larger card can strand a smaller one that then has no partners."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "Array.sort() with no comparator sorts numbers as text, so 10 comes before 9. Pass (a, b) => a - b."
+    },
+    {
+      "lang": "Go",
+      "text": "Map iteration order is random. Collect the keys and call sort.Ints, or the result changes from run to run."
+    },
+    {
+      "lang": "Go",
+      "text": "Reading count[x+k] for a missing key returns 0 and does not insert it. That is handy here, because 0 copies means the run is broken."
+    }
+  ],
+  "recap": {
+    "pattern": "Greedy: smallest card starts the group",
+    "key": "Count the cards. Walk the values in sorted order. While a value has copies left, it must start a group, so take it and the next size-1 values.",
+    "complexity": "Time O(n log n). Space O(n).",
+    "moves": [
+      "Return false unless n is a multiple of size",
+      "Count copies of each card",
+      "For each value x in sorted order, while count[x] > 0",
+      "Take x, x+1, ... x+size-1 or return false"
+    ]
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "slug": "jump-game-ii",
+  "title": "Jump Game II",
+  "category": "Greedy",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You stand on the first cell of a row of non-negative numbers. A number is the longest jump allowed from that cell, and shorter jumps are fine too. The last cell can always be reached. Return the fewest jumps needed to land on it.",
+  "example": {
+    "caption": "Jump from 2 to 3, then from 3 to the end. Two jumps is the minimum.",
+    "input": [{ "kind": "array", "label": "nums", "items": [2, 3, 1, 1, 4] }],
+    "output": [{ "kind": "array", "label": "path", "items": [2, 3, 1, 1, 4], "tones": ["hit", "hit", null, null, "hit"], "pointers": [{ "name": "1st", "at": 1, "tone": "hit" }, { "name": "2nd", "at": 4, "tone": "hit" }] }]
+  },
+  "idea": {
+    "sentence": "Think in waves. Cells reachable with k jumps form a window. Scan it, remember the farthest reach, and when the window ends the next jump must go there.",
+    "demo": "custom",
+    "jargon": [
+      { "term": "window", "plain": "The stretch of cells you can reach using exactly k jumps. Each jump adds a new window just after the old one." },
+      { "term": "BFS by levels", "plain": "Explore everything one step away, then everything two steps away, and so on. Here a level is one window." }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a list of jump lengths where the end is reachable, e.g. [2,3,1,1,4]",
+    "presets": [
+      { "label": "Classic", "args": [[2, 3, 1, 1, 4]] },
+      { "label": "Best landing matters", "args": [[3, 1, 4, 2, 1, 1, 1]] },
+      { "label": "One big jump", "args": [[5, 1, 1, 1, 1, 1]] },
+      { "label": "Step by step", "args": [[1, 1, 1, 1]] }
+    ]
+  },
+  "fast": {
+    "vars": [{ "sym": "n", "meaning": "number of cells" }],
+    "compare": { "brute": "n2", "optimal": "n", "bruteLabel": "Try every jump from every cell", "optimalLabel": "One pass over the windows", "unit": "cells visited (rough)" },
+    "rows": [
+      { "name": "Brute force / DP", "time": "O(n²)", "space": "O(n)", "note": "For each cell, look at every cell it can reach and keep the minimum count." },
+      { "name": "Window greedy", "time": "O(n)", "space": "O(1)", "note": "Each cell is visited once, and only three numbers are kept." }
+    ],
+    "takeaway": "Do not decide where to land. Wait until the window ends, then you know the best landing was whichever cell reached farthest."
+  },
+  "variants": [
+    { "id": "windows", "label": "Window greedy", "tsFn": "jump", "goFn": "jump", "stages": [
+      { "n": 1, "title": "Start state", "note": "jumps = 0. The window is just index 0, so end = 0. far = 0." },
+      { "n": 2, "title": "Widen far", "note": "For each cell in the window, far = max(far, i + nums[i]). Landing anywhere in the window is allowed, so only the best reach matters." },
+      { "n": 3, "title": "Window used up", "note": "When i hits end, no cheaper cell is left. One more jump is forced, so count it." },
+      { "n": 4, "title": "Next window", "note": "The cells after end, up to far, are reachable with the new count. Set end = far." }
+    ] }
+  ],
+  "goArgs": ["[]int"],
+  "goRet": "int",
+  "compare": "exact",
+  "edges": [
+    { "title": "Single cell", "input": "[0]", "output": "0", "why": "You already stand on the last cell. The loop runs zero times." },
+    { "title": "Last cell is not a jump", "input": "[1, 1]", "output": "1", "why": "The loop stops before the last index. If it ran there, i == end could count a useless extra jump." },
+    { "title": "One huge first jump", "input": "[10, 1, 1]", "output": "1", "why": "far overshoots the end, which is fine. Only reaching or passing it matters." },
+    { "title": "Choose the best landing", "input": "[3, 1, 4, 2, 1, 1, 1]", "output": "2", "why": "From index 0 you may land on 1, 2 or 3. Landing on index 2 reaches the end. Taking the farthest reach finds that without trying each." }
+  ],
+  "gotchas": [
+    { "lang": "General", "text": "Loop to n - 2, not n - 1. At the last index i may equal end, and counting a jump there makes the answer one too big." },
+    { "lang": "General", "text": "Update far before testing i == end. The last cell of the window also contributes its own reach." },
+    { "lang": "Go", "text": "The built-in max needs Go 1.21 or newer. Write an if on older versions." },
+    { "lang": "TypeScript", "text": "A recursive solution with a memo array is tempting here. The window version needs no call stack and no array of size n." }
+  ],
+  "recap": {
+    "pattern": "Greedy: BFS windows",
+    "key": "Scan the current window tracking the farthest reach. When the scan hits the window end, take a jump and make far the new end.",
+    "complexity": "Time O(n). Space O(1).",
+    "moves": ["jumps = 0, end = 0, far = 0", "For i before the last cell, far = max(far, i + nums[i])", "If i == end, jumps++", "Then end = far"]
+  }
+}

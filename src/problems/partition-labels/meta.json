@@ -1,0 +1,229 @@
+{
+  "slug": "partition-labels",
+  "title": "Partition Labels",
+  "category": "Greedy",
+  "difficulty": "Medium",
+  "status": "ready",
+  "statement": "You get a string of lowercase letters. Cut it into as many consecutive parts as you can, so that no letter shows up in two different parts. Return the length of each part, in order.",
+  "example": {
+    "caption": "Cut after the b, after the c, after the d. The e and f stay together to the end.",
+    "input": [
+      {
+        "kind": "array",
+        "label": "s",
+        "items": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "c",
+          "d",
+          "e",
+          "f",
+          "f",
+          "e"
+        ]
+      }
+    ],
+    "output": [
+      {
+        "kind": "buckets",
+        "keyLabel": "part",
+        "buckets": [
+          {
+            "key": "1",
+            "items": [
+              "a",
+              "b",
+              "a",
+              "b"
+            ],
+            "tone": "hit"
+          },
+          {
+            "key": "2",
+            "items": [
+              "c"
+            ],
+            "tone": "hit"
+          },
+          {
+            "key": "3",
+            "items": [
+              "d"
+            ],
+            "tone": "hit"
+          },
+          {
+            "key": "4",
+            "items": [
+              "e",
+              "f",
+              "f",
+              "e"
+            ],
+            "tone": "hit"
+          }
+        ]
+      }
+    ]
+  },
+  "idea": {
+    "sentence": "Start a part, and stretch its end to the last occurrence of every letter inside it. When you reach that end, nothing inside leaks out, so cut.",
+    "demo": "custom",
+    "jargon": [
+      {
+        "term": "last occurrence",
+        "plain": "The highest index where a letter appears. Found once with one pass."
+      },
+      {
+        "term": "part",
+        "plain": "A consecutive piece of the string. Parts together cover the whole string."
+      }
+    ]
+  },
+  "watch": {
+    "inputHint": "One argument: a lowercase string, e.g. \"ababcdeffe\"",
+    "presets": [
+      {
+        "label": "Four parts",
+        "args": [
+          "ababcdeffe"
+        ]
+      },
+      {
+        "label": "One big part",
+        "args": [
+          "abcabc"
+        ]
+      },
+      {
+        "label": "All different",
+        "args": [
+          "abcd"
+        ]
+      },
+      {
+        "label": "Nested letters",
+        "args": [
+          "abcba"
+        ]
+      }
+    ]
+  },
+  "fast": {
+    "vars": [
+      {
+        "sym": "n",
+        "meaning": "length of the string"
+      }
+    ],
+    "compare": {
+      "brute": "n2",
+      "optimal": "n",
+      "bruteLabel": "Test every cut by scanning both sides",
+      "optimalLabel": "Two passes with a last-index table",
+      "unit": "characters examined (rough)"
+    },
+    "rows": [
+      {
+        "name": "Brute force",
+        "time": "O(n²)",
+        "space": "O(1)",
+        "note": "For each possible cut, compare the letters on the left with those on the right."
+      },
+      {
+        "name": "Last occurrence",
+        "time": "O(n)",
+        "space": "O(1)",
+        "note": "One pass builds the table of 26 letters, one pass walks the string. Space is fixed at 26 entries."
+      }
+    ],
+    "takeaway": "The last-index table answers \"does this letter appear later?\" in one lookup. Cutting at the first safe spot gives the most parts."
+  },
+  "variants": [
+    {
+      "id": "reach",
+      "label": "Last occurrence",
+      "tsFn": "partitionLabels",
+      "goFn": "partitionLabels",
+      "stages": [
+        {
+          "n": 1,
+          "title": "Last index table",
+          "note": "One pass records the last index of every letter."
+        },
+        {
+          "n": 2,
+          "title": "Stretch the part",
+          "note": "For each character, push end out to that letter's last index if it is farther."
+        },
+        {
+          "n": 3,
+          "title": "Cut at the end",
+          "note": "When i reaches end, no letter in the part appears later. Record the size and start a new part."
+        }
+      ]
+    }
+  ],
+  "goArgs": [
+    "string"
+  ],
+  "goRet": "[]int",
+  "compare": "exact",
+  "edges": [
+    {
+      "title": "Single letter",
+      "input": "\"z\"",
+      "output": "[1]",
+      "why": "One character is one part. i == end on the first step."
+    },
+    {
+      "title": "One letter spans everything",
+      "input": "\"abcdefa\"",
+      "output": "[7]",
+      "why": "The first a reaches index 6, so every letter between is trapped in the same part."
+    },
+    {
+      "title": "All letters the same",
+      "input": "\"aaaa\"",
+      "output": "[4]",
+      "why": "The only letter ends at index 3. No cut is possible before that."
+    },
+    {
+      "title": "All different",
+      "input": "\"abcdef\"",
+      "output": "[1, 1, 1, 1, 1, 1]",
+      "why": "Each letter ends where it begins, so every position is a safe cut."
+    }
+  ],
+  "gotchas": [
+    {
+      "lang": "General",
+      "text": "Only cut when i == end, not when end is bigger than i. Until then some letter in the part still shows up later."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "Map.get returns number | undefined. After the first pass every letter in s is present, so the ! is safe. Do not use || 0, which would hide a real index 0."
+    },
+    {
+      "lang": "Go",
+      "text": "Indexing a string gives a byte, so s[i] - 'a' is the array slot. That is fine for ASCII lowercase, but not for arbitrary Unicode."
+    },
+    {
+      "lang": "Go",
+      "text": "Start with sizes := []int{}, not var sizes []int. Both work for append, but a nil slice and an empty one are different when encoded as JSON, and the result is never empty here."
+    }
+  ],
+  "recap": {
+    "pattern": "Greedy: stretch to last occurrence",
+    "key": "Store each letter's last index. Grow end as the max last index of the letters seen. When i reaches end, cut.",
+    "complexity": "Time O(n). Space O(1) (26 letters).",
+    "moves": [
+      "Record the last index of every letter",
+      "Walk i, set end = max(end, last[s[i]])",
+      "When i == end, record end − start + 1",
+      "Start the next part at i + 1"
+    ]
+  }
+}
