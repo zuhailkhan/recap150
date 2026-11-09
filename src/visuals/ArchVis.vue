@@ -19,7 +19,13 @@ const segs = computed(() => props.p.edges.filter((e) => byId.value.has(e.from) &
     const k = Math.min((NW / 2 + 3) / Math.abs(ddx || 1e-9), (NH / 2 + 3) / Math.abs(ddy || 1e-9))
     return { x: cx + ddx * k, y: cy + ddy * k }
   }
-  const s = clip(ax, ay, bx, by), t = clip(bx, by, ax, ay)
+  let s = clip(ax, ay, bx, by), t = clip(bx, by, ax, ay)
+  // two arrows between the same pair of nodes: push each sideways so both stay visible
+  if (props.p.edges.some((o) => o.from === e.to && o.to === e.from)) {
+    const len = Math.hypot(dx, dy) || 1, off = 7
+    const ox = (-dy / len) * off, oy = (dx / len) * off
+    s = { x: s.x + ox, y: s.y + oy }; t = { x: t.x + ox, y: t.y + oy }
+  }
   return { e, s, t, mx: (s.x + t.x) / 2, my: (s.y + t.y) / 2, flat: Math.abs(dy) < Math.abs(dx) && dx !== 0 }
 }))
 const labelOf = (n: ArchNode) => n.label
@@ -32,7 +38,6 @@ const labelOf = (n: ArchNode) => n.label
     </defs>
     <g v-for="(s, i) in segs" :key="i">
       <line class="edge" :class="[s.e.tone ? `t-${s.e.tone}` : '', { dashed: s.e.dashed }]" :x1="s.s.x" :y1="s.s.y" :x2="s.t.x" :y2="s.t.y" marker-end="url(#ar-a)" />
-      <text v-if="s.e.label" class="el" :x="s.mx" :y="s.my - 5" text-anchor="middle">{{ s.e.label }}</text>
     </g>
     <g v-for="n in p.nodes" :key="n.id" :transform="`translate(${px(n)} ${py(n)})`">
       <!-- shape by kind: the silhouette tells you what it is before you read the label -->
@@ -48,6 +53,10 @@ const labelOf = (n: ArchNode) => n.label
       <rect v-else class="svn" :class="[cls(n.id), { soft: n.kind === 'worker' || n.kind === 'external' }]" :x="-NW / 2" :y="-NH / 2" :width="NW" :height="NH" :rx="n.kind === 'client' ? 16 : 7" />
       <text class="svt nl" :class="cls(n.id)" x="0" :y="n.sub ? -5 : 0">{{ labelOf(n) }}</text>
       <text v-if="n.sub" class="svs ns" :class="cls(n.id)" x="0" y="12">{{ n.sub }}</text>
+    </g>
+    <!-- labels are drawn last, so a node never covers them -->
+    <g v-for="(s, i) in segs" :key="'l' + i">
+      <text v-if="s.e.label" class="el" :x="s.mx" :y="s.my - 5" text-anchor="middle">{{ s.e.label }}</text>
     </g>
   </svg>
 </template>

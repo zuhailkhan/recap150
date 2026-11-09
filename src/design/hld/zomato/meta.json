@@ -1,0 +1,197 @@
+{
+  "slug": "zomato",
+  "title": "Zomato (Food Delivery)",
+  "group": "Ride, food and marketplaces",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a system like Zomato: customers browse nearby restaurants, order a meal, the restaurant prepares it and a delivery partner brings it. Three different parties must stay in step on one order, and most of the load arrives in two short windows, lunch and dinner.",
+  "requirements": {
+    "functional": [
+      "Search nearby restaurants by location, cuisine and filters, ranked well.",
+      "Show a menu with live availability and prices.",
+      "Place an order and pay for it.",
+      "The restaurant accepts or rejects, then marks it ready.",
+      "Assign a nearby delivery partner and show live tracking.",
+      "Show an estimated delivery time that is honest."
+    ],
+    "nonFunctional": [
+      { "name": "Peak load", "target": "Handle 4 to 5 times the average order rate at lunch and dinner" },
+      { "name": "Order integrity", "target": "An order is never lost, and is charged once" },
+      { "name": "Browse latency", "target": "Search and menu return under 300 ms at the 99th percentile" },
+      { "name": "Restaurant response", "target": "A restaurant sees a new order within 2 s" },
+      { "name": "Availability", "target": "Placing an order works 99.95% of the time" }
+    ],
+    "outOfScope": ["Reviews and ratings", "Restaurant onboarding and settlements", "Coupons and loyalty", "Dine-in and table booking"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts: a customer browses about 30 times per order, one menu item is about 1 KB, and orders crowd into a few hours. The peak factor is the rate in the busiest hour compared with the daily average.",
+    "inputs": [
+      { "id": "ordersDay", "label": "Orders per day", "value": 1000000, "min": 50000, "max": 20000000, "log": true },
+      { "id": "peakFactor", "label": "Peak factor over the daily average", "value": 4, "min": 1, "max": 10, "step": 0.5, "unit": "x" },
+      { "id": "restaurants", "label": "Restaurants listed", "value": 200000, "min": 10000, "max": 1000000, "log": true },
+      { "id": "menuItems", "label": "Menu items per restaurant", "value": 80, "min": 20, "max": 300, "step": 10 },
+      { "id": "partners", "label": "Delivery partners online at peak", "value": 100000, "min": 5000, "max": 1000000, "log": true },
+      { "id": "pingSec", "label": "Seconds between partner pings", "value": 5, "min": 2, "max": 30, "step": 1, "unit": "s" }
+    ],
+    "outputs": [
+      { "id": "avgQps", "label": "Orders per second, daily average", "expr": "ordersDay / 86400", "unit": "per s" },
+      { "id": "peakQps", "label": "Orders per second at peak", "expr": "avgQps * peakFactor", "unit": "per s", "note": "This is the number to size for, not the average." },
+      { "id": "browseQps", "label": "Browse requests per second at peak", "expr": "peakQps * 30", "unit": "per s", "note": "Search and menu views. Mostly served by the search index and cache." },
+      { "id": "menuRows", "label": "Menu items in the catalog", "expr": "restaurants * menuItems", "unit": "items" },
+      { "id": "menuCacheGb", "label": "Menu cache size", "expr": "menuRows * 1000 / 1e9", "unit": "GB", "note": "At about 1 KB per item. Fits in a small cache cluster." },
+      { "id": "pingQps", "label": "Partner location writes per second", "expr": "partners / pingSec", "unit": "per s", "note": "Goes to an in-memory location index, not the order store." },
+      { "id": "peakHourOrders", "label": "Orders in the peak hour", "expr": "peakQps * 3600", "unit": "orders" }
+    ]
+  },
+  "api": [
+    { "call": "GET /restaurants?lat&lng&cuisine&sort", "does": "Returns nearby open restaurants, filtered and ranked, from the search index." },
+    { "call": "GET /restaurants/{id}/menu", "does": "Returns the menu with availability. Served from a cache." },
+    { "call": "POST /orders  { cart, address, payment, requestId }", "does": "Places an order. requestId makes a retry safe." },
+    { "call": "POST /orders/{id}/accept | reject | ready", "does": "Restaurant actions that move the order along." },
+    { "call": "PUT /menu/items/{id}  { available }", "does": "Restaurant marks a dish in or out of stock." },
+    { "call": "WS partner { lat, lng }", "does": "Delivery partner location ping. Also receives pickup offers." },
+    { "call": "WS order/{id}", "does": "Streams state changes, partner position and the ETA to the customer." }
+  ],
+  "data": [
+    { "entity": "Restaurant and Menu", "fields": "restaurantId, name, location, cuisines, isOpen, items[itemId, price, available]", "store": "Document or relational store, cached, plus a search index.", "why": "Read far more than written. The search index handles geo, filters and ranking, and the menu is cached." },
+    { "entity": "Order", "fields": "orderId, customerId, restaurantId, partnerId, items, state, total, version", "store": "Relational store, durable.", "why": "Money and a promise to three parties. State changes are conditional writes on version." },
+    { "entity": "PartnerLocation", "fields": "partnerId, lat, lng, cellId, status, updatedAt", "store": "In-memory geo index by cell.", "why": "Overwritten every few seconds. Only the latest value matters, and partners ping again after a restart." },
+    { "entity": "Payment", "fields": "orderId, amount, status, providerRef", "store": "Relational store.", "why": "Keyed by orderId so a retry cannot charge twice." }
+  ],
+  "nodes": [
+    { "id": "customer", "label": "Customer app", "kind": "client", "x": 6, "y": 12, "since": 0 },
+    { "id": "restaurant", "label": "Restaurant app", "kind": "client", "x": 6, "y": 50, "since": 0 },
+    { "id": "partner", "label": "Delivery app", "kind": "client", "x": 6, "y": 88, "since": 3 },
+    { "id": "gw", "label": "API + live gateway", "kind": "service", "x": 26, "y": 50, "sub": "sockets and push", "since": 2 },
+    { "id": "search", "label": "Search service", "kind": "service", "x": 26, "y": 12, "sub": "geo, filters, rank", "since": 1 },
+    { "id": "cache", "label": "Menu cache", "kind": "cache", "x": 46, "y": 31, "sub": "menus, stock", "since": 1 },
+    { "id": "index", "label": "Search index", "kind": "db", "x": 66, "y": 12, "sub": "restaurants", "since": 1 },
+    { "id": "order", "label": "Order service", "kind": "service", "x": 46, "y": 50, "sub": "state machine", "since": 0 },
+    { "id": "odb", "label": "Order store", "kind": "db", "x": 66, "y": 69, "sub": "durable", "since": 0 },
+    { "id": "dispatch", "label": "Dispatch", "kind": "service", "x": 46, "y": 88, "sub": "assign, batch", "since": 3 },
+    { "id": "geo", "label": "Partner locations", "kind": "cache", "x": 66, "y": 88, "sub": "geo index by cell", "since": 3 },
+    { "id": "eta", "label": "ETA service", "kind": "service", "x": 26, "y": 88, "sub": "prep + travel", "since": 4 },
+    { "id": "pay", "label": "Payment service", "kind": "service", "x": 88, "y": 50, "sub": "idempotent", "since": 5 },
+    { "id": "psp", "label": "Payment provider", "kind": "external", "x": 88, "y": 31, "since": 5 }
+  ],
+  "edges": [
+    { "from": "customer", "to": "order", "label": "browse, order", "since": 0, "until": 2 },
+    { "from": "restaurant", "to": "order", "label": "poll", "since": 0, "until": 2 },
+    { "from": "order", "to": "odb", "since": 0 },
+    { "from": "customer", "to": "search", "since": 1, "until": 2 },
+    { "from": "search", "to": "index", "label": "query", "since": 1 },
+    { "from": "search", "to": "cache", "label": "menu", "since": 1 },
+    { "from": "order", "to": "cache", "since": 1 },
+    { "from": "odb", "to": "index", "label": "changes", "dashed": true, "since": 1 },
+    { "from": "customer", "to": "gw", "since": 2 },
+    { "from": "restaurant", "to": "gw", "since": 2 },
+    { "from": "gw", "to": "search", "since": 2 },
+    { "from": "gw", "to": "order", "since": 2 },
+    { "from": "partner", "to": "gw", "since": 3 },
+    { "from": "gw", "to": "geo", "label": "pings", "since": 3 },
+    { "from": "order", "to": "dispatch", "since": 3 },
+    { "from": "dispatch", "to": "geo", "since": 3 },
+    { "from": "dispatch", "to": "gw", "dashed": true, "since": 3 },
+    { "from": "dispatch", "to": "eta", "since": 4 },
+    { "from": "order", "to": "pay", "since": 5 },
+    { "from": "pay", "to": "psp", "since": 5 }
+  ],
+  "evolution": [
+    { "title": "One order service", "problem": "Start with the simplest thing that works: customers and restaurants talk to one service backed by one database.", "change": "Restaurants and menus live in the database. A customer lists restaurants with a query, places an order, and the restaurant app polls for new orders." },
+    { "title": "Search index and menu cache", "problem": "At lunch, browsing is about 30 requests per order. A 'near me, open now, Chinese, best rated' query on the database is slow, and menus are re-read constantly.", "change": "Restaurants go into a search index that handles geo, filters and ranking. Menus are cached, and a stock change from a restaurant updates the cache. The order store streams changes to the index.", "numbers": "browse load is about 30 times the order load" },
+    { "title": "Live gateway and order states", "problem": "A restaurant that polls sees an order late, or never. Orders hang in limbo when nobody answers, and the customer cannot tell what is going on.", "change": "A gateway holds sockets for apps and pushes updates. The order service runs a state machine: placed, accepted, preparing, ready, picked up, delivered, with timeouts. An unaccepted order auto-cancels and refunds.", "numbers": "restaurant sees an order in under 2 s" },
+    { "title": "Partner location and dispatch", "problem": "Someone must carry the food. 100K partners pinging every 5 s is 20K writes per second, and the nearest free partner must be found fast.", "change": "Partner pings go to an in-memory geo index. A dispatch service picks a free partner near the restaurant, offers the job with a timeout, and moves on if declined. It waits until the food is nearly ready so the partner does not idle." },
+    { "title": "ETA and batching", "problem": "A promise of 30 minutes that really takes 50 loses trust. One partner can also carry two nearby orders, which saves cost at the peak.", "change": "An ETA service adds the restaurant's recent prep time to travel time. Dispatch may batch a second order when the detour is small and neither delivery slips much." },
+    { "title": "Async payments", "problem": "Card networks are slow and fail. A timeout in the payment call must not leave an order half paid, or charge the customer twice.", "change": "A payment service charges with the orderId as an idempotency key, authorises when the order is placed and captures on acceptance. A failure retries in the background, and a rejected order triggers a refund." }
+  ],
+  "flows": [
+    {
+      "name": "Browse and place an order",
+      "steps": [
+        { "say": "The customer opens the app. It asks for restaurants near them, open now.", "nodes": ["customer", "gw"], "edges": [["customer", "gw"]] },
+        { "say": "The gateway passes the search to the search service.", "nodes": ["gw", "search"], "edges": [["gw", "search"]] },
+        { "say": "It queries the index by location and filters, and ranks the hits.", "nodes": ["search", "index"], "edges": [["search", "index"]] },
+        { "say": "Opening a restaurant reads the menu from the cache, with live stock.", "nodes": ["search", "cache"], "edges": [["search", "cache"]] },
+        { "say": "The customer places the order. It reaches the order service with a requestId, so a retry is safe.", "nodes": ["gw", "order"], "edges": [["gw", "order"]] },
+        { "say": "The order service checks the items are still in stock in the cache.", "nodes": ["order", "cache"], "edges": [["order", "cache"]] },
+        { "say": "It writes the order in state 'placed' to the durable store.", "nodes": ["order", "odb"], "edges": [["order", "odb"]] },
+        { "say": "The payment service authorises the card with the orderId as the idempotency key.", "nodes": ["order", "pay", "psp"], "edges": [["order", "pay"], ["pay", "psp"]] },
+        { "say": "The gateway pushes the new order to the restaurant's app.", "nodes": ["order", "gw", "restaurant"], "edges": [["gw", "order"], ["restaurant", "gw"]] }
+      ]
+    },
+    {
+      "name": "Accept, assign and deliver",
+      "steps": [
+        { "say": "The restaurant taps accept. The state moves from 'placed' to 'accepted' with a conditional write.", "nodes": ["restaurant", "gw", "order", "odb"], "edges": [["restaurant", "gw"], ["gw", "order"], ["order", "odb"]] },
+        { "say": "The order service asks dispatch for a partner.", "nodes": ["order", "dispatch"], "edges": [["order", "dispatch"]] },
+        { "say": "Dispatch asks the ETA service when the food will be ready and how long the partner needs to arrive.", "nodes": ["dispatch", "eta"], "edges": [["dispatch", "eta"]] },
+        { "say": "It finds the nearest free partners to the restaurant in the location index.", "nodes": ["dispatch", "geo"], "edges": [["dispatch", "geo"]] },
+        { "say": "It offers the job to the best one through the gateway. A decline or timeout goes to the next.", "nodes": ["dispatch", "gw", "partner"], "edges": [["dispatch", "gw"], ["partner", "gw"]] },
+        { "say": "The partner accepts, picks up and the order becomes 'picked up'. Pings keep flowing in.", "nodes": ["partner", "gw", "geo"], "edges": [["partner", "gw"], ["gw", "geo"]] },
+        { "say": "The customer's app gets the partner's position and the refreshed ETA over its socket.", "nodes": ["gw", "customer"], "edges": [["customer", "gw"]] },
+        { "say": "On delivery the state becomes 'delivered'. The payment is captured and the order is closed.", "nodes": ["gw", "order", "pay"], "edges": [["gw", "order"], ["order", "pay"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Ranking nearby restaurants",
+      "question": "How do we return the right restaurants for a location within a few hundred milliseconds?",
+      "options": [
+        { "name": "Database query", "pros": "Simple, and always fresh.", "cons": "Geo plus several filters plus a sort does not index well. It melts at lunch." },
+        { "name": "Search index with geo and filters", "pros": "Built for filtering and scoring. Reads scale by adding replicas.", "cons": "It lags the source of truth by seconds. Open or closed and stock must be handled separately." },
+        { "name": "Precomputed lists per area", "pros": "A lookup is very fast.", "cons": "Cannot cover every filter combination. Stale after a restaurant closes." }
+      ],
+      "pick": "Search index, with open status checked live",
+      "because": "Index the stable facts (location, cuisine, rating, price band) and score them. Keep volatile facts such as open now and busy level in a small fast store that the query filters through. Delivery time from the ETA service can re-rank the top results."
+    },
+    {
+      "title": "Order state machine",
+      "question": "How do three parties agree on where an order is?",
+      "options": [
+        { "name": "Each app keeps its own copy", "pros": "Quick to build.", "cons": "Copies drift. The customer sees 'preparing' while the restaurant rejected it." },
+        { "name": "One state machine with conditional writes", "pros": "One source of truth. Only valid moves are allowed, and a retry or a double tap is harmless.", "cons": "Every move is a write to the order store. You must design timeouts and compensation." }
+      ],
+      "pick": "One state machine in the order store",
+      "because": "Only the order service moves state, and each move says 'from accepted to preparing' and fails if the order is no longer accepted. Timeouts cancel unaccepted orders. A rejection or a failed delivery triggers a refund event."
+    },
+    {
+      "title": "When to call a partner",
+      "question": "When should a delivery partner be assigned?",
+      "options": [
+        { "name": "As soon as the order is placed", "pros": "Fast to assign. The partner is nearly always available.", "cons": "The partner waits at the restaurant. This wastes their time and money at the peak." },
+        { "name": "When the food is about ready", "pros": "Partners wait less and serve more orders per hour.", "cons": "A wrong prep estimate means cold food waiting. Needs a good prep-time model." }
+      ],
+      "pick": "Assign so the partner arrives as the food is ready",
+      "because": "Start dispatch at estimated prep time minus the partner's travel time. Use the restaurant's recent prep times and the current queue. Fall back to an earlier assignment when partners are plentiful."
+    },
+    {
+      "title": "Surviving the dinner spike",
+      "question": "Orders jump 4 to 5 times in an hour. How do we not fall over?",
+      "options": [
+        { "name": "Autoscale on load", "pros": "Pays only for what is used.", "cons": "New servers need a minute to warm up. A sharp spike arrives before they do." },
+        { "name": "Scale ahead of the known pattern", "pros": "Capacity is ready before the spike. The pattern is very regular.", "cons": "Wasteful when the day is quiet. Does not help with a surprise such as a match day." },
+        { "name": "Shed or queue the optional work", "pros": "Protects the order path. Browse can drop images, ratings and promotions under pressure.", "cons": "A degraded experience. You must decide what is optional." }
+      ],
+      "pick": "Pre-scale, autoscale for surprises, and degrade browse first",
+      "because": "Lunch and dinner are predictable, so provision for them early. Keep order placement the most protected path, serve browse from the cache and index, and cap partner dispatch work per city."
+    }
+  ],
+  "failures": [
+    { "what": "A restaurant does not respond", "impact": "The customer is charged or waiting for food that nobody is cooking.", "fix": "The state machine auto-cancels an unaccepted order after a timeout and releases the payment hold. A restaurant that often misses orders is hidden from search." },
+    { "what": "No delivery partner is free", "impact": "The food is ready but nobody picks it up, and ETAs slip for every order.", "fix": "Dispatch widens the search radius, then pays a bonus. The ETA service adds waiting time, and search hides restaurants beyond the delivery range for that area." },
+    { "what": "The menu cache is stale", "impact": "A customer orders a dish that is already out of stock.", "fix": "The restaurant's stock update writes through to the cache. The order service re-checks stock at placement, and the restaurant can reject with a clear reason and a refund." },
+    { "what": "A payment call times out", "impact": "It is unknown whether the card was charged. A retry might charge twice.", "fix": "Use the orderId as the idempotency key and query the provider before retrying. Reconcile payments against the provider every day." },
+    { "what": "The partner location index restarts", "impact": "Dispatch sees no partners for a few seconds.", "fix": "Pings refill it within one interval. Keep a replica per city. Dispatch retries briefly rather than failing the order." }
+  ],
+  "scaling": [
+    { "limit": "Browse traffic is about 30 times the order traffic", "lever": "Add search index replicas and cache nodes. Cache whole result pages per area and filter for a few seconds." },
+    { "limit": "Order writes and partner pings at the peak", "lever": "Shard orders by city. Partition the partner geo index by cell or city. Pings never touch the order store." },
+    { "limit": "A few huge cities dominate the load", "lever": "Give each big city its own cluster of search, dispatch and location index. Small cities share one." }
+  ],
+  "recap": {
+    "key": "Treat it as three parties around one order state machine: search and menus are cached reads, partner location is a volatile in-memory index, and everything is sized for the lunch and dinner peak.",
+    "numbers": "1M orders a day is about 12 per second, 46 at a 4x peak. Browsing adds about 1,400 requests per second. 100K partners pinging every 5 s is 20K location writes per second.",
+    "moves": ["Search index for discovery, cache for menus and stock", "One order state machine with conditional writes and timeouts", "Dispatch from an in-memory partner index, timed to the prep", "Pre-scale for the peak and protect order placement first"]
+  }
+}

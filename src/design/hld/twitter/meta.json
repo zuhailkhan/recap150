@@ -1,0 +1,172 @@
+{
+  "slug": "twitter",
+  "title": "Twitter / X",
+  "group": "Social and messaging",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a system like Twitter / X: short public posts, a home timeline, and live conversation around events. The timeline is the News Feed design, so this page spends its time on what is different: search that finds a tweet within seconds, trending topics, and a viral tweet whose like counter takes a huge burst of writes.",
+  "requirements": {
+    "functional": [
+      "Post a short tweet and delete it.",
+      "Read the home timeline (one block, covered in News Feed).",
+      "Search tweets by word or hashtag, newest first.",
+      "Show trending topics, per region.",
+      "Like and retweet, and show live counts, even on a viral tweet."
+    ],
+    "nonFunctional": [
+      { "name": "Search freshness", "target": "A new tweet is searchable within about 5 seconds" },
+      { "name": "Search latency", "target": "Results in under 300 ms at the 99th percentile" },
+      { "name": "Trend freshness", "target": "Trending lists update every minute or so" },
+      { "name": "Counter accuracy", "target": "Counts may lag a few seconds, but never lose likes for good" },
+      { "name": "Availability", "target": "Posting and reading work 99.95% of the time" }
+    ],
+    "outOfScope": ["Home timeline ranking and fan-out (see News Feed)", "Direct messages", "Ads and moderation", "Video and image pipeline"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts. One indexed tweet costs about 600 bytes of postings and metadata. Peak is 3 times average. One counter shard absorbs about 5K writes per second.",
+    "inputs": [
+      { "id": "dau", "label": "Daily active users", "value": 100000000, "min": 1000000, "max": 1000000000, "log": true },
+      { "id": "tweetsPerUser", "label": "Tweets per active user per day", "value": 2, "min": 0.2, "max": 20, "log": true },
+      { "id": "searchesPerUser", "label": "Searches per active user per day", "value": 1, "min": 0.1, "max": 10, "log": true },
+      { "id": "tagsPerTweet", "label": "Hashtags and terms counted per tweet", "value": 1, "min": 0.1, "max": 5, "log": true },
+      { "id": "hotRate", "label": "Likes per second on one viral tweet", "value": 50000, "min": 1000, "max": 1000000, "log": true },
+      { "id": "indexDays", "label": "Days kept in the fast index", "value": 7, "min": 1, "max": 30, "step": 1, "unit": "days" }
+    ],
+    "outputs": [
+      { "id": "tweetQps", "label": "Tweets per second, average", "expr": "dau * tweetsPerUser / 86400", "unit": "per s", "note": "Multiply by 3 for peak. Spikes during live events are far higher." },
+      { "id": "searchQps", "label": "Search queries per second", "expr": "dau * searchesPerUser / 86400 * 3", "unit": "per s", "note": "At peak." },
+      { "id": "indexGb", "label": "Fast index size", "expr": "dau * tweetsPerUser * indexDays * 600 / 1e9", "unit": "GB", "note": "Recent days only, held in memory and SSD. Older tweets go to a cheaper tier." },
+      { "id": "trendEvents", "label": "Trend events per second", "expr": "tweetQps * 3 * tagsPerTweet", "unit": "per s", "note": "Each tweet emits one event per hashtag or term, at peak." },
+      { "id": "hotShards", "label": "Counter shards for the viral tweet", "expr": "ceil(hotRate / 5000)", "unit": "shards", "note": "One counter row cannot take this write rate." },
+      { "id": "shardWrites", "label": "Writes per shard per second", "expr": "hotRate / hotShards", "unit": "per s" }
+    ]
+  },
+  "api": [
+    { "call": "POST /tweets  { text, replyTo? }", "does": "Stores a tweet, returns its id, and emits an event for the timeline, search and trends." },
+    { "call": "GET /search?q=&cursor=", "does": "Returns the newest matching tweets, a page at a time." },
+    { "call": "GET /trends?region=", "does": "Returns the current top topics for a region." },
+    { "call": "POST /tweets/{id}/like", "does": "Records a like. Idempotent per user, so a retry does not count twice." },
+    { "call": "GET /tweets/{id}", "does": "Returns the tweet with its like and retweet counts." }
+  ],
+  "data": [
+    { "entity": "Tweet", "fields": "tweetId, authorId, text, createdAt, deleted", "store": "Sharded key-value store by tweetId.", "why": "Read by id. Time-sortable ids give order for free." },
+    { "entity": "Search index", "fields": "term, [tweetId, position] sorted newest first", "store": "Inverted index, split by time and term.", "why": "Maps a word to the tweets that contain it. Newest segments are small and searched first." },
+    { "entity": "Trend window", "fields": "region, term, bucket, count", "store": "In-memory store with TTL.", "why": "Counts per short time bucket. Old buckets expire, so counts decay by design." },
+    { "entity": "Counter shard", "fields": "tweetId, shardNo, likes, retweets", "store": "In-memory store, many rows per hot tweet.", "why": "A read sums the shards. Writes spread across them." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Client", "kind": "client", "x": 7, "y": 50, "since": 0 },
+    { "id": "api", "label": "Tweet service", "kind": "service", "x": 27, "y": 50, "sub": "post, read, like", "since": 0 },
+    { "id": "tweetdb", "label": "Tweet store", "kind": "db", "x": 27, "y": 88, "sub": "tweets by id", "since": 0 },
+    { "id": "tl", "label": "Timeline", "kind": "service", "x": 27, "y": 12, "sub": "see News Feed", "since": 1 },
+    { "id": "search", "label": "Search service", "kind": "service", "x": 67, "y": 12, "sub": "query and merge", "since": 2 },
+    { "id": "indexer", "label": "Indexer", "kind": "worker", "x": 67, "y": 31, "sub": "tokenize, add", "since": 2 },
+    { "id": "index", "label": "Search index", "kind": "db", "x": 90, "y": 31, "sub": "inverted, by time", "since": 2 },
+    { "id": "stream", "label": "Event stream", "kind": "queue", "x": 47, "y": 50, "sub": "every new tweet", "since": 3 },
+    { "id": "trend", "label": "Trend counter", "kind": "worker", "x": 67, "y": 69, "sub": "windowed top-K", "since": 4 },
+    { "id": "trendstore", "label": "Trends", "kind": "cache", "x": 47, "y": 88, "sub": "top-K per region", "since": 4 },
+    { "id": "counters", "label": "Sharded counters", "kind": "cache", "x": 67, "y": 88, "sub": "likes, retweets", "since": 5 }
+  ],
+  "edges": [
+    { "from": "client", "to": "api", "since": 0 },
+    { "from": "api", "to": "tweetdb", "since": 0 },
+    { "from": "api", "to": "tl", "label": "fan-out", "since": 1 },
+    { "from": "api", "to": "search", "label": "query", "since": 2 },
+    { "from": "search", "to": "index", "since": 2 },
+    { "from": "api", "to": "indexer", "label": "inline", "dashed": true, "since": 2, "until": 3 },
+    { "from": "indexer", "to": "index", "since": 2 },
+    { "from": "api", "to": "stream", "since": 3 },
+    { "from": "stream", "to": "indexer", "since": 3 },
+    { "from": "stream", "to": "trend", "since": 4 },
+    { "from": "trend", "to": "trendstore", "since": 4 },
+    { "from": "api", "to": "trendstore", "label": "read trends", "since": 4 },
+    { "from": "api", "to": "counters", "label": "like", "since": 5 }
+  ],
+  "evolution": [
+    { "title": "Tweets in one store", "problem": "Start with the simplest thing: post a tweet, read a tweet by id.", "change": "A tweet service writes to a tweet store keyed by a time-sortable id. Everything else is built on top." },
+    { "title": "Timeline as one block", "problem": "People open the app to see what the accounts they follow said. A join over follows and tweets is too slow.", "change": "Add the timeline from the News Feed design as one node: fan-out on write, hybrid for celebrities. We do not redraw it here." },
+    { "title": "A search index", "problem": "Finding a word with a scan of the tweet store reads billions of rows. Search needs a different shape.", "change": "Build an inverted index: for each word, a list of tweet ids, newest first. An indexer adds each tweet inline when it is posted, and a search service merges the lists.", "numbers": "the estimator shows the fast index size" },
+    { "title": "Stream the tweet events", "problem": "Indexing inline slows every post, and a slow or failed indexer loses tweets from search. Trends will need the same events.", "change": "Publish every new tweet to an event stream. The indexer reads from it and adds tweets within seconds. Posting no longer waits for search, and a failed indexer just catches up.", "numbers": "tweets per second sets the stream rate" },
+    { "title": "Trending from the stream", "problem": "Trends need what is rising right now, per region. Counting over the whole tweet store is far too slow and would only show what is big, not what is new.", "change": "A stream processor counts terms in short time windows and keeps top-K per region. Old windows decay out. A small trends store serves the answer.", "numbers": "trend events per second in the estimator" },
+    { "title": "Shard the hot counters", "problem": "One viral tweet can get tens of thousands of likes per second. A single counter row is a hot spot, and the writes queue up.", "change": "Split each hot counter into many shard rows. A like picks a random shard, a read sums them. Writes spread out, and counts catch up within seconds.", "numbers": "shards needed and writes per shard in the estimator" }
+  ],
+  "flows": [
+    {
+      "name": "Post, then search for it",
+      "steps": [
+        { "say": "The client posts a tweet to the tweet service.", "nodes": ["client", "api"], "edges": [["client", "api"]] },
+        { "say": "The service saves it in the tweet store. From here it is durable.", "nodes": ["api", "tweetdb"], "edges": [["api", "tweetdb"]] },
+        { "say": "It hands the timeline block a copy. Fan-out is the News Feed design.", "nodes": ["api", "tl"], "edges": [["api", "tl"]] },
+        { "say": "It puts a tweet event on the stream and answers the client. It does not wait for search.", "nodes": ["api", "stream"], "edges": [["api", "stream"]] },
+        { "say": "The indexer takes the event, splits the text into terms and adds the tweet id to each term's list in the newest segment.", "nodes": ["stream", "indexer"], "edges": [["stream", "indexer"]] },
+        { "say": "The newest segment is made visible to searches a second or two later. This is why search is near real time.", "nodes": ["indexer", "index"], "edges": [["indexer", "index"]] },
+        { "say": "Someone searches for a word. The search service reads the lists for that word.", "nodes": ["client", "api", "search"], "edges": [["client", "api"], ["api", "search"]] },
+        { "say": "It reads the newest segment first, then older ones until it has a page, and returns the newest tweets.", "nodes": ["search", "index"], "edges": [["search", "index"]] }
+      ]
+    },
+    {
+      "name": "Trends and a viral like",
+      "steps": [
+        { "say": "Every new tweet goes onto the event stream.", "nodes": ["api", "stream"], "edges": [["api", "stream"]] },
+        { "say": "The trend counter reads the stream and adds one to the count of each term, per region, in the current time bucket.", "nodes": ["stream", "trend"], "edges": [["stream", "trend"]] },
+        { "say": "It compares recent buckets to older ones, so a term that is rising beats a term that is just big. It keeps top-K per region.", "nodes": ["trend", "trendstore"], "edges": [["trend", "trendstore"]] },
+        { "say": "A client asks for trends. The service reads the small top-K list. One lookup.", "nodes": ["client", "api", "trendstore"], "edges": [["client", "api"], ["api", "trendstore"]] },
+        { "say": "Meanwhile a tweet goes viral. Each like arrives at the tweet service.", "nodes": ["client", "api"], "edges": [["client", "api"]] },
+        { "say": "The service adds one to a random shard of that tweet's counter. No single row takes all the writes.", "nodes": ["api", "counters"], "edges": [["api", "counters"]] },
+        { "say": "A read sums the shards, or reads a total refreshed every second or two and cached.", "nodes": ["api", "counters"], "edges": [["api", "counters"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Making search near real time",
+      "question": "How can a tweet be searchable within seconds when the index holds billions of tweets?",
+      "options": [
+        { "name": "One big index, rebuilt in batches", "pros": "Simple and compact. Very fast to query.", "cons": "A rebuild takes hours, so new tweets are invisible until then." },
+        { "name": "Small in-memory segments plus big old ones", "pros": "New tweets go into a small recent segment visible in seconds. Old segments are immutable and merge in the background.", "cons": "A query reads several segments and merges. More moving parts." },
+        { "name": "Write straight into one live index", "pros": "No segments to manage.", "cons": "Heavy writes and heavy reads fight on the same structures. Both get slower." }
+      ],
+      "pick": "Recent segment plus immutable old segments",
+      "because": "Search wants recent tweets first. The small recent segment stays fast to write and cheap to search, and old data is rarely changed. Merge into larger segments in the background and move cold ones to a cheaper tier."
+    },
+    {
+      "title": "Counting trends",
+      "question": "How do we find what is rising right now, not just what is common?",
+      "options": [
+        { "name": "Exact counts per term", "pros": "Simple and exact.", "cons": "Millions of distinct terms per window. Memory grows with the long tail." },
+        { "name": "Approximate counts (count-min sketch)", "pros": "Fixed memory. Only the top terms are tracked precisely.", "cons": "Counts can be overestimated for rare terms. Needs tuning." },
+        { "name": "Exact counts, pruned by threshold", "pros": "Accurate for what matters. Easy to reason about.", "cons": "Needs a good cutoff, and a sudden new term must climb from zero." }
+      ],
+      "pick": "Approximate counts per window, then compare to a baseline",
+      "because": "Trending means recent count against normal count. Keep short windows, say one minute, in a bounded sketch, and score each term by its jump over its usual rate. Add a decay so old windows fade. Partition by region and term so workers do not share state."
+    },
+    {
+      "title": "A hot counter",
+      "question": "How do we count likes on one tweet that gets 50K writes a second?",
+      "options": [
+        { "name": "One row, atomic increment", "pros": "Exact and simple.", "cons": "All writes hit one row on one node. It becomes a queue." },
+        { "name": "Sharded counter", "pros": "Writes spread across N rows. A read sums them. Scales with N.", "cons": "Reads cost N lookups. The total is slightly stale unless cached." },
+        { "name": "Batch in the service, flush every second", "pros": "Turns thousands of writes into one per interval per server.", "cons": "A server crash loses its in-memory batch." }
+      ],
+      "pick": "Sharded counters, with batching in front",
+      "because": "Counts do not need to be exact to the last like at the moment of reading. Batch in each service instance, flush to a random shard, and cache the summed total for a second. Keep a like record per user for idempotency, so retries do not double count. Shard only tweets that get hot."
+    }
+  ],
+  "failures": [
+    { "what": "The indexer falls behind", "impact": "New tweets are not searchable for minutes. The timeline still works.", "fix": "Scale indexers with stream lag. Alert on index age, not only on queue size. The stream keeps the events, so nothing is lost." },
+    { "what": "A live event floods the stream", "impact": "Tweet rate jumps many times over, and search and trends lag.", "fix": "Partition the stream by tweet id and add consumers. Sample for trends when needed, since a trend only needs a rate, not every event." },
+    { "what": "Trend list is gamed by a spam burst", "impact": "Junk topics show up as trending.", "fix": "Count distinct authors, not raw tweets. Ignore terms from new or flagged accounts, and filter a blocklist before publishing." },
+    { "what": "A counter shard node dies", "impact": "Part of a hot tweet's likes are lost from the count.", "fix": "Replicate shards. The like record per user is the source of truth, so a counter can be rebuilt by recounting." },
+    { "what": "Deleted tweet is still in search", "impact": "A removed tweet appears in results.", "fix": "Mark it deleted in the tweet store. Search results are hydrated from the store and filtered, and the index entry is removed at the next merge." }
+  ],
+  "scaling": [
+    { "limit": "The index grows with every day of tweets", "lever": "Split by time. Keep recent days on fast storage and older segments on cheaper tiers. Query older tiers only when the recent ones cannot fill a page." },
+    { "limit": "Every query touches many index shards", "lever": "Shard by tweet id so each shard answers on its own, then merge top results. Cache hot queries for a few seconds during events." },
+    { "limit": "Trend work grows with tweet rate and regions", "lever": "Partition counting by region and term hash. Merge per-region lists into a global one only at the end." }
+  ],
+  "recap": {
+    "key": "Three problems sit beside the timeline: an inverted index fed from a stream for near real-time search, windowed counting for trends, and sharded counters for viral tweets.",
+    "numbers": "About 2.3K tweets per second for 100M daily users, 840 GB of fast index for 7 days, 7K trend events per second at peak. A viral tweet at 50K likes per second needs 10 shards.",
+    "moves": ["Show the timeline as one block from News Feed", "Stream every tweet to an indexer so it is searchable in seconds", "Count terms per window and score the jump over normal for trends", "Split hot counters into shards and cache the sum"]
+  }
+}

@@ -1,0 +1,188 @@
+{
+  "slug": "netflix",
+  "title": "Netflix",
+  "group": "Media and streaming",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a video streaming service like Netflix: a curated catalog of films and series, watched by a huge audience on phones, TVs and browsers. The catalog is small and changes slowly, so the heavy work is done once, ahead of time: encode every title many ways and put the bytes close to the viewer. This page is a general design for a system like it, not a description of how any real company builds it.",
+  "requirements": {
+    "functional": [
+      "Browse a catalog and see titles with artwork and descriptions.",
+      "Press play and start watching within a couple of seconds.",
+      "Quality adapts to the viewer's bandwidth without stalling.",
+      "Resume a title where you left off, on any device.",
+      "Only paying members can play, and only titles they are licensed to see.",
+      "Get a personalised row of suggestions."
+    ],
+    "nonFunctional": [
+      { "name": "Start-up time", "target": "Video starts in under 2 seconds at the 95th percentile" },
+      { "name": "Smooth playback", "target": "Fewer than 1 in 100 sessions has a stall" },
+      { "name": "Availability", "target": "Playback keeps working if browse and recommendations are down" },
+      { "name": "Content protection", "target": "Segments are encrypted and need a licence to decode" }
+    ],
+    "outOfScope": ["Live events", "Billing and sign-up", "Content production and licensing deals", "The recommendation model itself"]
+  },
+  "estimate": {
+    "note": "All figures are assumptions you can move. The point: bytes dominate. Peak egress is concurrent streams times bitrate, and storage is titles times renditions times length. Requests for the catalog are tiny next to that.",
+    "inputs": [
+      { "id": "subs", "label": "Subscribers", "value": 200000000, "min": 10000000, "max": 500000000, "log": true },
+      { "id": "peakPct", "label": "Share streaming at peak", "value": 8, "min": 1, "max": 20, "step": 1, "unit": "%" },
+      { "id": "mbps", "label": "Average video bitrate", "value": 4, "min": 0.5, "max": 15, "log": true, "unit": "Mbit/s" },
+      { "id": "titles", "label": "Titles in the catalog", "value": 15000, "min": 1000, "max": 50000, "log": true },
+      { "id": "renditions", "label": "Renditions per title", "value": 100, "min": 20, "max": 300, "step": 10, "note": "Resolutions x bitrates x codecs x audio and subtitles." },
+      { "id": "hours", "label": "Average title length", "value": 1.5, "min": 0.5, "max": 10, "step": 0.5, "unit": "hours" }
+    ],
+    "outputs": [
+      { "id": "streams", "label": "Concurrent streams at peak", "expr": "subs * peakPct / 100", "unit": "streams" },
+      { "id": "egressTbps", "label": "Peak egress bandwidth", "expr": "streams * mbps / 1e6", "unit": "Tbit/s", "note": "Far too much for one origin site. This forces edge caches." },
+      { "id": "edgeServers", "label": "Edge servers at 100 Gbit/s each", "expr": "ceil(streams * mbps / 1e5)", "unit": "servers", "note": "Spread over many sites and ISPs, with spare capacity." },
+      { "id": "startsQps", "label": "Playback starts per second", "expr": "streams / 2400", "unit": "per s", "note": "Assumes a 40 minute average session. Tiny next to the byte load." },
+      { "id": "storageTb", "label": "Storage for all renditions", "expr": "titles * renditions * hours * 3600 * mbps / 8 / 1e6", "unit": "TB", "note": "Rough: every rendition averages the streaming bitrate." },
+      { "id": "chunkJobs", "label": "Encode tasks for one title", "expr": "hours * 3600 / 10 * renditions", "unit": "tasks", "note": "10 second chunks, each encoded once per rendition, in parallel." }
+    ]
+  },
+  "api": [
+    { "call": "POST /playback  { titleId, device }", "does": "Checks the plan, picks a manifest for the device and returns its URL, a licence URL and the edge hosts to try." },
+    { "call": "GET {edge}/titles/{id}/manifest", "does": "The manifest lists every rendition and its segment URLs. The player reads it to choose quality." },
+    { "call": "GET {edge}/titles/{id}/{rendition}/seg-{n}", "does": "Fetches one short encrypted segment of video. Cacheable by URL, so edges can keep it." },
+    { "call": "POST /licence  { titleId, deviceProof }", "does": "Returns the key that decrypts segments, if this member and device are allowed." },
+    { "call": "POST /progress  { titleId, positionSec }", "does": "Reports where the viewer is, every few seconds. Used for resume and history." },
+    { "call": "GET /home", "does": "Returns the rows of titles for this profile, already personalised and cached." }
+  ],
+  "data": [
+    { "entity": "Title", "fields": "titleId, name, artwork, lengthSec, availableRegions", "store": "Replicated key-value store, cached hard.", "why": "Small, read-mostly and identical for everyone in a region. Safe to cache for minutes." },
+    { "entity": "Rendition and segment", "fields": "titleId, renditionId, codec, bitrate, segmentKeys[]", "store": "Object storage, plus a manifest file per title.", "why": "Immutable files named by content. Never updated, so they cache perfectly." },
+    { "entity": "Viewing history", "fields": "profileId, titleId, positionSec, updatedAt", "store": "Wide-column store partitioned by profile.", "why": "Written every few seconds by many users. Read as one profile's recent rows." },
+    { "entity": "Licence", "fields": "titleId, keyId, rights, expiresAt", "store": "Key-value store behind the licence service.", "why": "Keys must be tightly guarded and checked per play." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Player apps", "kind": "client", "x": 10, "y": 50, "since": 0 },
+    { "id": "api", "label": "Playback API", "kind": "service", "x": 30, "y": 14, "sub": "control plane", "since": 0 },
+    { "id": "blob", "label": "Segment store", "kind": "blob", "x": 90, "y": 86, "sub": "object storage", "since": 0 },
+    { "id": "studio", "label": "Studio masters", "kind": "external", "x": 10, "y": 86, "sub": "source files", "since": 1 },
+    { "id": "queue", "label": "Encode jobs", "kind": "queue", "x": 30, "y": 86, "sub": "one task per chunk", "since": 1 },
+    { "id": "enc", "label": "Encoders", "kind": "worker", "x": 60, "y": 86, "sub": "parallel, scale to zero", "since": 1 },
+    { "id": "edge", "label": "Edge caches", "kind": "cdn", "x": 60, "y": 62, "sub": "near and inside ISPs", "since": 3 },
+    { "id": "planner", "label": "Fill planner", "kind": "worker", "x": 90, "y": 62, "sub": "off-peak pre-fill", "since": 4 },
+    { "id": "lic", "label": "Licence service", "kind": "service", "x": 30, "y": 38, "sub": "keys and rights", "since": 5 },
+    { "id": "catalog", "label": "Catalog store", "kind": "db", "x": 50, "y": 14, "sub": "titles, rows", "since": 5 },
+    { "id": "history", "label": "Viewing history", "kind": "db", "x": 50, "y": 38, "sub": "by profile", "since": 6 },
+    { "id": "jobs", "label": "Offline jobs", "kind": "worker", "x": 70, "y": 38, "sub": "recs, popularity", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "api", "since": 0 },
+    { "from": "api", "to": "blob", "label": "whole file", "since": 0, "until": 2 },
+    { "from": "studio", "to": "queue", "label": "ingest", "since": 1 },
+    { "from": "queue", "to": "enc", "since": 1 },
+    { "from": "enc", "to": "blob", "label": "ladder", "since": 1 },
+    { "from": "client", "to": "blob", "label": "segments", "since": 2, "until": 3 },
+    { "from": "client", "to": "edge", "label": "segments", "since": 3 },
+    { "from": "edge", "to": "blob", "label": "miss", "since": 3 },
+    { "from": "planner", "to": "edge", "label": "pre-fill", "since": 4 },
+    { "from": "planner", "to": "blob", "label": "read", "dashed": true, "since": 4 },
+    { "from": "api", "to": "lic", "since": 5 },
+    { "from": "api", "to": "catalog", "since": 5 },
+    { "from": "api", "to": "history", "label": "progress", "since": 6 },
+    { "from": "history", "to": "jobs", "since": 6 },
+    { "from": "jobs", "to": "planner", "label": "popular", "dashed": true, "since": 6 },
+    { "from": "jobs", "to": "catalog", "label": "rows", "dashed": true, "since": 6 }
+  ],
+  "evolution": [
+    { "title": "One server, one file", "problem": "Start with what works: a server that checks the member and streams one video file per title straight from storage.", "change": "Player asks the API, the API reads the file and sends bytes. One quality for everyone." },
+    { "title": "Encode a ladder, in chunks", "problem": "One file cannot suit a phone on weak mobile data and a 4K TV on fibre. Encoding a two hour film as one job also takes hours and a crash restarts it.", "change": "Ingest the master, split it into chunks of a few seconds, and encode every chunk into many renditions in parallel. Write the results to object storage. A rendition is one resolution, bitrate and codec.", "numbers": "the estimator shows tasks per title and storage" },
+    { "title": "Segments and a manifest", "problem": "A single big file per rendition cannot change quality mid-stream. The player must pick a rendition once and live with it.", "change": "Store each rendition as short segments and publish a manifest listing them. The player fetches segments and moves up or down a rendition as its measured bandwidth changes. This is adaptive bitrate streaming." },
+    { "title": "Edge caches", "problem": "Peak egress is tens of terabits per second. No single storage site can send that, and distance adds start-up delay.", "change": "Put edge caches close to viewers, in regional sites and inside ISP networks. The player fetches segments from the nearest edge. Only a miss goes back to object storage. Segments are immutable, so they cache for a long time.", "numbers": "peak egress and edge server count in the estimator" },
+    { "title": "Pre-position at night", "problem": "A new hit lands in the evening peak and every edge misses at once. The fills compete with viewers for the same links.", "change": "A fill planner uses expected demand per region to copy titles to edges during the quiet hours. At peak the edges serve nearly everything locally, and the fill traffic has already happened." },
+    { "title": "Split control and data planes", "problem": "Login, catalog, plan checks and licences are small, sensitive and need strong consistency. Video bytes are huge and simple. Scaling them together wastes money and a bytes storm would take login down.", "change": "Keep the control plane (Playback API, catalog, licence service) separate from the data plane (edges and storage). The API authorises a play, returns a manifest URL and licence, then steps aside. Video keeps flowing if the control plane has a bad minute." },
+    { "title": "History and offline jobs", "problem": "Resume and suggestions need to know what each profile watched, but nobody wants to wait for a model at click time.", "change": "The player sends progress every few seconds into a history store. Batch jobs read it to build personalised rows and a demand forecast. Rows are written back to the catalog store, and the forecast feeds the fill planner." }
+  ],
+  "flows": [
+    {
+      "name": "Press play",
+      "steps": [
+        { "say": "The player asks the Playback API to play a title on this device.", "nodes": ["client", "api"], "edges": [["client", "api"]] },
+        { "say": "The API checks the member's plan and the title's rights in the catalog store.", "nodes": ["api", "catalog"], "edges": [["api", "catalog"]] },
+        { "say": "It returns a manifest URL, a licence URL and the nearest edge hosts, then steps out of the data path.", "nodes": ["api", "client"], "edges": [["client", "api"]] },
+        { "say": "The player asks the licence service for the decryption key. It checks rights and device proof.", "nodes": ["api", "lic"], "edges": [["api", "lic"]] },
+        { "say": "The player reads the manifest and starts with a middle rendition so it begins fast.", "nodes": ["client", "edge"], "edges": [["client", "edge"]] },
+        { "say": "The edge holds most segments already, pre-filled the night before. It answers directly.", "nodes": ["edge", "client"], "edges": [["client", "edge"]] },
+        { "say": "On a rare miss the edge fetches the segment from object storage, keeps a copy and serves it.", "nodes": ["edge", "blob"], "edges": [["edge", "blob"]] },
+        { "say": "Every few seconds the player reports its position, and moves rendition up or down based on bandwidth it measured.", "nodes": ["client", "api", "history"], "edges": [["client", "api"], ["api", "history"]] }
+      ]
+    },
+    {
+      "name": "Add a new title",
+      "steps": [
+        { "say": "The studio master file arrives in ingest and a job is queued.", "nodes": ["studio", "queue"], "edges": [["studio", "queue"]] },
+        { "say": "The job is split into chunks, and one task is queued per chunk per rendition.", "nodes": ["queue"], "edges": [] },
+        { "say": "Many encoders pick tasks up in parallel. A failed task is simply retried.", "nodes": ["queue", "enc"], "edges": [["queue", "enc"]] },
+        { "say": "Each finished segment is encrypted and written to object storage. Names include a content hash, so files never change.", "nodes": ["enc", "blob"], "edges": [["enc", "blob"]] },
+        { "say": "When every rendition is done a manifest is published and the title is marked available in the catalog.", "nodes": ["jobs", "catalog"], "edges": [["jobs", "catalog"]] },
+        { "say": "The fill planner forecasts demand and reads the segments it wants to place.", "nodes": ["jobs", "planner", "blob"], "edges": [["jobs", "planner"], ["planner", "blob"]] },
+        { "say": "In the quiet hours it pushes those segments to the edges that will need them.", "nodes": ["planner", "edge"], "edges": [["planner", "edge"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "How many renditions",
+      "question": "One ladder for everything, or a ladder shaped per title?",
+      "options": [
+        { "name": "One fixed ladder", "pros": "Simple. Same recipe for every title and easy to reason about.", "cons": "A cartoon wastes bits at the top rungs. A grainy action film looks bad at the same bitrate." },
+        { "name": "Per-title ladder", "pros": "Analyse the content, then pick bitrates that fit it. Same quality for fewer bytes.", "cons": "More encoding compute up front and a more complex pipeline." },
+        { "name": "Per-scene tuning", "pros": "Best quality per byte.", "cons": "Even more compute and tooling, and gains shrink after the per-title step." }
+      ],
+      "pick": "Per-title ladders",
+      "because": "Encoding runs once, but every play pays the bytes. Spending extra compute once to save bandwidth on millions of plays is a good trade for a catalog that is small and watched a lot."
+    },
+    {
+      "title": "Where the bytes come from",
+      "question": "Which cache layout serves the traffic?",
+      "options": [
+        { "name": "Rented third-party CDN only", "pros": "No hardware to run. Fast to start in new regions.", "cons": "Cost per byte grows with traffic. Less control over placement and tuning." },
+        { "name": "Own caches inside ISPs", "pros": "Traffic never crosses the backbone. Lowest latency and cost at scale.", "cons": "Hardware to ship and operate. Needs agreements with each ISP." },
+        { "name": "Own regional sites", "pros": "Full control, and fewer places to manage than ISPs.", "cons": "Still crosses ISP links to reach the viewer." }
+      ],
+      "pick": "Own ISP and regional caches, CDN overflow",
+      "because": "The audience is huge and the catalog small, so caching pays off. Place caches near users, keep a managed CDN for new regions and spikes."
+    },
+    {
+      "title": "Pre-fill or fill on demand",
+      "question": "When do segments reach an edge?",
+      "options": [
+        { "name": "Pull on first miss", "pros": "Needs no prediction. Cache holds what people actually watch.", "cons": "A new release makes every edge miss during peak, hammering storage and links." },
+        { "name": "Pre-position off peak", "pros": "Evening traffic is served locally. Fill uses idle capacity.", "cons": "Needs a demand forecast. A wrong guess wastes space." },
+        { "name": "Pre-fill plus pull for the tail", "pros": "Head titles ready in advance, the odd request still works.", "cons": "Two paths to operate." }
+      ],
+      "pick": "Pre-fill popular titles, pull for the tail",
+      "because": "Demand for a curated catalog is predictable by region and time. Forecast it, fill at night, and let misses cover surprises."
+    },
+    {
+      "title": "Adaptive bitrate: who decides",
+      "question": "Who chooses the quality for the next segment?",
+      "options": [
+        { "name": "Player decides", "pros": "It sees the real bandwidth and buffer. Servers stay stateless and cacheable.", "cons": "Every device needs good logic. Many players can swing at once." },
+        { "name": "Server decides", "pros": "Central control and one algorithm.", "cons": "Servers keep state per viewer, and URLs stop being shared cache keys." }
+      ],
+      "pick": "The player decides, from the manifest",
+      "because": "Plain segment URLs make every request a cacheable GET. The player already knows its buffer and bandwidth, and can adapt in one round trip."
+    }
+  ],
+  "failures": [
+    { "what": "An edge cache dies", "impact": "Viewers on that edge lose their segment source mid-play.", "fix": "The playback response lists several edges. The player retries the next host and keeps its buffer, usually without a visible stall." },
+    { "what": "Control plane goes down", "impact": "Nobody can start a new play or browse.", "fix": "Playing sessions keep running because segments need no API call. Cache the catalog, serve a stale home page, and shed load by degrading suggestions first." },
+    { "what": "Encoding task fails or is slow", "impact": "A title is late or has a gap in one rendition.", "fix": "Tasks are small and idempotent, so retry on another worker. Publish the manifest only when every required rendition exists." },
+    { "what": "Popular title is cold at peak", "impact": "A forecast miss sends a flood of misses to storage.", "fix": "Collapse concurrent misses for the same segment into one fetch, add a mid-tier cache and lower the top rendition for a while." },
+    { "what": "Licence service slow", "impact": "Play start slows or fails for new sessions.", "fix": "Cache short-lived licences on the device, replicate the service in several regions and fail open for already-authorised members for a short time." }
+  ],
+  "scaling": [
+    { "limit": "Egress at peak outgrows an edge fleet", "lever": "Add edge sites and ISP caches, raise per-server throughput, and lower the average bitrate with better codecs." },
+    { "limit": "Storage grows with catalog times renditions", "lever": "Prune rarely used renditions, move cold segments to cheaper storage and use per-title ladders." },
+    { "limit": "History writes grow with viewers", "lever": "Partition by profile, batch progress reports and write at coarser intervals." }
+  ],
+  "recap": {
+    "key": "Do the expensive work once: encode every title into a ladder of segments, push the popular ones to edge caches overnight, and keep the small control plane apart from the big data plane.",
+    "numbers": "With 200M subscribers, 8% streaming at 4 Mbit/s: 16M streams, 64 Tbit/s of egress, about 640 edge servers at 100 Gbit/s, thousands of TB of renditions.",
+    "moves": ["Encode once into many renditions, in parallel chunks", "Segments plus manifest let the player adapt", "Edge caches near users, pre-filled off peak", "Control plane and data plane scale separately"]
+  }
+}

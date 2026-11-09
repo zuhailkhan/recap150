@@ -1,0 +1,196 @@
+{
+  "slug": "slack",
+  "title": "Slack",
+  "group": "Social and messaging",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design a system like Slack: companies each get a workspace, with channels where members post messages and reply in threads. Messages show up live, unread counts stay right, and any member can search the history of their workspace. The hard parts are keeping every company's data apart and together, channels from ten to fifty thousand people, and a tiny hot data set of who has read what.",
+  "requirements": {
+    "functional": [
+      "Create a workspace, invite members, and create public and private channels.",
+      "Post a message to a channel, and reply in a thread.",
+      "See new messages live in the channels I have open.",
+      "Show unread counts and mentions for every channel I am in.",
+      "Search messages in my workspace, only in channels I may see.",
+      "Attach a file to a message."
+    ],
+    "nonFunctional": [
+      { "name": "Delivery latency", "target": "A message reaches online members in under 500 ms at the 99th percentile" },
+      { "name": "Isolation", "target": "One busy workspace must not slow another, and one workspace's data is never returned to another" },
+      { "name": "Unread accuracy", "target": "Unread badges are correct within 2 seconds of a message or a read" },
+      { "name": "Search freshness", "target": "A new message is searchable within 10 seconds" },
+      { "name": "Durability", "target": "An acknowledged message is never lost" }
+    ],
+    "outOfScope": ["Voice and video calls", "Apps, bots and workflows", "Enterprise compliance and retention rules", "The socket layer itself (reuse the Chat System design)"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts: peak is about 3 times the average, and the index is kept for one year. The split between small and huge channels decides whether fan-out on write is affordable.",
+    "inputs": [
+      { "id": "workspaces", "label": "Workspaces", "value": 500000, "min": 10000, "max": 10000000, "log": true },
+      { "id": "membersPerWs", "label": "Members per workspace, average", "value": 40, "min": 5, "max": 5000, "log": true },
+      { "id": "msgsPerMember", "label": "Messages per member per day", "value": 15, "min": 1, "max": 100, "step": 1, "note": "Averaged over every member, active or not." },
+      { "id": "largeShare", "label": "Messages posted in huge channels", "value": 5, "min": 1, "max": 30, "step": 1, "unit": "%" },
+      { "id": "smallSize", "label": "Members in a normal channel", "value": 25, "min": 3, "max": 500, "log": true },
+      { "id": "indexBytes", "label": "Search index bytes per message", "value": 500, "min": 100, "max": 2000, "step": 100, "unit": "B" }
+    ],
+    "outputs": [
+      { "id": "members", "label": "Members in total", "expr": "workspaces * membersPerWs", "unit": "people" },
+      { "id": "avgQps", "label": "Messages per second, average", "expr": "members * msgsPerMember / 86400", "unit": "per s" },
+      { "id": "peakQps", "label": "Messages per second at peak", "expr": "avgQps * 3", "unit": "per s", "note": "Weekday mornings overlap across time zones." },
+      { "id": "fanoutQps", "label": "Per-member pushes per second at peak", "expr": "peakQps * (1 - largeShare / 100) * smallSize", "unit": "per s", "note": "Normal channels only: one push per member." },
+      { "id": "pingQps", "label": "Huge-channel pings per second at peak", "expr": "peakQps * largeShare / 100", "unit": "per s", "note": "One 'new messages' ping each. Members pull the text." },
+      { "id": "searchTb", "label": "Search index for one year", "expr": "members * msgsPerMember * 365 * indexBytes / 1e12", "unit": "TB", "note": "Spread across thousands of per-workspace index shards." }
+    ]
+  },
+  "api": [
+    { "call": "WS connect /rtm?workspaceId&token", "does": "Opens a socket for my workspace. Live messages, typing and read updates flow over it." },
+    { "call": "POST /channels/{id}/messages { text, clientMsgId, threadTs? }", "does": "Posts a message, or a thread reply if threadTs is set. The client id makes a retry safe." },
+    { "call": "GET /channels/{id}/messages?before=seq&limit=50", "does": "Pages history backward from a sequence number." },
+    { "call": "POST /channels/{id}/read { seq }", "does": "Moves my read marker for this channel forward." },
+    { "call": "GET /search?q&workspaceId", "does": "Full-text search within my workspace, limited to channels I can see." },
+    { "call": "POST /files.uploadUrl", "does": "Returns a signed URL. The client uploads the bytes straight to blob storage." }
+  ],
+  "data": [
+    { "entity": "Message", "fields": "workspaceId, channelId, seq, threadSeq, senderId, text, fileIds", "store": "Sharded store: workspaceId, then channel, seq.", "why": "All of a tenant's data lives together. History is one range read in one channel, and a thread is a range under its parent." },
+    { "entity": "Channel and membership", "fields": "channelId, workspaceId, type, memberIds, latestSeq", "store": "Same shard as the workspace's messages.", "why": "The member list drives fan-out. latestSeq is the per-channel counter." },
+    { "entity": "Read state", "fields": "userId, channelId, lastReadSeq, mentionCount", "store": "In-memory key-value store, sharded by workspace.", "why": "Tiny rows, written every time someone switches channel. Unread is latestSeq minus lastReadSeq." },
+    { "entity": "Search index", "fields": "workspaceId, channelId, seq, tokens", "store": "Full-text index, one logical index per workspace.", "why": "Searches never cross workspaces, so shards stay separate and a big tenant can be moved alone." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Clients", "kind": "client", "x": 6, "y": 50, "sub": "all devices", "since": 0 },
+    { "id": "api", "label": "Message API", "kind": "service", "x": 24, "y": 50, "sub": "post, read", "since": 0 },
+    { "id": "store", "label": "Message store", "kind": "db", "x": 64, "y": 50, "sub": "sharded by workspace", "since": 0 },
+    { "id": "directory", "label": "Workspace directory", "kind": "cache", "x": 24, "y": 88, "sub": "workspace to shard", "since": 1 },
+    { "id": "gw", "label": "Gateways", "kind": "service", "x": 24, "y": 12, "sub": "see Chat design", "since": 2 },
+    { "id": "bus", "label": "Event bus", "kind": "queue", "x": 44, "y": 31, "sub": "keyed by workspace", "since": 3 },
+    { "id": "fanout", "label": "Fan-out service", "kind": "worker", "x": 64, "y": 12, "sub": "push or ping", "since": 3 },
+    { "id": "members", "label": "Membership", "kind": "db", "x": 86, "y": 12, "sub": "channel members", "since": 3 },
+    { "id": "readstate", "label": "Read state", "kind": "cache", "x": 86, "y": 69, "sub": "last read per channel", "since": 4 },
+    { "id": "search", "label": "Search index", "kind": "db", "x": 86, "y": 31, "sub": "per workspace", "since": 5 },
+    { "id": "files", "label": "File storage", "kind": "blob", "x": 64, "y": 88, "sub": "blob store", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "api", "label": "HTTP", "since": 0 },
+    { "from": "api", "to": "store", "since": 0 },
+    { "from": "api", "to": "directory", "label": "which shard", "since": 1 },
+    { "from": "client", "to": "gw", "since": 2 },
+    { "from": "gw", "to": "api", "label": "send", "since": 2 },
+    { "from": "api", "to": "bus", "label": "publish", "since": 3 },
+    { "from": "bus", "to": "fanout", "since": 3 },
+    { "from": "fanout", "to": "members", "since": 3 },
+    { "from": "fanout", "to": "gw", "label": "push or ping", "since": 3 },
+    { "from": "api", "to": "readstate", "label": "read, unread", "since": 4 },
+    { "from": "api", "to": "search", "label": "query", "since": 5 },
+    { "from": "bus", "to": "search", "label": "index", "since": 5 },
+    { "from": "api", "to": "files", "label": "signed URL", "since": 6 }
+  ],
+  "evolution": [
+    { "title": "One app, one database", "problem": "Start with a small team chat: members post over HTTP and refresh to see new messages.", "change": "One message API stores channels and messages in one database. Every company's rows share the same tables, with a workspace id column." },
+    { "title": "Shard by workspace", "problem": "One table holds every company. A huge customer's imports slow everyone else, one index spans all tenants, and a bad query can read the wrong company's rows.", "change": "Partition the store by workspace id, so a tenant's channels, messages and members live on one shard. A small directory maps workspace to shard. Noisy tenants can be moved on their own, and no query ever spans two tenants.", "numbers": "the estimator shows total members across workspaces" },
+    { "title": "Live delivery through gateways", "problem": "Refreshing is slow, and polling for 20M people would swamp the API with empty requests.", "change": "Clients keep a socket to a gateway fleet. This is the Chat System design, shown here as one block. Sends come in through it, and messages go back down the same socket." },
+    { "title": "Channel membership and fan-out", "problem": "The API cannot know which sockets hold which channel members. Pushing to a 20,000-person channel from the API also blocks the sender's request.", "change": "The API stores the message, then publishes it on an event bus. A fan-out service reads the member list and pushes to each online member via their gateway. Above a size cap it sends one ping instead, and clients pull the text.", "numbers": "the estimator shows pushes and pings per second" },
+    { "title": "Unread counts and read state", "problem": "Counting unread messages for 100 channels on every open means 100 range queries. Read markers move every time someone switches channels, so they are written as often as messages are.", "change": "Keep a small read-state store with the last read sequence per user and channel. Unread is the channel's latest sequence minus that number. It is tiny and hot, so it sits in memory, sharded by workspace." },
+    { "title": "Per-workspace search", "problem": "Searching with LIKE over every message scans a huge table. A global index would also mix tenants and be hard to keep private.", "change": "The event bus feeds an index builder. Each workspace has its own index shard. A query goes to that workspace's shard only, then drops results from channels the user cannot see.", "numbers": "the estimator shows index size per year" },
+    { "title": "Files in blob storage", "problem": "Files are megabytes. Sending them through the message API would clog it and fill the message store.", "change": "The API hands the client a signed URL. The client uploads straight to blob storage, and the message only keeps a file id. Downloads use short-lived signed links, checked against channel access." }
+  ],
+  "flows": [
+    {
+      "name": "Post in a normal channel",
+      "steps": [
+        { "say": "I type a message in a channel of 25 people. My app sends it over the socket with a client message id.", "nodes": ["client", "gw"], "edges": [["client", "gw"]] },
+        { "say": "The gateway passes it to the message API.", "nodes": ["gw", "api"], "edges": [["gw", "api"]] },
+        { "say": "The API asks the directory which shard holds my workspace.", "nodes": ["api", "directory"], "edges": [["api", "directory"]] },
+        { "say": "It takes the next sequence number for the channel and writes the message to that shard. Only now am I told 'sent'.", "nodes": ["api", "store"], "edges": [["api", "store"]] },
+        { "say": "It publishes a 'message posted' event on the bus.", "nodes": ["api", "bus"], "edges": [["api", "bus"]] },
+        { "say": "The fan-out service picks the event up.", "nodes": ["bus", "fanout"], "edges": [["bus", "fanout"]] },
+        { "say": "It reads the channel's 25 members. The channel is small, so it will push to each online member.", "nodes": ["fanout", "members"], "edges": [["fanout", "members"]] },
+        { "say": "It sends the message to the gateways that hold those members, and they write it down each socket.", "nodes": ["fanout", "gw", "client"], "edges": [["fanout", "gw"]] },
+        { "say": "In parallel, the bus feeds the search index, so the message is searchable in seconds.", "nodes": ["bus", "search"], "edges": [["bus", "search"]] }
+      ]
+    },
+    {
+      "name": "Open a workspace, then search",
+      "steps": [
+        { "say": "I open the app. It asks for my channels and their unread counts.", "nodes": ["client", "api"], "edges": [["client", "api"]] },
+        { "say": "The API reads my read marker for each channel from the read-state store.", "nodes": ["api", "readstate"], "edges": [["api", "readstate"]] },
+        { "say": "It compares each marker with the channel's latest sequence. The difference is the unread badge.", "nodes": ["api", "store"], "edges": [["api", "store"]] },
+        { "say": "I search for 'launch plan'. The request carries my workspace id.", "nodes": ["client", "api"], "edges": [["client", "api"]] },
+        { "say": "The API sends the query to my workspace's own index shard, and nobody else's.", "nodes": ["api", "search"], "edges": [["api", "search"]] },
+        { "say": "It removes hits from private channels I am not in, and returns the rest with message ids.", "nodes": ["search", "api", "client"], "edges": [] }
+      ]
+    },
+    {
+      "name": "Attach a file",
+      "steps": [
+        { "say": "I drop a file into the message box. The app asks the API for an upload link.", "nodes": ["client", "api"], "edges": [["client", "api"]] },
+        { "say": "The API checks I may post here, and returns a signed URL with an expiry.", "nodes": ["api", "files"], "edges": [["api", "files"]] },
+        { "say": "The app uploads the bytes straight to blob storage. The message service never sees them.", "nodes": ["client", "files"], "edges": [] },
+        { "say": "The app posts the message with the file id. The rest is the normal post path.", "nodes": ["client", "api", "store"], "edges": [["client", "api"], ["api", "store"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "The sharding key",
+      "question": "What do we partition messages by?",
+      "options": [
+        { "name": "By workspace", "pros": "A tenant's data lives together. Isolation, moving a customer and tenant-wide queries are easy.", "cons": "A giant workspace is a hot shard. Small ones leave shards uneven." },
+        { "name": "By channel", "pros": "Spreads load evenly. History is one partition.", "cons": "Workspace-wide work (search, unread, export, delete) touches thousands of partitions." },
+        { "name": "By user", "pros": "Reads of 'my stuff' are local.", "cons": "A message belongs to many users, so it is copied or scattered. Wrong for shared channels." }
+      ],
+      "pick": "By workspace, and by channel inside a big workspace's shard",
+      "because": "Everything a user does is inside one workspace, so that is the natural boundary for isolation and for access checks. Split a very large tenant across shards by channel so no single shard is hot."
+    },
+    {
+      "title": "Fan-out in small and huge channels",
+      "question": "When someone posts, how does it reach everyone?",
+      "options": [
+        { "name": "Push to every member", "pros": "Instant and simple. Members need no extra request.", "cons": "A 50,000-member channel means 50,000 pushes for one message." },
+        { "name": "Members pull", "pros": "One write and one ping. Cost does not grow with members.", "cons": "Each member then sends a request. Feels slower without a nudge." },
+        { "name": "Hybrid by size", "pros": "Small channels feel instant. Huge ones stay cheap.", "cons": "Two code paths and a threshold to tune." }
+      ],
+      "pick": "Hybrid: push to a few hundred, ping and pull above",
+      "because": "Most channels are small and most messages go there, so push is the common case. Only a handful of channels are huge, and for them a ping to online members that says 'new messages in this channel' is enough, then they pull from the store."
+    },
+    {
+      "title": "Unread counts",
+      "question": "How do we keep a correct badge for every channel without scanning?",
+      "options": [
+        { "name": "Count rows after the read marker", "pros": "Always exact. Nothing extra to store.", "cons": "A range count per channel per open. Slow in busy channels." },
+        { "name": "A counter per user and channel", "pros": "Instant to read.", "cons": "Every message writes one counter per member: the fan-out problem again, and drift if a write fails." },
+        { "name": "Sequence difference", "pros": "Store only lastReadSeq per user and channel. Unread is latestSeq minus that, so a message writes nothing here.", "cons": "Mentions and muted channels need their own small counters. Deleted messages make the number slightly off." }
+      ],
+      "pick": "Sequence difference, plus a small mention counter",
+      "because": "It turns a write per member per message into a write per read action. Read state is only a few bytes per row but written often, so it fits an in-memory store, with a periodic snapshot to disk."
+    },
+    {
+      "title": "Where search lives",
+      "question": "How do we search each workspace's history quickly and privately?",
+      "options": [
+        { "name": "LIKE queries in the message store", "pros": "No extra system. Always up to date.", "cons": "Scans large partitions. Slow and costly, and cannot rank results." },
+        { "name": "One global full-text index", "pros": "One system to run.", "cons": "Every query filters by workspace. A leak bug exposes other tenants, and a huge tenant is a hot spot." },
+        { "name": "A per-workspace index", "pros": "Query touches one shard. Easy to isolate, move and delete a tenant.", "cons": "Many small indexes to manage, with a long tail of tiny workspaces." }
+      ],
+      "pick": "A per-workspace index, filled from the event bus",
+      "because": "Search never crosses tenants, so we shard the same way as the data. Small workspaces can share a shard. The index is allowed to lag by seconds, and a permission filter removes channels the user cannot see."
+    }
+  ],
+  "failures": [
+    { "what": "A giant workspace is hot", "impact": "One shard gets most of a customer's traffic, and neighbours on that shard slow down.", "fix": "Move that workspace to its own shard. Split it by channel across shards. Cap per-tenant rates." },
+    { "what": "A message is posted to a huge channel", "impact": "Fanning out to 50,000 sockets would spike the fan-out service and delay other messages.", "fix": "Use the ping and pull path above the size cap. Spread pings over time and limit them per channel." },
+    { "what": "Read state node is lost", "impact": "Unread badges reset or show wrong numbers for a part of the workspaces.", "fix": "Replicate it and snapshot it often. If lost, rebuild from the clients' last known markers, or mark channels as read, which is a harmless error." },
+    { "what": "Search index falls behind", "impact": "New messages are missing from search results.", "fix": "The index is built from the bus, so it catches up by replaying. Show results as 'may be a few seconds old'. Reindex a workspace from the store if needed." },
+    { "what": "A private channel leaks into search", "impact": "A user sees text from a channel they are not in.", "fix": "Check channel membership at query time, not only at index time. Test it. Delete or hide results when someone leaves a channel." }
+  ],
+  "scaling": [
+    { "limit": "Shard count grows with workspaces, and some workspaces are huge", "lever": "Keep the directory as the only mapping. Rebalance by moving whole tenants, and split the few giant ones by channel." },
+    { "limit": "Fan-out cost grows with channel size times message rate", "lever": "Cap push at a few hundred members, use ping and pull above it, and batch pushes per gateway." },
+    { "limit": "Read state is small but written very often", "lever": "Shard by workspace, batch marker updates for a second or two, and let the client report only the highest seen sequence." },
+    { "limit": "Search index size grows forever", "lever": "Keep hot recent messages on fast disks, move old ones to cheaper index tiers, and apply retention per workspace." }
+  ],
+  "recap": {
+    "key": "Shard everything by workspace, publish each message once on a bus, push to small channels and ping huge ones, and compute unread as latest sequence minus last read.",
+    "numbers": "For 500K workspaces of 40 members: 20M members, about 3.5K messages per second on average and 10K at peak, around 250K per-member pushes per second at peak, and about 55 TB of search index per year.",
+    "moves": ["Make the workspace the tenant and the shard key", "Fan out per member in small channels, ping and pull in huge ones", "Keep a tiny in-memory read state and derive unread from sequences", "Search each workspace's own index, filtered by channel access"]
+  }
+}

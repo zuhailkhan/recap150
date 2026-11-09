@@ -1,0 +1,185 @@
+{
+  "slug": "airbnb",
+  "title": "Airbnb",
+  "group": "Ride, food and marketplaces",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a home-rental marketplace like Airbnb: hosts list places, guests search by area and dates and book a stay. Search must understand both where and when, and a listing must never be booked twice for the same night. Guests pay up front and hosts get paid after check-in.",
+  "requirements": {
+    "functional": [
+      "Hosts create a listing and manage its calendar and prices.",
+      "Guests search by place, dates, guests and filters.",
+      "A guest books a listing for a range of nights and pays.",
+      "Hosts get paid after the stay starts.",
+      "Guests and hosts review each other after the stay.",
+      "Guests and hosts message each other."
+    ],
+    "nonFunctional": [
+      { "name": "Search latency", "target": "Results in under 300 ms at the 99th percentile" },
+      { "name": "No double booking", "target": "A listing night is booked by at most one guest" },
+      { "name": "Booking safety", "target": "A retry never charges or books twice" },
+      { "name": "Availability", "target": "Search stays up at 99.95%, even if slightly stale" },
+      { "name": "Money", "target": "Every charge and payout is traceable and reconciled" }
+    ],
+    "outOfScope": ["Photos and media pipeline", "Trust, safety and fraud checks", "Experiences and long-term stays", "Tax and regulation by city"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts. Searches vastly outnumber bookings, and the calendar is one row per listing per night, which is a big table even though each row is tiny.",
+    "inputs": [
+      { "id": "listings", "label": "Listings", "value": 7000000, "min": 100000, "max": 20000000, "log": true },
+      { "id": "searchesPerDay", "label": "Searches per day", "value": 50000000, "min": 1000000, "max": 1000000000, "log": true },
+      { "id": "bookingsPerDay", "label": "Bookings per day", "value": 1000000, "min": 10000, "max": 10000000, "log": true },
+      { "id": "daysAhead", "label": "Days of calendar kept ahead", "value": 365, "min": 90, "max": 730, "step": 5, "unit": "days" },
+      { "id": "peakMult", "label": "Peak multiplier", "value": 3, "min": 1, "max": 10, "step": 1, "unit": "x" },
+      { "id": "rowBytes", "label": "Bytes per calendar row", "value": 50, "min": 20, "max": 200, "step": 10, "unit": "B" }
+    ],
+    "outputs": [
+      { "id": "avgSearchQps", "label": "Searches per second, average", "expr": "searchesPerDay / 86400", "unit": "per s" },
+      { "id": "peakSearchQps", "label": "Searches per second at peak", "expr": "avgSearchQps * peakMult", "unit": "per s", "note": "Each one is a geo, date and filter query." },
+      { "id": "peakBookQps", "label": "Bookings per second at peak", "expr": "bookingsPerDay / 86400 * peakMult", "unit": "per s", "note": "Few, but each is a correctness-critical write." },
+      { "id": "searchToBook", "label": "Searches per booking", "expr": "searchesPerDay / bookingsPerDay", "unit": "x" },
+      { "id": "availEntries", "label": "Availability entries", "expr": "listings * daysAhead", "unit": "rows", "note": "One per listing per night." },
+      { "id": "calendarGb", "label": "Calendar storage", "expr": "availEntries * rowBytes / 1e9", "unit": "GB", "note": "One copy, before replication." }
+    ]
+  },
+  "api": [
+    { "call": "GET /search?bbox&checkin&checkout&guests&filters", "does": "Returns a page of listings in the area that are free for those nights, with total price." },
+    { "call": "GET /listings/{id}?checkin&checkout", "does": "Returns listing details, a live availability check and a price quote." },
+    { "call": "POST /bookings  { listingId, checkin, checkout, quoteId } + Idempotency-Key", "does": "Holds the nights, charges the guest, confirms. A repeat key returns the same booking." },
+    { "call": "PUT /listings/{id}/calendar  { dates, status, price }", "does": "Host blocks nights or changes nightly prices." },
+    { "call": "POST /reviews  { bookingId, rating, text }", "does": "Allowed once, only after a completed stay." }
+  ],
+  "data": [
+    { "entity": "Listing", "fields": "listingId, hostId, lat, lng, type, amenities, capacity, rules", "store": "Relational store by listingId.", "why": "The source of truth for details, edited by hosts. Search copies the fields it needs into its index." },
+    { "entity": "CalendarDay", "fields": "listingId, date, status, price, bookingId", "store": "Store with conditional writes, key listingId + date.", "why": "One row per night. Booking is a conditional write: set booked only where status is free. That is the double-booking guard." },
+    { "entity": "Booking", "fields": "bookingId, listingId, guestId, range, total, status, idemKey", "store": "Relational store, transactional.", "why": "Money and state changes need transactions. A unique idemKey makes booking safe to retry." },
+    { "entity": "Review", "fields": "bookingId, authorId, rating, text, visibleAt", "store": "Key-value or document store.", "why": "Written once per stay, read per listing. Hidden until both sides submit or a deadline passes." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Guests and hosts", "kind": "client", "x": 6, "y": 50, "since": 0 },
+    { "id": "app", "label": "API service", "kind": "service", "x": 26, "y": 50, "sub": "stateless", "since": 0 },
+    { "id": "listings", "label": "Listings DB", "kind": "db", "x": 50, "y": 12, "sub": "details, host edits", "since": 0 },
+    { "id": "search", "label": "Search index", "kind": "service", "x": 26, "y": 12, "sub": "geo and filters", "since": 1 },
+    { "id": "calendar", "label": "Calendar store", "kind": "db", "x": 74, "y": 38, "sub": "one row per night", "since": 2 },
+    { "id": "booking", "label": "Booking service", "kind": "service", "x": 50, "y": 50, "sub": "hold, pay, confirm", "since": 3 },
+    { "id": "pay", "label": "Payment provider", "kind": "external", "x": 92, "y": 64, "sub": "charge, payout", "since": 4 },
+    { "id": "queue", "label": "Booking events", "kind": "queue", "x": 50, "y": 88, "sub": "durable log", "since": 4 },
+    { "id": "payout", "label": "Payout worker", "kind": "worker", "x": 74, "y": 88, "sub": "pay hosts later", "since": 4 },
+    { "id": "pricing", "label": "Pricing service", "kind": "service", "x": 74, "y": 12, "sub": "nightly rules, fees", "since": 5 },
+    { "id": "reviews", "label": "Reviews store", "kind": "db", "x": 26, "y": 88, "sub": "after the stay", "since": 6 },
+    { "id": "msg", "label": "Messaging", "kind": "service", "x": 6, "y": 88, "sub": "guest to host", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "app", "since": 0 },
+    { "from": "app", "to": "listings", "since": 0 },
+    { "from": "app", "to": "search", "label": "search", "since": 1 },
+    { "from": "listings", "to": "search", "label": "index", "dashed": true, "since": 1 },
+    { "from": "search", "to": "calendar", "label": "free?", "since": 2 },
+    { "from": "app", "to": "booking", "label": "book", "since": 3 },
+    { "from": "booking", "to": "calendar", "label": "hold nights", "since": 3 },
+    { "from": "booking", "to": "pay", "label": "charge", "since": 4 },
+    { "from": "booking", "to": "queue", "label": "Confirmed", "since": 4 },
+    { "from": "queue", "to": "payout", "since": 4 },
+    { "from": "payout", "to": "pay", "label": "pay host", "since": 4 },
+    { "from": "app", "to": "pricing", "label": "quote", "since": 5 },
+    { "from": "pricing", "to": "calendar", "label": "nightly prices", "since": 5 },
+    { "from": "app", "to": "reviews", "since": 6 },
+    { "from": "app", "to": "msg", "since": 6 }
+  ],
+  "evolution": [
+    { "title": "One app, one database", "problem": "Start with what works: one server and one relational database for listings and bookings.", "change": "Search is a SQL query on city and filters. Booking inserts a row if no booking overlaps." },
+    { "title": "A geo search index", "problem": "Searching by map area plus amenities, price and type means range scans on latitude and longitude plus many filters. SQL cannot answer that fast with millions of listings.", "change": "Build a search index of listings with a geo structure and filter fields, fed from the database by a change stream. Search returns listing ids ranked, and details come from the database. Nearby search is a known block, shown here as one node." },
+    { "title": "A calendar with availability", "problem": "A search for 3 nights must not show listings that are already booked. Date overlap does not fit a text or geo index well, and a listing is free or busy per night.", "change": "Keep a calendar store with one row per listing per night. Search finds nearby candidates, then checks them against the calendar in a batch and drops the booked ones. Part of this can be copied into the index to prune early.", "numbers": "the estimator shows rows and GB" },
+    { "title": "A booking service with conditional writes", "problem": "Two guests pick the same Friday and both pass the availability check. A plain check then write lets both succeed, and one guest arrives to a stranger in the flat.", "change": "A booking service writes the nights in one conditional transaction: set each night to held only where it is free. Exactly one writer wins, and the other gets 'dates no longer available'. A hold expires if payment is not completed." },
+    { "title": "Payments and host payouts", "problem": "Booking takes money. A retry must not charge twice, and the host should not be paid before the guest arrives or if the stay is cancelled.", "change": "Charge the guest with an idempotency key, then confirm the booking and publish Confirmed on a queue. A payout worker pays the host after check-in, with a ledger entry per step. Refunds follow the cancellation policy." },
+    { "title": "Pricing as its own service", "problem": "The price depends on the night (weekends, seasons), the length of stay, guest count and fees. Search needs a total for every result, and the guest must pay exactly what they saw.", "change": "A pricing service reads nightly prices from the calendar, applies discounts and fees, and returns a quote with an id. Booking charges the quote, so the price cannot shift between page and payment." },
+    { "title": "Reviews and messaging", "problem": "Trust drives bookings. Reviews must come only from real stays, and guests and hosts must talk before and after a booking.", "change": "A reviews store accepts one review per booking after checkout, hidden until both sides submit or a deadline passes. Messaging is a separate chat-style service tied to a booking, and it reuses the chat design." }
+  ],
+  "flows": [
+    {
+      "name": "Search by place and dates",
+      "steps": [
+        { "say": "The guest sends the map area, dates, guest count and filters.", "nodes": ["client", "app"], "edges": [["client", "app"]] },
+        { "say": "The API calls the search index. It finds listings in the area that match the filters and fit the party.", "nodes": ["app", "search"], "edges": [["app", "search"]] },
+        { "say": "The index returns a few hundred candidate ids, ranked by relevance.", "nodes": ["search"], "edges": [] },
+        { "say": "For those candidates it asks the calendar: are all the nights free? Booked ones drop out.", "nodes": ["search", "calendar"], "edges": [["search", "calendar"]] },
+        { "say": "The API asks pricing for the total for those dates.", "nodes": ["app", "pricing"], "edges": [["app", "pricing"]] },
+        { "say": "It loads details for the top page from the listings database and returns the results.", "nodes": ["app", "listings"], "edges": [["app", "listings"]] }
+      ]
+    },
+    {
+      "name": "Book a stay",
+      "steps": [
+        { "say": "The guest confirms the dates and price. The app sends the quote id and an idempotency key.", "nodes": ["client", "app"], "edges": [["client", "app"]] },
+        { "say": "The API passes the request to the booking service.", "nodes": ["app", "booking"], "edges": [["app", "booking"]] },
+        { "say": "It tries to hold every night in one conditional write: set held only where the night is free. If any night is taken, the whole write fails and nothing is held.", "nodes": ["booking", "calendar"], "edges": [["booking", "calendar"]] },
+        { "say": "With the hold in place, it charges the guest through the payment provider, using the idempotency key.", "nodes": ["booking", "pay"], "edges": [["booking", "pay"]] },
+        { "say": "On success it turns the hold into a booking. On failure or timeout it releases the nights.", "nodes": ["booking", "calendar"], "edges": [["booking", "calendar"]] },
+        { "say": "It publishes Confirmed on the queue, so notifications and payouts happen off the request path.", "nodes": ["booking", "queue"], "edges": [["booking", "queue"]] },
+        { "say": "Later, the payout worker pays the host after check-in.", "nodes": ["queue", "payout", "pay"], "edges": [["queue", "payout"], ["payout", "pay"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Never double-booking a night",
+      "question": "Two guests book overlapping dates at the same moment. How do we make sure only one wins?",
+      "options": [
+        { "name": "Check, then write", "pros": "Easy to build.", "cons": "Both checks pass before either write lands. This is a race and it will happen at scale." },
+        { "name": "Conditional write per night row", "pros": "Each night is a row. Set held only if status is free, in one atomic transaction over all nights. The store enforces it, so app bugs cannot break it.", "cons": "A long stay writes many rows. Needs a store with transactions or conditional batches." },
+        { "name": "Distributed lock on the listing", "pros": "Easy to explain: one booker at a time per listing.", "cons": "Locks expire, and a paused holder can write after losing the lock. You still need a conditional write for safety." }
+      ],
+      "pick": "Conditional write on calendar rows",
+      "because": "The data itself must refuse the second booking. One row per night turns an overlap check into a simple 'is every row free' transaction. A lock can reduce contention, but never replaces the check."
+    },
+    {
+      "title": "Availability in search",
+      "question": "How does a search for specific dates avoid showing booked listings?",
+      "options": [
+        { "name": "Check the calendar at query time", "pros": "Always fresh and the calendar stays the single truth.", "cons": "Extra reads per search, and if most candidates are booked you have to over-fetch." },
+        { "name": "Copy availability into the index", "pros": "The index filters by date in one query. Fast.", "cons": "Every booking and host edit must update the index. It lags, and it is a large denormalised copy." },
+        { "name": "Both: coarse in the index, exact at the calendar", "pros": "The index prunes obviously busy listings. The calendar check removes the rest and fixes staleness.", "cons": "Two places to maintain. A stale index can hide a listing that is actually free." }
+      ],
+      "pick": "Coarse in the index, exact check on the calendar",
+      "because": "Search can afford to be slightly stale, because the booking write is the real guard. A coarse flag such as 'any free weekend in this month' prunes most candidates, and the batched calendar check makes the shown results honest."
+    },
+    {
+      "title": "Holding dates while paying",
+      "question": "How do we keep the nights safe during payment without locking them forever?",
+      "options": [
+        { "name": "Book first, pay later", "pros": "Fast, and the dates are safe.", "cons": "Unpaid bookings block real guests, and cleaning up is messy." },
+        { "name": "Hold with expiry, then confirm", "pros": "Dates are held for a few minutes. If payment fails or times out, the hold lapses by itself.", "cons": "Needs expiry handling and care when payment finishes just after the hold lapses." },
+        { "name": "Pay first, book after", "pros": "Never holds dates without money.", "cons": "You can charge a guest and then lose the dates to someone else. That means refunds." }
+      ],
+      "pick": "Hold with expiry, then confirm",
+      "because": "The hold is the cheap, reversible step, and payment is the costly one. Confirm only if the hold is still valid. If payment lands late, refund automatically."
+    },
+    {
+      "title": "Paying hosts",
+      "question": "When does the host get the money, and how do we keep that safe?",
+      "options": [
+        { "name": "Pay at booking", "pros": "Hosts like it, and it is simple.", "cons": "A cancellation or a bad stay means clawing money back." },
+        { "name": "Pay after check-in via a ledger", "pros": "The money moves only once the stay has started. Each movement is a ledger entry, so the books can be reconciled.", "cons": "Needs a ledger, scheduled payout jobs and rules for refunds." }
+      ],
+      "pick": "Pay after check-in, every move in a ledger",
+      "because": "Money is where mistakes cost most. Append-only entries with idempotency keys let you replay and audit, and payouts run as queued jobs that are safe to retry."
+    }
+  ],
+  "failures": [
+    { "what": "Two guests race for the same night", "impact": "Without a guard, both think they booked.", "fix": "A conditional write per night row. The loser gets a clear 'no longer available' and search refreshes the results." },
+    { "what": "Payment times out mid-booking", "impact": "Unknown whether the guest was charged. Nights may stay held.", "fix": "Hold with expiry, charge with an idempotency key, and reconcile by asking the provider for the outcome of that key. Then confirm or release." },
+    { "what": "The search index is behind", "impact": "Results show a listing that was just booked, or hide one that just became free.", "fix": "Treat the index as a hint. The batched calendar check and the booking write are exact. Monitor the change stream lag." },
+    { "what": "A host edits the calendar during a booking", "impact": "The host blocks nights that a guest is holding.", "fix": "Host edits use the same conditional writes. Blocking a held night fails or is queued until the hold ends." },
+    { "what": "Payout worker crashes after paying", "impact": "On retry the host could be paid twice.", "fix": "Each payout has an id used as the provider idempotency key, and the ledger records it before the call is retried." }
+  ],
+  "scaling": [
+    { "limit": "The calendar is billions of tiny rows", "lever": "Shard by listing id, so one booking touches one shard. Keep only the next 1 to 2 years hot and archive past nights." },
+    { "limit": "Search load and index size", "lever": "Shard the index by region. Cache popular searches for a short time, and cap how many candidates go to the calendar check." },
+    { "limit": "A hot listing in a busy season", "lever": "Conditional writes serialise per night row, which is cheap. Rate limit retries and show a quick 'taken' message." }
+  ],
+  "recap": {
+    "key": "Search is geo plus dates, but booking is the correctness point: one calendar row per night, written conditionally so two guests cannot both win. Hold, pay with an idempotency key, then confirm.",
+    "numbers": "About 580 searches per second on average and 1.7K at peak, with about 35 bookings per second at peak. 2.5 billion calendar rows, around 130 GB for 7M listings a year ahead. 50 searches per booking.",
+    "moves": ["Geo and filter search in an index, with an exact calendar check", "One calendar row per night, updated by a conditional write", "Hold with expiry, charge with an idempotency key, then confirm", "Quote prices once, and pay hosts after check-in through a ledger"]
+  }
+}

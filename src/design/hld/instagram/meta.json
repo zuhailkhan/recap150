@@ -1,0 +1,185 @@
+{
+  "slug": "instagram",
+  "title": "Instagram",
+  "group": "Social and messaging",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a system like Instagram: people post photos and short videos, follow others, scroll a feed, watch 24-hour stories and explore content from accounts they do not follow. What makes it hard is the media pipeline: huge files must be uploaded, resized, stored and delivered worldwide cheaply.",
+  "requirements": {
+    "functional": [
+      "Upload a photo or video with a caption.",
+      "See the post in several sizes, fast, on any phone.",
+      "Open a home feed of posts from people you follow.",
+      "Post a story that disappears after 24 hours.",
+      "Explore posts from accounts you do not follow.",
+      "Like and comment, and see the counts."
+    ],
+    "nonFunctional": [
+      { "name": "Upload", "target": "A post is visible to its author within seconds, and an upload never loses data" },
+      { "name": "Image load", "target": "Photos appear in under 300 ms on a warm CDN, from the nearest edge" },
+      { "name": "Durability", "target": "An uploaded original is never lost" },
+      { "name": "Availability", "target": "Browsing works 99.95% of the time even if counts are stale" }
+    ],
+    "outOfScope": ["Direct messages", "Ads and monetization", "Moderation and ML models themselves", "Live streaming"]
+  },
+  "estimate": {
+    "note": "All numbers are assumptions you can change. Delivered size per view is fixed at 0.3 MB (a resized copy). Peak is 3 times average. A photo job takes 0.5 CPU-seconds, a video 30, and a worker has 16 cores.",
+    "inputs": [
+      { "id": "dau", "label": "Daily active users", "value": 500000000, "min": 10000000, "max": 2000000000, "log": true },
+      { "id": "uploads", "label": "Photos and videos posted per day", "value": 100000000, "min": 1000000, "max": 1000000000, "log": true },
+      { "id": "videoPct", "label": "Share that are videos", "value": 10, "min": 0, "max": 50, "step": 1, "unit": "%" },
+      { "id": "photoMB", "label": "Stored size per photo, all sizes", "value": 1.5, "min": 0.5, "max": 5, "step": 0.5, "unit": "MB" },
+      { "id": "videoMB", "label": "Stored size per video, all sizes", "value": 20, "min": 5, "max": 100, "step": 5, "unit": "MB" },
+      { "id": "views", "label": "Media views per user per day", "value": 100, "min": 10, "max": 500, "log": true }
+    ],
+    "outputs": [
+      { "id": "uploadQps", "label": "Uploads per second, average", "expr": "uploads / 86400", "unit": "per s" },
+      { "id": "peakUploads", "label": "Uploads per second at peak", "expr": "uploadQps * 3", "unit": "per s" },
+      { "id": "workers", "label": "Processing workers at peak", "expr": "ceil(peakUploads * ((1 - videoPct / 100) * 0.5 + videoPct / 100 * 30) / 16)", "unit": "workers", "note": "Videos dominate the cost even when they are few." },
+      { "id": "storagePb", "label": "New storage per year", "expr": "uploads * ((1 - videoPct / 100) * photoMB + videoPct / 100 * videoMB) * 365 / 1e9", "unit": "PB", "note": "One copy. Replication or erasure coding adds more." },
+      { "id": "cdnGbps", "label": "CDN egress, average", "expr": "dau * views * 0.3 * 8 / 86400 / 1000", "unit": "Gbit/s", "note": "Reads dwarf writes. This is why the CDN exists." },
+      { "id": "originGbps", "label": "Reaching blob storage", "expr": "cdnGbps * 0.05", "unit": "Gbit/s", "note": "Assumes the CDN answers 95% of requests." },
+      { "id": "likeQps", "label": "Likes per second", "expr": "dau * views * 0.02 / 86400", "unit": "per s", "note": "Assumes 2% of views get a like." }
+    ]
+  },
+  "api": [
+    { "call": "POST /uploads  { type, size }", "does": "Creates a pending post and returns a presigned URL for blob storage." },
+    { "call": "PUT <presigned URL>", "does": "The client sends the file straight to blob storage. App servers never see the bytes." },
+    { "call": "POST /posts/{id}/publish  { caption }", "does": "Confirms the upload. The post goes live once processing is done." },
+    { "call": "GET /feed?cursor=", "does": "Returns post cards for the home feed. Media are CDN URLs." },
+    { "call": "GET /stories/tray", "does": "Lists the people you follow who have a live story." },
+    { "call": "GET /explore?cursor=", "does": "Returns posts from a precomputed list of suggestions for this user." },
+    { "call": "POST /posts/{id}/like", "does": "Counts a like. Idempotent per user and post." }
+  ],
+  "data": [
+    { "entity": "Media", "fields": "mediaId, ownerId, type, state, renditions[], createdAt", "store": "Sharded key-value store by mediaId.", "why": "Read by id. State moves from pending to ready once workers finish." },
+    { "entity": "Post", "fields": "postId, authorId, mediaIds, caption, createdAt", "store": "Sharded store, partitioned by authorId.", "why": "Profile pages list one author's posts newest first, so one partition read." },
+    { "entity": "Story", "fields": "storyId, authorId, mediaId, expiresAt", "store": "Store with a TTL on each row.", "why": "Every row dies after 24 hours, so expiry is the store's job, not a cleanup script." },
+    { "entity": "Counters", "fields": "postId, shard, likeCount, commentCount", "store": "Sharded counters in a fast store.", "why": "A viral post gets thousands of likes per second. Split one counter into many." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Phone app", "kind": "client", "x": 8, "y": 50, "since": 0 },
+    { "id": "app", "label": "App service", "kind": "service", "x": 28, "y": 50, "sub": "posts, feed, uploads", "since": 0 },
+    { "id": "meta", "label": "Metadata store", "kind": "db", "x": 48, "y": 50, "sub": "posts and media rows", "since": 0 },
+    { "id": "blob", "label": "Blob storage", "kind": "blob", "x": 28, "y": 88, "sub": "originals and sizes", "since": 1 },
+    { "id": "queue", "label": "Processing queue", "kind": "queue", "x": 69, "y": 88, "sub": "job per upload", "since": 2 },
+    { "id": "worker", "label": "Media workers", "kind": "worker", "x": 48, "y": 70, "sub": "resize, transcode", "since": 2 },
+    { "id": "cdn", "label": "CDN", "kind": "cdn", "x": 8, "y": 88, "sub": "edge cache", "since": 3 },
+    { "id": "feed", "label": "Feed (News Feed)", "kind": "service", "x": 28, "y": 12, "sub": "see News Feed design", "since": 4 },
+    { "id": "counters", "label": "Like counters", "kind": "cache", "x": 69, "y": 12, "sub": "sharded, approximate", "since": 5 },
+    { "id": "stories", "label": "Stories store", "kind": "db", "x": 8, "y": 12, "sub": "24 hour TTL", "since": 6 },
+    { "id": "explore", "label": "Explore suggestions", "kind": "service", "x": 48, "y": 12, "sub": "computed offline", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "app", "since": 0 },
+    { "from": "app", "to": "meta", "since": 0 },
+    { "from": "client", "to": "blob", "label": "presigned PUT", "since": 1 },
+    { "from": "blob", "to": "queue", "label": "uploaded", "since": 2 },
+    { "from": "queue", "to": "worker", "since": 2 },
+    { "from": "worker", "to": "blob", "since": 2 },
+    { "from": "worker", "to": "meta", "since": 2 },
+    { "from": "blob", "to": "cdn", "since": 3 },
+    { "from": "cdn", "to": "client", "since": 3 },
+    { "from": "app", "to": "feed", "since": 4 },
+    { "from": "app", "to": "counters", "since": 5 },
+    { "from": "app", "to": "stories", "since": 6 },
+    { "from": "app", "to": "explore", "since": 6 },
+    { "from": "explore", "to": "meta", "label": "offline job", "dashed": true, "since": 6 }
+  ],
+  "evolution": [
+    { "title": "App server and one database", "problem": "Start with what works: the phone posts a file to one server, which saves the bytes and a row.", "change": "One app service and one metadata store. Photos are stored next to the data, and read back through the same server." },
+    { "title": "Presigned upload to blob storage", "problem": "Every photo and video flows through app servers. At a few thousand uploads per second they spend their time copying bytes and run out of bandwidth.", "change": "Move files to blob storage, a store for big immutable objects. The app hands the client a presigned URL, a short-lived permission, and the client uploads straight to blob. The server only keeps the row.", "numbers": "storage per year in the estimator is petabytes" },
+    { "title": "Async processing with a queue", "problem": "A raw upload is too big for a phone on a slow link, and a video cannot be played on every device as it came. Doing resizing inside the request makes posting slow and fragile.", "change": "Blob storage fires an event onto a queue. Workers make several sizes, a thumbnail and for video several bitrates, write them back, and mark the row ready. A crashed job is simply retried.", "numbers": "the estimator shows videos dominate worker count" },
+    { "title": "CDN for delivery", "problem": "Views outnumber uploads by orders of magnitude, and a photo fetched across an ocean is slow. Blob storage cannot take the whole read traffic.", "change": "Put a CDN, a network of edge caches, in front of blob. Most reads end at the edge. Rows store media ids and the client picks the size that fits its screen.", "numbers": "egress is Tbit/s, origin only a few percent of it" },
+    { "title": "Feed as a building block", "problem": "The home feed needs recent posts from the people you follow in under a second. A query over follows and posts is too slow.", "change": "Add one feed service. It is the News Feed design: ids pushed to followers on write, celebrities pulled on read. Here it returns ids, and the app hydrates them from the metadata store." },
+    { "title": "Sharded like counters", "problem": "One viral post can take thousands of likes per second on a single row. That row becomes a hot spot and every like waits on a lock.", "change": "Split each counter into many shards, pick one at random per like and add them up on read. Flush updates in batches. A count that is a few seconds old is fine.", "numbers": "likes per second in the estimator" },
+    { "title": "Stories and Explore", "problem": "Stories must vanish after 24 hours without a cleanup job racing the readers. Explore needs posts from people you do not follow, and ranking that live would be far too slow.", "change": "Stories live in a store whose rows carry a TTL, and a tray lists followed authors with a live story. Explore suggestions are computed offline from what users engage with, saved per user, and read as a list." }
+  ],
+  "flows": [
+    {
+      "name": "Upload and publish a photo",
+      "steps": [
+        { "say": "The app asks for an upload slot. The service writes a pending media row and returns a presigned URL.", "nodes": ["client", "app", "meta"], "edges": [["client", "app"], ["app", "meta"]] },
+        { "say": "The phone uploads the file straight to blob storage with that URL. App servers carry no bytes.", "nodes": ["client", "blob"], "edges": [["client", "blob"]] },
+        { "say": "Blob storage emits an uploaded event onto the processing queue.", "nodes": ["blob", "queue"], "edges": [["blob", "queue"]] },
+        { "say": "A worker takes the job.", "nodes": ["queue", "worker"], "edges": [["queue", "worker"]] },
+        { "say": "It reads the original, makes several sizes and a thumbnail, and writes them back to blob.", "nodes": ["worker", "blob"], "edges": [["worker", "blob"]] },
+        { "say": "It marks the media row ready. Only now can the post be shown.", "nodes": ["worker", "meta"], "edges": [["worker", "meta"]] },
+        { "say": "The publish call hands the post to the feed service, which fans it out to followers.", "nodes": ["app", "feed"], "edges": [["app", "feed"]] }
+      ]
+    },
+    {
+      "name": "Open the feed and view a post",
+      "steps": [
+        { "say": "The app asks for page one of the feed.", "nodes": ["client", "app"], "edges": [["client", "app"]] },
+        { "say": "The service gets a list of post ids from the feed building block.", "nodes": ["app", "feed"], "edges": [["app", "feed"]] },
+        { "say": "It hydrates the ids: reads each post and its media rows.", "nodes": ["app", "meta"], "edges": [["app", "meta"]] },
+        { "say": "It reads like counts. A number a few seconds old is fine.", "nodes": ["app", "counters"], "edges": [["app", "counters"]] },
+        { "say": "The page goes back with CDN URLs. The phone asks the CDN for the image size that fits its screen.", "nodes": ["cdn", "client"], "edges": [["cdn", "client"]] },
+        { "say": "On a miss the edge fetches once from blob storage and keeps the copy for the next viewer.", "nodes": ["blob", "cdn"], "edges": [["blob", "cdn"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Upload path",
+      "question": "How do big files get into storage?",
+      "options": [
+        { "name": "Through the app server", "pros": "Simple. The server can check everything before it stores a byte.", "cons": "Servers carry every byte twice. Slow phones hold connections open. Scaling means scaling bandwidth." },
+        { "name": "Presigned URL to blob storage", "pros": "Bytes bypass app servers. Blob storage is built for this. Large files can use resumable multipart uploads.", "cons": "Validation happens after the fact. You need a pending state and cleanup of abandoned uploads." },
+        { "name": "Dedicated upload gateway", "pros": "Central place to scan, throttle and resume.", "cons": "One more fleet that carries all the bytes." }
+      ],
+      "pick": "Presigned URL, resumable multipart",
+      "because": "The files are large and the app does nothing with the bytes. Let storage take them, then validate in the worker. Expire the URL in minutes and sweep pending rows that never finish."
+    },
+    {
+      "title": "When to make the sizes",
+      "question": "Do we resize every photo when it is uploaded, or the first time someone asks?",
+      "options": [
+        { "name": "Eager, at upload", "pros": "Every read is a plain file. No work on the read path and latency is predictable.", "cons": "Pays for sizes that nobody ever views. A new size means reprocessing everything." },
+        { "name": "Lazy, on first request", "pros": "Pays only for sizes used. New sizes appear without a backfill.", "cons": "The first viewer waits. A burst of cold reads can overload the resizer." },
+        { "name": "Eager for common, lazy for the rest", "pros": "Covers most traffic cheaply, and rare sizes still work.", "cons": "Two paths to run and test." }
+      ],
+      "pick": "Eager for a few standard sizes, lazy for the rest",
+      "because": "Most views use a handful of sizes, so make those up front and keep the read path trivial. Videos are always eager, since transcoding is slow. Cache lazy results at the CDN."
+    },
+    {
+      "title": "Like counters",
+      "question": "How do we count likes when one post gets thousands per second?",
+      "options": [
+        { "name": "One row, increment", "pros": "Exact and trivial.", "cons": "Hot row. Updates queue behind each other." },
+        { "name": "Sharded counters", "pros": "Writes spread over N rows. Read sums them, or reads a cached sum.", "cons": "Reads are a little more work, and the total can lag." },
+        { "name": "Batch in memory, flush", "pros": "Turns thousands of writes into one per interval.", "cons": "A crash loses the last interval unless a log backs it up." }
+      ],
+      "pick": "Shard it, and batch the writes",
+      "because": "Nobody needs an exact like count in real time. Keep a set of who liked, to make a like idempotent, and add up shards in the background. Show a rounded count such as 1.2K."
+    },
+    {
+      "title": "Stories and Explore",
+      "question": "How do we serve data that expires, and data that comes from a model?",
+      "options": [
+        { "name": "Reuse the post path", "pros": "No new system. A story is a post with a flag.", "cons": "Expiry needs a sweeper, and a feed read must filter old rows." },
+        { "name": "TTL store plus offline suggestions", "pros": "Rows expire on their own. Suggestions are a stored list, so Explore is a cheap read.", "cons": "Two more stores. Suggestions can be a few hours old." }
+      ],
+      "pick": "TTL store plus offline suggestions",
+      "because": "A story's lifetime is its defining rule, so make storage enforce it. Explore needs heavy models, and a nightly or hourly job is cheaper than ranking at request time. The tray also drops expired items at read time."
+    }
+  ],
+  "failures": [
+    { "what": "A worker dies mid-job", "impact": "A post stays pending and the author sees nothing.", "fix": "Jobs are idempotent: writing the same size twice is harmless. The queue redelivers if no ack arrives. Alert on the age of the oldest job." },
+    { "what": "A burst of uploads", "impact": "The queue grows, and new posts take minutes to appear.", "fix": "Scale workers on queue depth. Process photos before videos, and show the original at low quality at once while sizes are made." },
+    { "what": "CDN miss storm for a viral post", "impact": "Thousands of edge nodes ask blob storage for the same object at once.", "fix": "Collapse requests at the edge so one fetch fills the cache. Add a mid-tier cache between edges and blob storage." },
+    { "what": "Counter lag or loss", "impact": "Shown counts are stale, or drop after a crash.", "fix": "Accept it for display. Keep the set of likers as the truth and rebuild counts from it. Round large numbers on screen." },
+    { "what": "Abandoned uploads pile up", "impact": "Blob storage fills with files that never became posts.", "fix": "Pending rows have an expiry. A sweeper deletes orphan objects after a day. Blob lifecycle rules help." }
+  ],
+  "scaling": [
+    { "limit": "Storage grows by petabytes a year", "lever": "Tier old media to cheaper storage, use erasure coding instead of full copies, and keep only the sizes that are still read." },
+    { "limit": "CDN egress is the biggest bill", "lever": "Better formats and compression, right-size images per device, and a long cache time. Every point of hit rate is cheap bandwidth." },
+    { "limit": "Video transcoding cost", "lever": "Make fewer renditions for rarely watched videos, and transcode more only once a video proves popular. Use spot capacity." }
+  ],
+  "recap": {
+    "key": "Treat media as its own pipeline: upload straight to blob storage, process it asynchronously through a queue, and serve every read from a CDN.",
+    "numbers": "With 100M posts a day: about 1.2K uploads per second, 3.5K at peak, roughly 750 workers, 120 PB a year, and 1.4 Tbit/s of CDN egress.",
+    "moves": ["Presigned URLs keep bytes off app servers", "Queue and workers make sizes and video bitrates, and are retried safely", "CDN answers almost every read, with feed, stories, counters and Explore as side systems", "Count likes with shards and accept small staleness"]
+  }
+}

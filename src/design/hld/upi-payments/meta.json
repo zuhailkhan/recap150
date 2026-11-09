@@ -1,0 +1,185 @@
+{
+  "slug": "upi-payments",
+  "title": "UPI Payments (PhonePe)",
+  "group": "Productivity, maps and payments",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a UPI-style payment app: a person sends money to another person or a shop from their phone, and the money moves between two bank accounts. The real internals of any payment company are not public, so this is a standard payments architecture built from general knowledge. The hard part is never losing or duplicating money while talking to banks and a central switch that you do not control.",
+  "requirements": {
+    "functional": [
+      "Send money to a person or merchant from a linked bank account.",
+      "Show the status of a payment: pending, success or failed.",
+      "Show a transaction history.",
+      "Refund or reverse a payment.",
+      "Flag and block suspicious payments.",
+      "Let the user retry safely after a timeout."
+    ],
+    "nonFunctional": [
+      { "name": "Correctness", "target": "Money is never created, lost or taken twice" },
+      { "name": "Latency", "target": "A payment completes in a few seconds at the 99th percentile" },
+      { "name": "Availability", "target": "Payment start works 99.99% of the time" },
+      { "name": "Auditability", "target": "Every movement of money can be traced and replayed" },
+      { "name": "Consistency", "target": "Our books match the bank's books by end of day" }
+    ],
+    "outOfScope": ["Linking and verifying bank accounts", "PIN entry and device binding", "Merchant onboarding", "Real bank and switch protocols"]
+  },
+  "estimate": {
+    "note": "Assumptions for a large payment app, not real figures. Peak is what sizes the system. The ledger is append-only, so storage grows with every row ever written.",
+    "inputs": [
+      { "id": "tps", "label": "Payments per second at peak", "value": 10000, "min": 500, "max": 200000, "log": true, "unit": "per s" },
+      { "id": "avgShare", "label": "Average load as share of peak", "value": 30, "min": 10, "max": 100, "step": 5, "unit": "%" },
+      { "id": "steps", "label": "State changes per payment", "value": 6, "min": 3, "max": 12, "step": 1, "unit": "steps" },
+      { "id": "rows", "label": "Ledger rows per payment", "value": 4, "min": 2, "max": 8, "step": 1, "unit": "rows" },
+      { "id": "bytesRow", "label": "Bytes per ledger row", "value": 200, "min": 100, "max": 500, "step": 50, "unit": "B" },
+      { "id": "years", "label": "Keep ledger for", "value": 7, "min": 1, "max": 10, "step": 1, "unit": "years" }
+    ],
+    "outputs": [
+      { "id": "stateWrites", "label": "State writes per second at peak", "expr": "tps * steps", "unit": "per s", "note": "Each step of the payment state machine is a durable write." },
+      { "id": "ledgerRate", "label": "Ledger rows per second at peak", "expr": "tps * rows", "unit": "rows/s", "note": "A debit and a credit at least, plus fees and holds." },
+      { "id": "shards", "label": "Ledger shards needed", "expr": "ceil(ledgerRate / 10000)", "unit": "shards", "note": "Assumes one shard takes about 10K rows per second. Add headroom." },
+      { "id": "perDay", "label": "Payments per day", "expr": "tps * avgShare / 100 * 86400", "unit": "payments" },
+      { "id": "rowsPerDay", "label": "Ledger rows per day", "expr": "perDay * rows", "unit": "rows" },
+      { "id": "storageTb", "label": "Ledger storage over retention", "expr": "rowsPerDay * 365 * years * bytesRow / 1e12", "unit": "TB", "note": "One copy. Multiply by replicas, and move old rows to cheaper storage." }
+    ]
+  },
+  "api": [
+    { "call": "POST /payments  { idempotencyKey, to, amount, note }", "does": "Creates a payment intent. The same key always returns the same payment." },
+    { "call": "GET /payments/{id}", "does": "Returns the current state and the reason if it failed." },
+    { "call": "POST /payments/{id}/refund  { amount, idempotencyKey }", "does": "Reverses all or part of a finished payment through the ledger." },
+    { "call": "GET /accounts/{id}/transactions?before=cursor", "does": "Pages the history, newest first, from ledger entries." },
+    { "call": "POST /bank-callbacks", "does": "Receives the final result from the bank side. Signed, and safe to receive twice." }
+  ],
+  "data": [
+    { "entity": "Payment intent", "fields": "paymentId, idempotencyKey, payerId, payeeId, amount, state, bankRef, version", "store": "Relational database, sharded by payer.", "why": "A small state machine with strict transitions. Needs transactions and a unique key on the idempotency key." },
+    { "entity": "Ledger entry", "fields": "entryId, paymentId, account, direction, amount, createdAt", "store": "Append-only relational or log-structured store.", "why": "Double entry: every payment writes a debit and a credit that sum to zero. Rows are never updated, so history can always be audited and replayed." },
+    { "entity": "Idempotency record", "fields": "key, requestHash, paymentId, response, expiresAt", "store": "Key-value store with TTL, backed by the unique key above.", "why": "Answers a retry in one lookup, before any work is repeated." },
+    { "entity": "Bank request", "fields": "paymentId, bankRef, sentAt, status, attempts", "store": "Relational database.", "why": "Tells the reconciler what was sent and still has no final answer." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Payer app", "kind": "client", "x": 6, "y": 50, "since": 0 },
+    { "id": "limiter", "label": "Rate limiter", "kind": "service", "x": 28, "y": 14, "sub": "per user and device", "since": 6 },
+    { "id": "api", "label": "Payment API", "kind": "service", "x": 28, "y": 50, "sub": "stateless, many copies", "since": 0 },
+    { "id": "idem", "label": "Idempotency store", "kind": "cache", "x": 28, "y": 86, "sub": "key to result", "since": 1 },
+    { "id": "pdb", "label": "Payments DB", "kind": "db", "x": 50, "y": 28, "sub": "intent and state", "since": 0 },
+    { "id": "adapter", "label": "Bank adapter", "kind": "service", "x": 50, "y": 50, "sub": "talks to our bank", "since": 0 },
+    { "id": "ledger", "label": "Ledger", "kind": "db", "x": 50, "y": 72, "sub": "double entry", "since": 2 },
+    { "id": "bank", "label": "Sponsor bank", "kind": "external", "x": 72, "y": 50, "sub": "not ours", "since": 0 },
+    { "id": "switch", "label": "Central switch", "kind": "external", "x": 92, "y": 50, "sub": "routes to other banks", "since": 0 },
+    { "id": "recon", "label": "Recon worker", "kind": "worker", "x": 72, "y": 86, "sub": "status checks", "since": 3 },
+    { "id": "events", "label": "Event stream", "kind": "queue", "x": 72, "y": 12, "sub": "outbox", "since": 5 },
+    { "id": "risk", "label": "Risk engine", "kind": "worker", "x": 92, "y": 12, "sub": "scores, flags", "since": 5 }
+  ],
+  "edges": [
+    { "from": "client", "to": "api", "since": 0, "until": 6 },
+    { "from": "client", "to": "limiter", "since": 6 },
+    { "from": "limiter", "to": "api", "since": 6 },
+    { "from": "api", "to": "pdb", "label": "intent", "since": 0 },
+    { "from": "api", "to": "adapter", "since": 0 },
+    { "from": "adapter", "to": "bank", "since": 0 },
+    { "from": "bank", "to": "switch", "since": 0 },
+    { "from": "api", "to": "idem", "label": "key", "since": 1 },
+    { "from": "api", "to": "ledger", "label": "post", "since": 2 },
+    { "from": "recon", "to": "adapter", "label": "check", "since": 3 },
+    { "from": "recon", "to": "ledger", "label": "fix", "dashed": true, "since": 3 },
+    { "from": "adapter", "to": "ledger", "label": "reverse", "dashed": true, "since": 4 },
+    { "from": "pdb", "to": "events", "dashed": true, "since": 5 },
+    { "from": "events", "to": "risk", "since": 5 }
+  ],
+  "evolution": [
+    { "title": "Call the bank and write a row", "problem": "Start with the simplest thing that works: the app asks us to pay, we call the bank, and we save the outcome.", "change": "A payment API stores an intent, hands the request to a bank adapter, and the sponsor bank passes it on through the central switch to the receiving bank." },
+    { "title": "Idempotency key", "problem": "The phone times out and the user taps again, or the network retries. Now the same payment is sent twice and money is taken twice.", "change": "The client makes a key for each payment. The API looks the key up first and returns the saved result for a repeat. A unique constraint on the key is the real guard. Intent states only move forward.", "numbers": "a retry costs one lookup and moves no money" },
+    { "title": "A double-entry ledger", "problem": "A single balance column can be overwritten or drift, and nobody can say where a rupee went.", "change": "Every payment writes balanced entries to an append-only ledger: a debit and a credit that sum to zero. Balances are derived from entries. Nothing is updated in place, so every movement is auditable.", "numbers": "the estimator shows rows per second and shards" },
+    { "title": "Unknown outcomes and reconciliation", "problem": "The bank call times out. The money may or may not have moved. If we guess failure we may pay twice later, and if we guess success we may lose money.", "change": "Mark the payment pending, never failed. A recon worker asks the bank for the true status of each unfinished request, with backoff. A deadline rule settles the rest, and the daily bank file is matched to our ledger." },
+    { "title": "Callbacks and reversals", "problem": "The bank may report a late result, or a payment may need to be undone after it looked successful.", "change": "The bank adapter accepts signed callbacks, safe to receive twice. A failure or refund is not an edit: it posts reversing entries to the ledger that point back to the original payment." },
+    { "title": "Risk checks off the critical path", "problem": "Scoring every payment with heavy models inline adds latency, and a risk outage would stop all payments.", "change": "Cheap rules and limits run inline. The rest is written as events from the payments database through an outbox, and the risk engine scores them. It can flag, step up, or freeze an account for the next payment." },
+    { "title": "Rate limits and high availability", "problem": "Bots, retry storms and one broken client can flood the API, and any single machine is a point of failure.", "change": "A rate limiter keyed by user and device sits in front. The API runs as many stateless copies in several zones, and the databases have synchronous replicas. A slow bank is shed with a circuit breaker, not queued forever." }
+  ],
+  "flows": [
+    {
+      "name": "Send money",
+      "steps": [
+        { "say": "The payer's app sends the payment with a fresh idempotency key. The rate limiter lets it through.", "nodes": ["client", "limiter", "api"], "edges": [["client", "limiter"], ["limiter", "api"]] },
+        { "say": "The API checks the key. If it was seen, the stored result is returned and nothing else happens.", "nodes": ["api", "idem"], "edges": [["api", "idem"]] },
+        { "say": "A new key: the API stores the intent in the payments database with state 'created'.", "nodes": ["api", "pdb"], "edges": [["api", "pdb"]] },
+        { "say": "The bank adapter sends the debit and credit request to the sponsor bank, with our own reference number.", "nodes": ["api", "adapter", "bank"], "edges": [["api", "adapter"], ["adapter", "bank"]] },
+        { "say": "The bank sends it through the central switch to the receiving bank, and the answer comes back the same way.", "nodes": ["bank", "switch"], "edges": [["bank", "switch"]] },
+        { "say": "On success the API posts a balanced debit and credit to the ledger and moves the intent to 'success'. The payer sees the result.", "nodes": ["api", "ledger", "pdb"], "edges": [["api", "ledger"], ["api", "pdb"]] },
+        { "say": "The state change is also written to the outbox and flows to the risk engine, off the critical path.", "nodes": ["pdb", "events", "risk"], "edges": [["pdb", "events"], ["events", "risk"]] }
+      ]
+    },
+    {
+      "name": "Bank call times out",
+      "steps": [
+        { "say": "The adapter sent the request but got no answer in time.", "nodes": ["adapter", "bank"], "edges": [["adapter", "bank"]] },
+        { "say": "The payment is set to 'pending'. The user sees 'processing', not failure. Nothing is posted to the ledger yet.", "nodes": ["api", "pdb"], "edges": [["api", "pdb"]] },
+        { "say": "The recon worker picks up the pending request and asks the bank for its status, using our reference number.", "nodes": ["recon", "adapter", "bank"], "edges": [["recon", "adapter"], ["adapter", "bank"]] },
+        { "say": "The bank says it succeeded. The worker posts the ledger entries and moves the intent to 'success'.", "nodes": ["recon", "ledger"], "edges": [["recon", "ledger"]] },
+        { "say": "If the bank says failed, no entries are posted and the intent becomes 'failed'. If it is still unknown at the deadline, apply the deemed rule and let the end-of-day file settle it.", "nodes": ["recon", "adapter"], "edges": [["recon", "adapter"]] },
+        { "say": "A late callback from the bank is accepted once. A repeat does nothing, because the state only moves forward.", "nodes": ["adapter", "ledger"], "edges": [["adapter", "ledger"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Handling an unknown outcome",
+      "question": "The bank did not answer. How do we avoid both a lost payment and a double payment?",
+      "options": [
+        { "name": "Treat a timeout as failure", "pros": "Simple. The user can retry right away.", "cons": "The money may have moved. A retry then pays twice, and the payer is out of pocket." },
+        { "name": "Retry the same request", "pros": "Often works for a short glitch.", "cons": "Only safe if the bank also dedupes on our reference. Otherwise it is a second debit." },
+        { "name": "Pending, then status check and reconcile", "pros": "Never guesses. The truth comes from the bank, and the books are fixed afterwards.", "cons": "Users wait in an uncertain state. More states and a worker to run." }
+      ],
+      "pick": "Pending, then status checks, then reconciliation",
+      "because": "In payments, a wrong guess costs real money, while waiting costs a little patience. Never turn unknown into failure by yourself. Ask the party that knows."
+    },
+    {
+      "title": "Ledger design",
+      "question": "How do we keep balances right and every movement explainable?",
+      "options": [
+        { "name": "Balance column updated in place", "pros": "Trivial and fast to read.", "cons": "History is lost. A bug or a retry silently changes the number, and you cannot audit it." },
+        { "name": "Double-entry, append-only ledger", "pros": "Entries always sum to zero. Balances can be rebuilt. Corrections are new rows.", "cons": "More rows and a harder balance read, so keep a cached balance too." },
+        { "name": "Event log only", "pros": "Full history, easy to replay.", "cons": "Needs the discipline of balanced entries on top, or it is just a log." }
+      ],
+      "pick": "Double-entry, append-only, with a derived balance",
+      "because": "Correctness comes from the invariant that debits equal credits and rows never change. Refunds and fixes are new reversing rows. A cached balance is only a speed-up and can be rebuilt from entries."
+    },
+    {
+      "title": "Where idempotency lives",
+      "question": "How do we make a retried request safe at every hop?",
+      "options": [
+        { "name": "Only a cache lookup", "pros": "Very fast.", "cons": "The cache can lose data or expire. A retry after that goes through twice." },
+        { "name": "Unique key in the payments database", "pros": "Durable and exact. The database rejects the second insert.", "cons": "Slower than a cache, and every retry reaches the database." },
+        { "name": "Key at every hop, end to end", "pros": "The same key goes down to the bank request, so even the bank can dedupe.", "cons": "Needs agreement from every party you talk to. Some may not support it." }
+      ],
+      "pick": "Cache, database unique key, and pass the key on",
+      "because": "The cache makes the common retry cheap. The database constraint makes the answer exact. Passing the key on closes the last gap, when the call to the bank was sent but the answer was lost."
+    },
+    {
+      "title": "Risk checks and the critical path",
+      "question": "Should fraud scoring block each payment?",
+      "options": [
+        { "name": "Fully inline", "pros": "Bad payments never go out.", "cons": "Adds latency, and a risk outage stops every payment." },
+        { "name": "Fully async", "pros": "No added latency and no coupling.", "cons": "Money has already moved when a bad one is found. It can only be recovered afterwards." },
+        { "name": "Light rules inline, heavy scoring async", "pros": "Limits and blocklists stop the obvious. The model flags the rest and can freeze the next move.", "cons": "Two systems with a gap between them." }
+      ],
+      "pick": "Light rules inline, heavy scoring async",
+      "because": "Keep the critical path fast and always available. Inline checks use data already in memory, such as limits per user. The slower, smarter scoring acts on the next payment and on pending ones."
+    }
+  ],
+  "failures": [
+    { "what": "Bank or switch is slow or down", "impact": "Payments pile up as pending and users retry.", "fix": "Set timeouts and a circuit breaker per bank, and shed load early with a clear message. Pending payments are resolved by the recon worker when the bank returns." },
+    { "what": "Same payment arrives twice", "impact": "A double debit.", "fix": "Idempotency key with a unique constraint, and the same reference sent to the bank. Callbacks are deduped by bank reference." },
+    { "what": "Ledger and bank disagree", "impact": "Our books say one thing, the bank's file another.", "fix": "Match the bank's settlement file against ledger entries every day. Differences become tickets and reversing or fixing entries. Never edit a row." },
+    { "what": "Crash between bank success and ledger write", "impact": "The money moved but our records have no entry.", "fix": "The intent stays pending because it was saved before the call. The recon worker finds it, asks the bank, and posts the entries." },
+    { "what": "Retry storm after an outage", "impact": "Every client retries at once and knocks the system over again.", "fix": "Rate limit per user and device, jittered backoff in the app, and back-pressure at the API instead of an unbounded queue." }
+  ],
+  "scaling": [
+    { "limit": "One ledger database cannot take the write rate", "lever": "Shard by account. A payment touches two accounts, so use a transfer record and a saga, or keep both legs in one shard when possible. The estimator shows how many shards." },
+    { "limit": "Peak days such as a festival or a sale", "lever": "Load test for a multiple of the last peak. Keep the API stateless and scale it out. Scale the bank-facing side to what the bank agrees to accept." },
+    { "limit": "Years of ledger rows", "lever": "Partition by time. Keep recent months on fast storage, move older rows to cheap storage, and keep summaries for balances and statements." }
+  ],
+  "recap": {
+    "key": "Treat every payment as a state machine with an idempotency key, record money in an append-only double-entry ledger, and resolve unknown outcomes by asking the bank, never by guessing.",
+    "numbers": "10K payments per second at peak with 4 ledger rows each is 40K rows per second, so about 4 shards. About 260M payments per day and roughly 500 TB of ledger over 7 years, at these assumptions.",
+    "moves": ["Idempotency key on every request, end to end", "Balanced, append-only ledger entries", "Pending, status check, reconcile for unknown outcomes", "Light risk rules inline, heavy scoring off the path"]
+  }
+}

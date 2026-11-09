@@ -1,0 +1,199 @@
+{
+  "slug": "uber",
+  "title": "Uber (Ride Hailing)",
+  "group": "Ride, food and marketplaces",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a system like Uber: a rider asks for a car and a nearby free driver is found, offered the trip and tracked to the destination. The hard part is that every driver keeps moving, so the question 'who is nearest right now?' must be answered from a live, constantly changing map in a second or two.",
+  "requirements": {
+    "functional": [
+      "Drivers go online and send their location every few seconds.",
+      "A rider requests a ride and sees a fare and an arrival estimate.",
+      "Find nearby free drivers and offer the trip to one at a time.",
+      "Track the trip live on both phones until it ends.",
+      "Charge the rider when the trip finishes.",
+      "Raise prices in an area where riders far outnumber drivers."
+    ],
+    "nonFunctional": [
+      { "name": "Match latency", "target": "A driver offer goes out within 2 s of a request" },
+      { "name": "Freshness", "target": "Driver positions in the index are under 10 s old" },
+      { "name": "Trip durability", "target": "An accepted trip is never lost or double-assigned" },
+      { "name": "Availability", "target": "Requesting a ride works 99.99% of the time" },
+      { "name": "Payments", "target": "A rider is charged exactly once per trip" }
+    ],
+    "outOfScope": ["Maps, routing and turn-by-turn directions", "Driver onboarding and documents", "Ride pooling and scheduled rides", "Fraud detection"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts: pings are about 100 bytes, a trip is offered to about 3 drivers before one accepts, and a trip changes state about 6 times. The location stream, not the trips, is the heavy part.",
+    "inputs": [
+      { "id": "drivers", "label": "Drivers online", "value": 500000, "min": 10000, "max": 5000000, "log": true },
+      { "id": "pingSec", "label": "Seconds between location pings", "value": 4, "min": 1, "max": 30, "step": 1, "unit": "s" },
+      { "id": "rps", "label": "Ride requests per second", "value": 300, "min": 10, "max": 5000, "log": true },
+      { "id": "riders", "label": "Riders in the service area", "value": 2000000, "min": 100000, "max": 20000000, "log": true },
+      { "id": "openPct", "label": "Riders with the app open", "value": 5, "min": 1, "max": 30, "step": 1, "unit": "%" },
+      { "id": "entryBytes", "label": "Geo index bytes per driver", "value": 100, "min": 50, "max": 500, "step": 10, "unit": "B" }
+    ],
+    "outputs": [
+      { "id": "pingQps", "label": "Location writes per second", "expr": "drivers / pingSec", "unit": "per s", "note": "Far more than trips. A normal database cannot take this." },
+      { "id": "pingMbps", "label": "Ping bandwidth", "expr": "pingQps * 100 * 8 / 1e6", "unit": "Mbit/s", "note": "At 100 bytes per ping." },
+      { "id": "geoMemMb", "label": "Geo index memory", "expr": "drivers * entryBytes / 1e6", "unit": "MB", "note": "Small. Fits in one machine, so the limit is writes, not size." },
+      { "id": "offersQps", "label": "Driver offers per second", "expr": "rps * 3", "unit": "per s", "note": "Several offers per ride, since some drivers decline." },
+      { "id": "tripWrites", "label": "Trip state writes per second", "expr": "rps * 6", "unit": "per s", "note": "Durable writes, about 6 state changes per trip." },
+      { "id": "conns", "label": "Live connections", "expr": "drivers + riders * openPct / 100", "unit": "conns", "note": "Every online driver and every open rider app holds a socket." },
+      { "id": "gateways", "label": "Gateways needed", "expr": "ceil(conns / 100000)", "unit": "servers", "note": "Assuming 100K sockets per gateway." }
+    ]
+  },
+  "api": [
+    { "call": "WS driver { lat, lng, heading }", "does": "A driver's ping, sent every few seconds. Overwrites the last position." },
+    { "call": "POST /trips  { pickup, dropoff, requestId }", "does": "Requests a ride. requestId makes a retry safe. Returns tripId and a quote." },
+    { "call": "GET /quote?pickup&dropoff", "does": "Returns fare, surge multiplier and the arrival estimate." },
+    { "call": "offer -> accept | decline { tripId }", "does": "Pushed to one driver, who must answer before a timeout." },
+    { "call": "WS trip/{id}", "does": "Streams driver position and state changes to the rider." },
+    { "call": "POST /trips/{id}/end", "does": "Finishes the trip and starts the payment." }
+  ],
+  "data": [
+    { "entity": "DriverLocation", "fields": "driverId, lat, lng, cellId, status, updatedAt", "store": "In-memory geo index, grouped by cell.", "why": "Overwritten every few seconds, so only the latest value matters. Losing it is fine: drivers ping again." },
+    { "entity": "Trip", "fields": "tripId, riderId, driverId, state, pickup, dropoff, fare, version", "store": "Relational or key-value store, durable.", "why": "Money and a promise to a driver. Needs conditional writes on version so two matches cannot claim one driver." },
+    { "entity": "CellStats", "fields": "cellId, freeDrivers, openRequests, surge", "store": "In-memory, rebuilt every few seconds.", "why": "A ratio computed from the geo index and recent requests. Stale by seconds is fine." },
+    { "entity": "Payment", "fields": "tripId, amount, status, providerRef", "store": "Relational store.", "why": "Written by a worker, keyed by tripId so a retry cannot charge twice." }
+  ],
+  "nodes": [
+    { "id": "rider", "label": "Rider app", "kind": "client", "x": 6, "y": 31, "since": 0 },
+    { "id": "driver", "label": "Driver app", "kind": "client", "x": 6, "y": 69, "since": 0 },
+    { "id": "gw", "label": "Realtime gateway", "kind": "service", "x": 26, "y": 50, "sub": "holds sockets", "since": 3 },
+    { "id": "trip", "label": "Trip service", "kind": "service", "x": 46, "y": 50, "sub": "state machine", "since": 0 },
+    { "id": "tdb", "label": "Trip store", "kind": "db", "x": 66, "y": 50, "sub": "durable", "since": 0 },
+    { "id": "tdb2", "label": "Trip store 2", "kind": "db", "x": 66, "y": 69, "sub": "other cities", "since": 6 },
+    { "id": "loc", "label": "Location service", "kind": "service", "x": 26, "y": 12, "sub": "ping ingest", "since": 1 },
+    { "id": "geo", "label": "Geo index", "kind": "cache", "x": 46, "y": 12, "sub": "drivers by cell", "since": 1 },
+    { "id": "match", "label": "Matching", "kind": "service", "x": 66, "y": 12, "sub": "offer, timeout, next", "since": 2 },
+    { "id": "pricing", "label": "ETA and fare", "kind": "service", "x": 88, "y": 12, "sub": "surge by cell", "since": 4 },
+    { "id": "queue", "label": "Payment events", "kind": "queue", "x": 46, "y": 88, "since": 5 },
+    { "id": "pw", "label": "Payment worker", "kind": "worker", "x": 66, "y": 88, "sub": "idempotent charge", "since": 5 },
+    { "id": "psp", "label": "Payment provider", "kind": "external", "x": 88, "y": 88, "since": 5 }
+  ],
+  "edges": [
+    { "from": "rider", "to": "trip", "label": "request", "since": 0, "until": 3 },
+    { "from": "driver", "to": "trip", "label": "ping, poll", "since": 0, "until": 3 },
+    { "from": "trip", "to": "tdb", "since": 0 },
+    { "from": "driver", "to": "loc", "label": "ping", "since": 1, "until": 3 },
+    { "from": "loc", "to": "geo", "since": 1 },
+    { "from": "trip", "to": "geo", "label": "nearest?", "since": 1, "until": 2 },
+    { "from": "trip", "to": "match", "label": "find driver", "since": 2 },
+    { "from": "match", "to": "geo", "since": 2 },
+    { "from": "rider", "to": "gw", "since": 3 },
+    { "from": "driver", "to": "gw", "since": 3 },
+    { "from": "gw", "to": "trip", "since": 3 },
+    { "from": "gw", "to": "loc", "label": "pings", "since": 3 },
+    { "from": "trip", "to": "gw", "dashed": true, "since": 3 },
+    { "from": "trip", "to": "pricing", "label": "quote", "since": 4 },
+    { "from": "match", "to": "pricing", "since": 4 },
+    { "from": "trip", "to": "queue", "label": "trip ended", "since": 5 },
+    { "from": "queue", "to": "pw", "since": 5 },
+    { "from": "pw", "to": "psp", "since": 5 },
+    { "from": "trip", "to": "tdb2", "label": "by city", "since": 6 }
+  ],
+  "evolution": [
+    { "title": "Drivers in a table", "problem": "Start with the simplest thing that works: one server and one database.", "change": "The driver app sends its position and the server updates a drivers table. A ride request runs a query for the nearest free driver by latitude and longitude." },
+    { "title": "A live location index", "problem": "500K drivers pinging every 4 s is 125K writes per second. Each one rewrites a row that is stale seconds later, and the nearest-driver query scans them.", "change": "A location service keeps the latest ping in an in-memory geo index. Space is cut into cells, and each cell lists its drivers. A search reads the rider's cell and its neighbours. Nothing is persisted, since drivers ping again.", "numbers": "125K writes per second go to memory, not to the trip store" },
+    { "title": "Matching with offers", "problem": "The nearest driver may be busy, decline or not answer. The trip service cannot also run this loop for thousands of requests.", "change": "A matching service ranks the free drivers near the rider, offers the trip to the best one with a timeout of a few seconds, then moves to the next. The trip is claimed with a conditional write, so one driver gets one trip." },
+    { "title": "Realtime gateways", "problem": "Offers must reach a driver in under a second and the rider must watch the car move. Polling 500K drivers every second is wasteful and slow.", "change": "Gateways hold a WebSocket per app. Pings flow in through them and the trip service pushes offers and positions out through them. The load balancer picks a gateway once, at connect time.", "numbers": "the estimator shows the sockets and gateways" },
+    { "title": "ETA and surge by cell", "problem": "A rider wants a price and an arrival time before they book. When a stadium empties, requests in one cell far exceed free drivers there.", "change": "A pricing service estimates arrival from the nearest drivers and the route, and sets a surge multiplier per cell from open requests divided by free drivers. It is smoothed so prices do not flicker." },
+    { "title": "Async payments", "problem": "The card network is slow and sometimes fails. Charging inside the trip-end call can hang the driver app or charge twice on a retry.", "change": "Ending a trip writes the final state, then drops an event on a queue. A worker charges the provider with the tripId as the idempotency key and records the result." },
+    { "title": "Partition by city", "problem": "One trip store and one geo index for the whole world is a single point of failure, and a rider in Delhi never needs a driver in Paris.", "change": "Partition everything by city or region. Each region has its own geo index and trip store, and a trip is pinned to the region where it started." }
+  ],
+  "flows": [
+    {
+      "name": "Request and match a ride",
+      "steps": [
+        { "say": "The rider app asks for a ride. A requestId makes a retry safe.", "nodes": ["rider", "gw"], "edges": [["rider", "gw"]] },
+        { "say": "The gateway passes it to the trip service, which creates the trip in state 'requested'.", "nodes": ["gw", "trip"], "edges": [["gw", "trip"]] },
+        { "say": "The trip is written durably before anything else happens.", "nodes": ["trip", "tdb"], "edges": [["trip", "tdb"]] },
+        { "say": "The trip service asks the matching service to find a driver.", "nodes": ["trip", "match"], "edges": [["trip", "match"]] },
+        { "say": "Matching reads the rider's cell and its neighbours in the geo index and takes the free drivers.", "nodes": ["match", "geo"], "edges": [["match", "geo"]] },
+        { "say": "It offers the trip to the best driver. The trip service pushes the offer through the gateway.", "nodes": ["trip", "gw"], "edges": [["trip", "gw"]] },
+        { "say": "The driver accepts inside the timeout. If not, matching offers the next driver.", "nodes": ["driver", "gw"], "edges": [["driver", "gw"]] },
+        { "say": "The trip moves to 'matched' with a conditional write, so no other request can claim this driver.", "nodes": ["gw", "trip", "tdb"], "edges": [["gw", "trip"], ["trip", "tdb"]] }
+      ]
+    },
+    {
+      "name": "A driver ping",
+      "steps": [
+        { "say": "Every few seconds the driver app sends its position over the open socket.", "nodes": ["driver", "gw"], "edges": [["driver", "gw"]] },
+        { "say": "The gateway forwards it to the location service. No trip service, no database.", "nodes": ["gw", "loc"], "edges": [["gw", "loc"]] },
+        { "say": "The location service maps the position to a cell. If the driver changed cell, it moves them between cell lists, otherwise it overwrites the entry.", "nodes": ["loc", "geo"], "edges": [["loc", "geo"]] }
+      ]
+    },
+    {
+      "name": "Finish and pay",
+      "steps": [
+        { "say": "The driver ends the trip. The final state and fare are written first.", "nodes": ["driver", "gw", "trip", "tdb"], "edges": [["driver", "gw"], ["gw", "trip"], ["trip", "tdb"]] },
+        { "say": "The trip service asks for the final fare, using the surge at booking time.", "nodes": ["trip", "pricing"], "edges": [["trip", "pricing"]] },
+        { "say": "It puts a 'trip ended' event on the queue and answers at once.", "nodes": ["trip", "queue"], "edges": [["trip", "queue"]] },
+        { "say": "The worker picks the event up and charges with the tripId as the idempotency key.", "nodes": ["queue", "pw"], "edges": [["queue", "pw"]] },
+        { "say": "The payment provider confirms. A failure retries later and never blocks the driver.", "nodes": ["pw", "psp"], "edges": [["pw", "psp"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Indexing live drivers",
+      "question": "How do we find the nearest free drivers while everyone moves?",
+      "options": [
+        { "name": "SQL on latitude and longitude", "pros": "Simple. Works for a prototype.", "cons": "Every ping is a write. Range scans on two columns are slow, and the table is hot." },
+        { "name": "Geohash or grid cells in memory", "pros": "Position becomes a cell id. A search reads one cell and its 8 neighbours. Moving is a cheap list update.", "cons": "Cells are uneven: a dense downtown cell holds many drivers. Cell edges need the neighbour read." },
+        { "name": "Quadtree that splits dense areas", "pros": "Adapts to density. Dense areas get small cells.", "cons": "Rebalancing under constant movement is costly. Harder to shard and to reason about." }
+      ],
+      "pick": "Fixed grid cells in memory",
+      "because": "Fixed cells make an update a constant-time move between two lists and make sharding by cell id easy. If a cell is too crowded, use a finer cell size in that city. Nearby Places has the full search story."
+    },
+    {
+      "title": "How to match",
+      "question": "Who does a request go to, and what if they say no?",
+      "options": [
+        { "name": "Broadcast to all nearby drivers", "pros": "Fastest to get a yes.", "cons": "Many drivers race for one trip, most get a stale offer, and it feels unfair." },
+        { "name": "Offer to one, wait, then the next", "pros": "Fair and predictable. A driver sees only offers they can win.", "cons": "A timeout of 10 s per decline makes a bad case slow. Needs a good ranking." },
+        { "name": "Batch requests and drivers, then solve", "pros": "Better total pickup time when demand is high.", "cons": "Adds a short wait for every rider. More complex to build and explain." }
+      ],
+      "pick": "Offer one by one, with a short timeout",
+      "because": "It is simple and fair. Keep timeouts to a few seconds and rank by pickup time, not straight distance. Batching in short windows is a later upgrade for busy cells."
+    },
+    {
+      "title": "Where the trip lives",
+      "question": "How do we avoid two riders getting one driver?",
+      "options": [
+        { "name": "Lock the driver in the geo index", "pros": "Fast, and the index already knows the driver.", "cons": "The index is volatile. A restart forgets the lock, and money depends on it." },
+        { "name": "Conditional write on the trip store", "pros": "Durable and checked: claim only if the driver is free and the version matches.", "cons": "One store round trip per claim. Needs a store that supports conditional writes." }
+      ],
+      "pick": "Conditional write on the durable trip store",
+      "because": "The geo index is a hint, never the truth. The trip store decides who owns a driver. Each state change is a write with the expected previous state, so retries and races are harmless."
+    },
+    {
+      "title": "Surge pricing",
+      "question": "How is a surge multiplier set and kept stable?",
+      "options": [
+        { "name": "Fixed time-of-day tables", "pros": "Predictable and cheap.", "cons": "Ignores a concert, rain or an outage. Wrong exactly when it matters." },
+        { "name": "Per-cell supply and demand ratio", "pros": "Reacts to the real imbalance and can draw drivers to the area.", "cons": "Noisy if raw. Cell borders create price cliffs unless neighbours are blended." }
+      ],
+      "pick": "Per-cell ratio, smoothed over a window",
+      "because": "Compute open requests divided by free drivers per cell every few seconds, average over a minute, blend with neighbouring cells, and cap it. Lock the quote at booking so the rider pays what they saw."
+    }
+  ],
+  "failures": [
+    { "what": "The geo index node restarts", "impact": "The index is empty, so no driver can be found until pings refill it.", "fix": "Pings repopulate it within one interval. Keep a hot replica per region and fail over to it. Searches that find nothing retry briefly." },
+    { "what": "A driver does not answer an offer", "impact": "The rider waits while the offer sits with a driver who has gone away.", "fix": "A short timeout moves to the next driver. A driver who misses offers is marked unavailable until they ping with activity." },
+    { "what": "A gateway crashes", "impact": "Its drivers and riders lose their sockets, and offers and tracking stop for them.", "fix": "Apps reconnect with jittered backoff and ask for the current trip state. State lives in the trip store, so nothing is lost." },
+    { "what": "Duplicate request or double charge", "impact": "A retry creates two trips or charges a rider twice.", "fix": "requestId dedupes trip creation. The tripId is the idempotency key for the charge, and the worker records the result once." },
+    { "what": "A cell is crowded after a big event", "impact": "One cell or shard takes most of the requests and pings.", "fix": "Use finer cells in the hot area, give the busy city its own shard, and add a surge so demand and supply rebalance." }
+  ],
+  "scaling": [
+    { "limit": "Ping writes grow with drivers, not with trips", "lever": "Partition the geo index by cell id or city. Increase the ping interval for parked drivers, and send pings only when the driver moved." },
+    { "limit": "One region's trip store reaches its write limit", "lever": "Shard trips by tripId within a region. A trip is pinned to its starting region, so cross-region transactions are not needed." },
+    { "limit": "Sockets for tens of millions of apps", "lever": "Add gateways. The only shared parts are the trip service and the geo index, so the fleet scales out horizontally." }
+  ],
+  "recap": {
+    "key": "Keep drivers in an in-memory grid index that you overwrite on every ping, match by offering to one driver at a time, and make the durable trip store the only judge of who owns a trip.",
+    "numbers": "500K drivers pinging every 4 s is about 125K writes per second, yet the geo index is only about 50 MB. 300 requests per second means about 1,800 trip writes. 600K sockets need about 6 gateways.",
+    "moves": ["Treat location as volatile: memory, not a database", "Cut the map into cells so a search reads a few lists", "Offer to one driver with a timeout, then the next", "Claim trips with conditional writes and charge through a queue"]
+  }
+}

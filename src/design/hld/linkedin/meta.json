@@ -1,0 +1,174 @@
+{
+  "slug": "linkedin",
+  "title": "LinkedIn",
+  "group": "Social and messaging",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a system like LinkedIn: member profiles, a professional network of mutual connections, a feed, jobs and messaging. What makes it different from a plain social app is the graph. Connections are two-way, and the number of hops between two people shapes what you see, how search ranks, and who is suggested.",
+  "requirements": {
+    "functional": [
+      "View a profile, with the degree of separation to the viewer.",
+      "Send, accept and remove connection requests.",
+      "See mutual connections with another member.",
+      "Get people-you-may-know suggestions.",
+      "Search and apply to jobs.",
+      "Read a feed and send messages (covered by other designs)."
+    ],
+    "nonFunctional": [
+      { "name": "Profile latency", "target": "A profile loads in under 150 ms at the 99th percentile" },
+      { "name": "Degree check", "target": "First, second and third degree answers in under 100 ms" },
+      { "name": "Suggestions", "target": "Refreshed daily, shown instantly" },
+      { "name": "Consistency", "target": "An accepted connection shows on both sides within seconds" },
+      { "name": "Availability", "target": "Profiles and search work 99.95% of the time" }
+    ],
+    "outOfScope": ["Feed ranking and fan-out (see News Feed)", "Messaging internals (see WhatsApp)", "Recruiter tools and ads", "Learning and premium products"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts. Each connection is stored once per member, 16 bytes per entry. Peak is 3 times average. Second-degree reach is an upper bound, since friends share friends.",
+    "inputs": [
+      { "id": "members", "label": "Members", "value": 300000000, "min": 10000000, "max": 1000000000, "log": true },
+      { "id": "avgConns", "label": "Average connections per member", "value": 300, "min": 30, "max": 3000, "log": true },
+      { "id": "activePct", "label": "Members active per day", "value": 15, "min": 2, "max": 50, "step": 1, "unit": "%" },
+      { "id": "viewsPerActive", "label": "Profile views per active member per day", "value": 8, "min": 1, "max": 40, "step": 1 },
+      { "id": "hitPct", "label": "Profile cache hit rate", "value": 95, "min": 50, "max": 99, "step": 1, "unit": "%" },
+      { "id": "edgeBytes", "label": "Bytes per stored connection", "value": 16, "min": 8, "max": 64, "step": 8, "unit": "B" }
+    ],
+    "outputs": [
+      { "id": "viewQps", "label": "Profile views per second, average", "expr": "members * activePct / 100 * viewsPerActive / 86400", "unit": "per s" },
+      { "id": "peakViewQps", "label": "Profile views per second at peak", "expr": "viewQps * 3", "unit": "per s" },
+      { "id": "dbQps", "label": "Profile store reads at peak", "expr": "peakViewQps * (100 - hitPct) / 100", "unit": "per s", "note": "What the cache does not absorb." },
+      { "id": "secondDeg", "label": "Second-degree reach per member", "expr": "avgConns * avgConns", "unit": "people", "note": "Upper bound. Overlap makes the real number smaller." },
+      { "id": "graphGb", "label": "Graph storage", "expr": "members * avgConns * edgeBytes / 1e9", "unit": "GB", "note": "Every connection sits in both members' lists, so this counts both sides." },
+      { "id": "pymkPaths", "label": "Suggestion paths scanned per night", "expr": "members * secondDeg / 1e9", "unit": "billions", "note": "Why this runs offline, in batches." }
+    ]
+  },
+  "api": [
+    { "call": "GET /members/{id}", "does": "Returns the profile, plus the degree between the viewer and this member." },
+    { "call": "POST /connections  { toMemberId }", "does": "Sends a connection request. Accepting creates the edge in both directions." },
+    { "call": "GET /members/{id}/mutual", "does": "Returns connections the viewer and this member share." },
+    { "call": "GET /suggestions", "does": "Returns the precomputed people-you-may-know list for the viewer." },
+    { "call": "GET /jobs?q=&loc=", "does": "Searches jobs, ranked by match." },
+    { "call": "POST /jobs/{id}/apply", "does": "Submits an application. Idempotent per member and job." }
+  ],
+  "data": [
+    { "entity": "Profile", "fields": "memberId, headline, positions, skills, updatedAt", "store": "Sharded document store by memberId.", "why": "Always read whole, by id. Rarely written, so it caches very well." },
+    { "entity": "Connection", "fields": "memberId, otherId, since", "store": "Graph store, adjacency lists both ways.", "why": "Hops and intersections are the main queries. A join table makes second degree a huge self-join." },
+    { "entity": "Suggestions", "fields": "memberId, [candidateId, score, mutualCount]", "store": "Key-value store, written by a batch job.", "why": "Computed offline, served as one lookup." },
+    { "entity": "Job and application", "fields": "jobId, title, company, loc; memberId, jobId, status", "store": "Job search index, application table.", "why": "Jobs need text search and filters. Applications are plain rows." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Client", "kind": "client", "x": 7, "y": 50, "since": 0 },
+    { "id": "api", "label": "API service", "kind": "service", "x": 27, "y": 50, "sub": "profiles, network", "since": 0 },
+    { "id": "profiledb", "label": "Profile store", "kind": "db", "x": 27, "y": 88, "sub": "profiles by id", "since": 0 },
+    { "id": "cache", "label": "Profile cache", "kind": "cache", "x": 47, "y": 88, "sub": "hot profiles", "since": 1 },
+    { "id": "graphdb", "label": "Connection graph", "kind": "db", "x": 67, "y": 50, "sub": "adjacency lists", "since": 2 },
+    { "id": "graphsvc", "label": "Graph service", "kind": "service", "x": 47, "y": 50, "sub": "degrees, mutuals", "since": 3 },
+    { "id": "batch", "label": "Suggestion job", "kind": "worker", "x": 67, "y": 12, "sub": "nightly batch", "since": 4 },
+    { "id": "pymk", "label": "Suggestions", "kind": "cache", "x": 47, "y": 12, "sub": "may-know lists", "since": 4 },
+    { "id": "feed", "label": "Feed", "kind": "service", "x": 27, "y": 12, "sub": "see News Feed", "since": 5 },
+    { "id": "msg", "label": "Messaging", "kind": "service", "x": 7, "y": 12, "sub": "see WhatsApp", "since": 5 },
+    { "id": "jobs", "label": "Jobs service", "kind": "service", "x": 67, "y": 88, "sub": "search, apply", "since": 6 },
+    { "id": "jobidx", "label": "Job index", "kind": "db", "x": 90, "y": 88, "sub": "text and filters", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "api", "since": 0 },
+    { "from": "api", "to": "profiledb", "since": 0, "until": 1 },
+    { "from": "api", "to": "cache", "since": 1 },
+    { "from": "cache", "to": "profiledb", "since": 1 },
+    { "from": "api", "to": "graphdb", "label": "edges", "since": 2, "until": 3 },
+    { "from": "api", "to": "graphsvc", "since": 3 },
+    { "from": "graphsvc", "to": "graphdb", "since": 3 },
+    { "from": "graphsvc", "to": "cache", "label": "cache sets", "dashed": true, "since": 3 },
+    { "from": "graphdb", "to": "batch", "label": "scan", "since": 4 },
+    { "from": "batch", "to": "pymk", "since": 4 },
+    { "from": "api", "to": "pymk", "label": "read", "since": 4 },
+    { "from": "api", "to": "feed", "since": 5 },
+    { "from": "api", "to": "msg", "since": 5 },
+    { "from": "api", "to": "jobs", "since": 6 },
+    { "from": "jobs", "to": "jobidx", "since": 6 }
+  ],
+  "evolution": [
+    { "title": "Profiles and a connections table", "problem": "Start simple: members, profiles and a table of who is connected to whom, in one store.", "change": "An API service reads and writes a profile store. Connections are rows in the same database." },
+    { "title": "Cache the profiles", "problem": "A profile is read far more often than it is edited, and a profile page also checks the connection. The database sees every view.", "change": "Put a profile cache in front of the store. Hot profiles are served from memory. Only misses reach the database.", "numbers": "peak views per second and store reads in the estimator" },
+    { "title": "A real graph store", "problem": "Who is my second-degree contact is a self-join over the connections table. With 300 connections each, one query touches about 90K rows.", "change": "Keep connections in a graph store with an adjacency list per member, in both directions. First degree is one lookup, and mutual connections is the intersection of two lists.", "numbers": "second-degree reach is connections times connections" },
+    { "title": "A graph service for degrees", "problem": "Profile pages and search ranking all ask the degree between two members. Each team running its own graph walks is slow and duplicates work.", "change": "A graph service owns degree and mutual queries. It checks first degree directly, then intersects lists for second degree, and caches the small answers. Third degree is only bounded or looked up from a precomputed set." },
+    { "title": "People you may know, offline", "problem": "Suggestions mean counting mutual connections for every candidate. Doing it live for 300M members is billions of paths.", "change": "A nightly batch job scans the graph. For each member it counts second-degree candidates by mutual connections, scores them and keeps the top few hundred. Serving is one key lookup.", "numbers": "suggestion paths scanned per night in the estimator" },
+    { "title": "Feed and messaging as blocks", "problem": "Members also expect a feed of updates and one-to-one messages. These are already solved designs.", "change": "Add the feed (News Feed) and messaging (WhatsApp) as single blocks the API service calls. The graph tells the feed whom to include." },
+    { "title": "Jobs search and applications", "problem": "Jobs are a second product. Searching by title, skills and place, with filters, is poor in the profile store.", "change": "Add a jobs service with its own text-search index for job posts, and an application table. A member applies once per job." }
+  ],
+  "flows": [
+    {
+      "name": "Open a profile",
+      "steps": [
+        { "say": "The viewer opens a member's profile. The request reaches the API service.", "nodes": ["client", "api"], "edges": [["client", "api"]] },
+        { "say": "The service reads the profile from the cache. Most views stop here.", "nodes": ["api", "cache"], "edges": [["api", "cache"]] },
+        { "say": "On a miss the cache loads it from the profile store and keeps it.", "nodes": ["cache", "profiledb"], "edges": [["cache", "profiledb"]] },
+        { "say": "In parallel the service asks the graph service for the degree between viewer and member.", "nodes": ["api", "graphsvc"], "edges": [["api", "graphsvc"]] },
+        { "say": "The graph service looks at the viewer's first-degree list. If the member is not there, it intersects the two lists to find mutual connections.", "nodes": ["graphsvc", "graphdb"], "edges": [["graphsvc", "graphdb"]] },
+        { "say": "The page returns with the profile, a first, second or third degree badge, and a few mutual names.", "nodes": ["api", "client"], "edges": [["client", "api"]] }
+      ]
+    },
+    {
+      "name": "People you may know",
+      "steps": [
+        { "say": "Every night the suggestion job scans the connection graph.", "nodes": ["graphdb", "batch"], "edges": [["graphdb", "batch"]] },
+        { "say": "For each member it walks to friends, then to friends of friends, and counts how many mutual connections each candidate has.", "nodes": ["batch"], "edges": [] },
+        { "say": "It drops people already connected, scores the rest, and keeps the top few hundred.", "nodes": ["batch"], "edges": [] },
+        { "say": "The lists are written to the suggestions store, one key per member.", "nodes": ["batch", "pymk"], "edges": [["batch", "pymk"]] },
+        { "say": "The member opens the network tab. The API service reads their list. One lookup, no graph walk.", "nodes": ["client", "api", "pymk"], "edges": [["client", "api"], ["api", "pymk"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Where connections live",
+      "question": "Which store answers first, second and third degree quickly?",
+      "options": [
+        { "name": "Relational join table", "pros": "Familiar. Transactions on accept.", "cons": "Second degree is a self-join, third degree is worse. Sharding by member splits the walk across machines." },
+        { "name": "Adjacency lists in a key-value store", "pros": "First degree is one read. Intersecting two sorted lists is cheap. Scales by sharding on member id.", "cons": "You build the traversal yourself. Reads for a high-degree member are large." },
+        { "name": "A native graph database", "pros": "Traversal is built in.", "cons": "Hard to shard at this size, and deep walks on huge nodes are still costly." }
+      ],
+      "pick": "Sharded adjacency lists in a graph service",
+      "because": "Almost every question is first degree or an intersection of two lists. Both are cheap on sorted lists. Keep third degree bounded or precomputed instead of walking it live. Write both directions on accept so reads need one shard."
+    },
+    {
+      "title": "Degrees and search ranking",
+      "question": "How do we use closeness without a graph walk for every result?",
+      "options": [
+        { "name": "Compute degree per result at query time", "pros": "Always fresh.", "cons": "A page of 25 results is 25 graph queries, on top of the search itself." },
+        { "name": "Ship the first-degree set with the query", "pros": "Search can boost results who are in the set. One lookup, then a filter or boost.", "cons": "Large lists to ship. Needs the set to be fresh enough." },
+        { "name": "Precompute a small network set per member", "pros": "Cheap and quick at query time. Works for ranking and suggestion.", "cons": "Stale by hours. Costs storage for every member." }
+      ],
+      "pick": "First-degree set once, boost in search",
+      "because": "Search runs per query, but the viewer's list is one lookup and can be cached for the session. Boost first-degree results, and take second degree only for the top few candidates, from the graph service."
+    },
+    {
+      "title": "Suggestions: offline or live",
+      "question": "When do we compute people-you-may-know?",
+      "options": [
+        { "name": "Live at request time", "pros": "Always fresh, reacts to a new connection at once.", "cons": "Billions of paths overall, and a slow page for high-degree members." },
+        { "name": "Offline batch, daily", "pros": "Costs are controlled and planned. Serving is one lookup.", "cons": "A new connection does not change the list until the next run." },
+        { "name": "Batch plus incremental updates", "pros": "Fresh after a connection is made, with the batch as a base.", "cons": "More to build, and two paths to reconcile." }
+      ],
+      "pick": "Offline batch, with a small live adjustment later",
+      "because": "Suggestions are fine if they are a day old. Run the heavy mutual-count scan in batch, and remove people from the list at once if the member connects or dismisses them. Add incremental updates only when freshness proves to matter."
+    }
+  ],
+  "failures": [
+    { "what": "A member with a huge connection list", "impact": "Reading or intersecting a list with tens of thousands of entries is slow and loads one shard.", "fix": "Cap how many entries a walk reads. Cache lists for high-degree members and compute mutuals against the smaller side first." },
+    { "what": "Profile cache is cold or lost", "impact": "All views hit the profile store at once.", "fix": "Warm the most viewed profiles first. Limit parallel misses per key so one load fills the cache, and keep replicas." },
+    { "what": "Accept writes one side only", "impact": "One member sees the connection and the other does not.", "fix": "Write both adjacency lists from one event, retry until both succeed, and make the write idempotent. A repair job compares the two sides." },
+    { "what": "The nightly job runs late or fails", "impact": "Members see yesterday's suggestions, or none if the store is empty.", "fix": "Keep the previous day's lists until the new run finishes. Run in partitions so a failure re-runs only part." },
+    { "what": "Duplicate job application", "impact": "A retry creates two applications and two emails to the recruiter.", "fix": "Make the key member plus job unique. A repeat call returns the existing application." }
+  ],
+  "scaling": [
+    { "limit": "Graph storage grows with members times connections", "lever": "Shard by member id. Compress sorted id lists with delta encoding. About 1.4 TB for the defaults, which fits many machines." },
+    { "limit": "Second-degree walks fan out on the graph", "lever": "Intersect lists instead of expanding them. Cap walk size, and precompute the second-degree sets for the most queried members." },
+    { "limit": "Profile reads from many regions", "lever": "Regional profile caches and read replicas. Writes go to one home region, and a profile edit invalidates caches." }
+  ],
+  "recap": {
+    "key": "The graph is the product: store connections as adjacency lists, answer degrees by intersection, and compute people-you-may-know offline from mutual connections.",
+    "numbers": "About 4K profile views per second for 300M members, 12K at peak, 600 store reads at a 95% hit rate. 300 connections each gives 90K second-degree reach and about 1.4 TB of graph.",
+    "moves": ["Cache profiles heavily, since they are read much more than written", "Keep connections as adjacency lists and intersect for mutuals", "Run suggestions as a nightly batch of second-degree counts", "Reuse the feed and messaging designs as single blocks"]
+  }
+}

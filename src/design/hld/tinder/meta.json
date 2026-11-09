@@ -1,0 +1,177 @@
+{
+  "slug": "tinder",
+  "title": "Tinder",
+  "group": "Social and messaging",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design a system like Tinder: you see a stack of nearby people one card at a time and swipe right to like or left to pass. When two people have both liked each other it is a match, and they can chat. The hard parts are picking good nearby cards, taking a huge stream of swipes, and spotting a match the instant it happens.",
+  "requirements": {
+    "functional": [
+      "Show a stack of nearby people who fit my filters (age, distance, gender).",
+      "Swipe right to like or left to pass on a card.",
+      "Never show me the same person twice.",
+      "Detect a match when both people have liked each other.",
+      "Tell both people about the match, and open a chat.",
+      "Update my location as I move."
+    ],
+    "nonFunctional": [
+      { "name": "Swipe latency", "target": "A swipe is accepted in under 100 ms at the 99th percentile" },
+      { "name": "Match speed", "target": "A match shows on the swiping screen at once, and the other person is told within 5 seconds" },
+      { "name": "Card load", "target": "The next stack loads in under 300 ms" },
+      { "name": "No repeats", "target": "A person I already swiped is shown again almost never (under 1 in 10,000 cards)" },
+      { "name": "Durability", "target": "A right swipe is never lost, or a match could be missed" }
+    ],
+    "outOfScope": ["Chat itself (reuse the Chat System design)", "Payments and premium features", "Photo upload and moderation", "Safety and fraud checks"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts: a swipe is one small write, peak is about 3 times the average, and the seen filter uses a fixed number of bits per swipe. Swipes per second drive the write path, the seen set drives memory.",
+    "inputs": [
+      { "id": "dau", "label": "Daily active users", "value": 50000000, "min": 1000000, "max": 500000000, "log": true },
+      { "id": "swipesPerUser", "label": "Swipes per user per day", "value": 100, "min": 10, "max": 500, "log": true },
+      { "id": "likePct", "label": "Share of swipes that are right swipes", "value": 30, "min": 5, "max": 60, "step": 5, "unit": "%" },
+      { "id": "matchPct", "label": "Right swipes that complete a match", "value": 3, "min": 0.5, "max": 15, "step": 0.5, "unit": "%" },
+      { "id": "seenDays", "label": "Remember who I swiped for", "value": 365, "min": 30, "max": 1095, "step": 30, "unit": "days" },
+      { "id": "bitsPerEntry", "label": "Bloom filter bits per person seen", "value": 10, "min": 5, "max": 20, "step": 1, "unit": "bits", "note": "About 10 bits gives roughly 1% false positives." }
+    ],
+    "outputs": [
+      { "id": "avgQps", "label": "Swipes per second, average", "expr": "dau * swipesPerUser / 86400", "unit": "per s" },
+      { "id": "peakQps", "label": "Swipes per second at peak", "expr": "avgQps * 3", "unit": "per s", "note": "Evenings and weekends in busy cities." },
+      { "id": "likeChecks", "label": "Match lookups per second at peak", "expr": "peakQps * likePct / 100", "unit": "per s", "note": "Only right swipes need to ask: did they like me first?" },
+      { "id": "matchesPerSec", "label": "New matches per second, average", "expr": "avgQps * likePct / 100 * matchPct / 100", "unit": "per s" },
+      { "id": "seenPerUser", "label": "People in one user's seen set", "expr": "swipesPerUser * seenDays", "unit": "people" },
+      { "id": "seenKbPerUser", "label": "Seen filter size per user", "expr": "seenPerUser * bitsPerEntry / 8 / 1000", "unit": "KB" },
+      { "id": "seenTotalGb", "label": "Seen filters for all users", "expr": "dau * seenPerUser * bitsPerEntry / 8 / 1e9", "unit": "GB", "note": "Shard across many memory nodes." }
+    ]
+  },
+  "api": [
+    { "call": "GET /deck?lat&lng&limit=20", "does": "Returns the next cards: nearby people who fit my filters, ranked, never seen." },
+    { "call": "POST /swipe { targetId, dir, swipeId }", "does": "Records a like or pass. swipeId makes a retry safe. Replies with match: true if it completes a match." },
+    { "call": "PUT /location { lat, lng }", "does": "Updates my position in the geo index." },
+    { "call": "GET /matches", "does": "Lists my matches, each with a chat id." },
+    { "call": "DELETE /swipe/last", "does": "Undo the last swipe. Often a paid feature." }
+  ],
+  "data": [
+    { "entity": "Profile", "fields": "userId, name, age, photos, bio, prefs, lastActive", "store": "Document or key-value store keyed by userId.", "why": "Read by id when cards are built. No joins, so it shards cleanly." },
+    { "entity": "Swipe", "fields": "swiperId, targetId, dir, at", "store": "Wide-column store, partition key swiperId.", "why": "The durable log of every choice. It is write-heavy and only read back by one user." },
+    { "entity": "Likes index", "fields": "targetId to set of likerIds (right swipes only)", "store": "In-memory key-value store, sharded by targetId.", "why": "Answers 'did B like A?' with one lookup at swipe time. Only likes go in, which is a small share of swipes." },
+    { "entity": "Seen filter", "fields": "userId, bloom bits", "store": "In-memory store, one Bloom filter per user.", "why": "Tests 'did I already swipe this person?' in memory, at a few bits per person." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Phone app", "kind": "client", "x": 6, "y": 50, "since": 0 },
+    { "id": "api", "label": "API server", "kind": "service", "x": 24, "y": 50, "sub": "deck and swipe", "since": 0 },
+    { "id": "profiles", "label": "Profile store", "kind": "db", "x": 86, "y": 12, "sub": "by userId", "since": 0 },
+    { "id": "geo", "label": "Geo index", "kind": "cache", "x": 44, "y": 12, "sub": "cells to people", "since": 1 },
+    { "id": "swipes", "label": "Swipe service", "kind": "service", "x": 46, "y": 69, "sub": "record, match", "since": 2 },
+    { "id": "swipestore", "label": "Swipe log", "kind": "db", "x": 86, "y": 69, "sub": "by swiper", "since": 2 },
+    { "id": "ranker", "label": "Ranker", "kind": "service", "x": 64, "y": 12, "sub": "orders candidates", "since": 3 },
+    { "id": "seen", "label": "Seen filter", "kind": "cache", "x": 86, "y": 31, "sub": "Bloom per user", "since": 4 },
+    { "id": "likes", "label": "Likes index", "kind": "cache", "x": 46, "y": 50, "sub": "who liked whom", "since": 5 },
+    { "id": "queue", "label": "Swipe queue", "kind": "queue", "x": 66, "y": 69, "sub": "absorbs bursts", "since": 5 },
+    { "id": "chat", "label": "Chat system", "kind": "service", "x": 46, "y": 88, "sub": "see Chat design", "since": 6 },
+    { "id": "notify", "label": "Notifications", "kind": "worker", "x": 24, "y": 88, "sub": "push a match", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "api", "since": 0 },
+    { "from": "api", "to": "profiles", "label": "all users", "since": 0, "until": 3 },
+    { "from": "api", "to": "geo", "label": "nearby", "since": 1 },
+    { "from": "api", "to": "swipes", "since": 2 },
+    { "from": "swipes", "to": "swipestore", "since": 2, "until": 5 },
+    { "from": "api", "to": "ranker", "label": "rank", "since": 3 },
+    { "from": "ranker", "to": "profiles", "since": 3 },
+    { "from": "ranker", "to": "seen", "since": 4 },
+    { "from": "swipes", "to": "seen", "dashed": true, "since": 4, "until": 5 },
+    { "from": "queue", "to": "seen", "label": "mark seen", "since": 5 },
+    { "from": "swipes", "to": "likes", "since": 5 },
+    { "from": "swipes", "to": "queue", "since": 5 },
+    { "from": "queue", "to": "swipestore", "since": 5 },
+    { "from": "swipes", "to": "chat", "label": "match", "since": 6 },
+    { "from": "swipes", "to": "notify", "since": 6 }
+  ],
+  "evolution": [
+    { "title": "One server, one database", "problem": "Start with what works for a small town: all profiles in one table, and the app asks for people who fit the filters.", "change": "The API server runs a SQL query for profiles within a distance and the user's filters, and returns a page of cards." },
+    { "title": "A geo index for candidates", "problem": "Distance on raw latitude and longitude means scanning every user, and locations change all day. At 10M users in a metro area the query takes seconds.", "change": "Keep an in-memory geo index: the map is cut into cells and each cell lists the people in it. A deck query reads the user's cell and its neighbours, then filters by preferences. It is the nearby search building block, shown as one node." },
+    { "title": "Record swipes and find matches", "problem": "Nothing remembers a choice yet. Without it there are no matches, and cards repeat.", "change": "A swipe service writes each swipe to a swipe log. On a right swipe from A to B it reads whether B already liked A. If yes, it creates a match. Writes and reads both hit the one log." },
+    { "title": "Rank the candidates", "problem": "Sorting by distance shows the same few people to everyone nearby. Popular profiles get swamped, and others are never seen.", "change": "A ranker scores the geo candidates with a few signals (activity, mutual preferences, past likes) and returns the best. It loads profiles for the cards it keeps.", "numbers": "Cards ranked per deck, about 20 out of a few hundred" },
+    { "title": "Never show someone twice", "problem": "Each user swipes about 36,500 people in a year. Checking every candidate against the swipe log is a database read per card, and users hate repeats.", "change": "Keep a Bloom filter per user in memory. The ranker drops candidates the filter says were seen, and the swipe service adds each new swipe to it (later via the queue). A rare false positive just hides one person, which is harmless.", "numbers": "the estimator shows the filter size per user" },
+    { "title": "Swipes at very high write rate", "problem": "Peak swipes are over 100K per second. The match check must be a fast lookup, and the durable log cannot take a synchronous write for every swipe.", "change": "Right swipes go into a likes index keyed by the target, so 'did B like A?' is one in-memory read. The swipe is also put on a queue. Its consumer writes the swipe log in batches and updates the seen filter, so bursts do not hit the database.", "numbers": "the estimator shows swipes and lookups per second" },
+    { "title": "Hand off to chat and notify", "problem": "A match is only useful if both people know, and can talk.", "change": "On a match the swipe service creates the chat through the Chat System block and sends a push through notifications to the person who is offline. The swiper sees the match in the swipe reply." }
+  ],
+  "flows": [
+    {
+      "name": "Swipe right and match",
+      "steps": [
+        { "say": "I swipe right on Sam. The app posts the swipe with a swipe id it made itself.", "nodes": ["client", "api"], "edges": [["client", "api"]] },
+        { "say": "The API passes it to the swipe service.", "nodes": ["api", "swipes"], "edges": [["api", "swipes"]] },
+        { "say": "The service asks the likes index: has Sam already liked me? It also adds my like of Sam, in that order.", "nodes": ["swipes", "likes"], "edges": [["swipes", "likes"]] },
+        
+        { "say": "It puts the swipe on the queue. A consumer will write it to the swipe log in a batch.", "nodes": ["swipes", "queue"], "edges": [["swipes", "queue"]] },
+        { "say": "The queue consumer appends the swipe to the durable log.", "nodes": ["queue", "swipestore"], "edges": [["queue", "swipestore"]] },
+        { "say": "It also marks Sam as seen in my Bloom filter.", "nodes": ["queue", "seen"], "edges": [["queue", "seen"]] },
+        { "say": "Sam had liked me, so it is a match. The service creates the chat.", "nodes": ["swipes", "chat"], "edges": [["swipes", "chat"]] },
+        { "say": "It tells Sam by push. My screen already shows 'It is a match' from the reply.", "nodes": ["swipes", "notify"], "edges": [["swipes", "notify"]] }
+      ]
+    },
+    {
+      "name": "Load the next cards",
+      "steps": [
+        { "say": "I open the app. It sends my location and filters.", "nodes": ["client", "api"], "edges": [["client", "api"]] },
+        { "say": "The API asks the geo index for people in my cell and the cells around it.", "nodes": ["api", "geo"], "edges": [["api", "geo"]] },
+        { "say": "It gets a few hundred user ids and checks them against my filters.", "nodes": ["geo", "api"], "edges": [] },
+        { "say": "The ranker takes the candidates to order them.", "nodes": ["api", "ranker"], "edges": [["api", "ranker"]] },
+        { "say": "It drops everyone my Bloom filter says I have already swiped.", "nodes": ["ranker", "seen"], "edges": [["ranker", "seen"]] },
+        { "say": "It reads the profiles of the best 20 and the deck goes back to the phone.", "nodes": ["ranker", "profiles", "api", "client"], "edges": [["ranker", "profiles"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Detecting a match at swipe time",
+      "question": "How do we know, within one request, that the other person already liked me?",
+      "options": [
+        { "name": "Query the swipe log", "pros": "No extra system. The log already has the answer.", "cons": "The log is partitioned by swiper, so 'who swiped me' is a scatter across partitions. Too slow for every swipe." },
+        { "name": "Likes index keyed by target", "pros": "One in-memory lookup per right swipe. Only likes are stored, a small share of all swipes.", "cons": "A second copy of the data. It must be rebuilt from the log if lost." },
+        { "name": "Scan on a timer", "pros": "Cheap and simple batch job.", "cons": "The match shows up minutes late and kills the moment. Not acceptable." }
+      ],
+      "pick": "Likes index keyed by target, rebuilt from the log",
+      "because": "A match needs a fast reverse lookup, and that is a different access path from the log. Write my like first, then read theirs. If both swipe at once, at least one of us sees the other. A pair key makes the match idempotent."
+    },
+    {
+      "title": "Remembering who I have seen",
+      "question": "How do we avoid repeats without a database read per card?",
+      "options": [
+        { "name": "Exact set in the database", "pros": "No false positives. Easy to reason about.", "cons": "A read per candidate, and tens of thousands of rows per user. Heavy and slow." },
+        { "name": "Bloom filter in memory", "pros": "About 10 bits per person. A test is constant time and needs no disk.", "cons": "A small false-positive rate hides a few unseen people. Cannot remove entries, so undo needs care." },
+        { "name": "Exact set plus Bloom in front", "pros": "Bloom says 'definitely new' fast, and the exact set settles the rest.", "cons": "More moving parts. The exact set is still read for many cards." }
+      ],
+      "pick": "Bloom filter per user, rebuilt from the swipe log",
+      "because": "Hiding one person in a hundred is a fine price in a pool of thousands. If a filter fills up or an undo is needed, rebuild it from the log. For the exact answer, the log is still the truth."
+    },
+    {
+      "title": "Building the deck",
+      "question": "Query on every card, or prepare a batch ahead?",
+      "options": [
+        { "name": "Query on demand", "pros": "Always fresh. Reflects my newest location and filters.", "cons": "Every swipe cycle costs a geo read, a ranking pass and a profile fetch." },
+        { "name": "Precompute a batch", "pros": "Take 20 or so cards per request. Ranking cost is spread, and the next swipe is instant.", "cons": "Cards can go stale: people leave the area or go offline. Need a refresh rule." }
+      ],
+      "pick": "Precompute about 20 cards, refresh when low or moved",
+      "because": "Users swipe fast and cards load from the phone's own stack. Staleness is tolerable, and the seen filter still runs on each refresh."
+    }
+  ],
+  "failures": [
+    { "what": "Two people swipe right at the same moment", "impact": "Each checks the likes index before the other's like lands, so neither sees a match and it is lost.", "fix": "Write my like first, then read theirs. Whoever is second always sees the first. Create the match by a pair key so a double detection is harmless." },
+    { "what": "Likes index node is lost", "impact": "Match lookups fail for the users on that shard, so matches are missed.", "fix": "Replicate the index, and rebuild a shard from the swipe log. While rebuilding, fall back to a slower log lookup for those users." },
+    { "what": "Queue falls behind", "impact": "Swipes are not yet in the log, so the seen filter and match history lag. A person can reappear.", "fix": "The swipe service writes the likes index itself, before the queue, so matches stay correct. The phone also remembers its recent swipes and hides them. Scale consumers on queue depth." },
+    { "what": "Ranker is down or slow", "impact": "No decks are built, so users see a blank screen.", "fix": "Fall back to distance order from the geo index with the seen filter. Serve the last good deck from a cache. Time out the ranker at a short limit." },
+    { "what": "A hot city cell", "impact": "One geo cell has millions of people and a single node cannot serve it.", "fix": "Split dense cells into smaller ones and replicate the hot ones. Sample candidates instead of listing all." }
+  ],
+  "scaling": [
+    { "limit": "Seen filters are the largest memory cost, growing with swipes per user times days kept", "lever": "Cap the window, drop filters of inactive users and rebuild them on return, and shard by userId. Lower bits per entry if more false positives are fine." },
+    { "limit": "Swipes at peak need a very high write rate", "lever": "Partition the queue and log by swiper id. Batch writes. The match path only uses memory, so it is not limited by the log." },
+    { "limit": "Dense places make geo cells hot", "lever": "Use finer cells in dense areas and cache their candidate lists for short periods. Pick candidates by sampling." }
+  ],
+  "recap": {
+    "key": "A deck is geo candidates, ranked and filtered by a per-user Bloom filter. A match is one reverse lookup in a likes index at swipe time, with the durable log written behind a queue.",
+    "numbers": "For 50M daily users at 100 swipes each: about 58K swipes per second on average and 174K at peak, around 52K match lookups per second at peak, and about 45 KB of Bloom filter per user.",
+    "moves": ["Find candidates from a geo index, then rank them", "Check the reverse like in memory, write the log behind a queue", "Use a Bloom filter per user so nobody repeats", "Hand a match to chat and notifications as single blocks"]
+  }
+}

@@ -1,0 +1,186 @@
+{
+  "slug": "amazon",
+  "title": "Amazon (E-commerce)",
+  "group": "Ride, food and marketplaces",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design an online store like Amazon: millions of products people browse, a cart, and a checkout that charges money and ships goods. Browsing is read-heavy and can be a little stale. Stock counts and orders cannot: never sell what you do not have, never charge twice, and survive a sale that sends a huge crowd to a few products at once.",
+  "requirements": {
+    "functional": [
+      "Browse and search a catalog, and open a product page.",
+      "Add items to a cart and change it.",
+      "Check out: reserve stock, pay, and create an order.",
+      "Show the order and its status as it ships.",
+      "Handle a flash sale on a few popular products."
+    ],
+    "nonFunctional": [
+      { "name": "Product page latency", "target": "Under 100 ms at the 99th percentile, from cache" },
+      { "name": "No overselling", "target": "Units sold never exceed units in stock" },
+      { "name": "Checkout safety", "target": "A retry never charges or orders twice" },
+      { "name": "Availability", "target": "Browsing stays up at 99.99%, even if checkout is degraded" },
+      { "name": "Sale spike", "target": "Survive 10 times normal traffic without losing orders" }
+    ],
+    "outOfScope": ["Recommendations and ads", "Seller onboarding and returns", "Fraud scoring", "Tax and shipping rules"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts. Most traffic is people looking, not buying, so page reads dwarf orders. The peak multiplier is a sale or holiday spike. Cache hit rate decides how much reaches the database.",
+    "inputs": [
+      { "id": "ordersPerDay", "label": "Orders per day", "value": 10000000, "min": 100000, "max": 100000000, "log": true },
+      { "id": "peakMult", "label": "Peak multiplier during a sale", "value": 10, "min": 1, "max": 50, "step": 1, "unit": "x" },
+      { "id": "viewsPerOrder", "label": "Product page views per order", "value": 50, "min": 10, "max": 500, "step": 10, "note": "Browse-to-buy ratio" },
+      { "id": "catalogSize", "label": "Products in the catalog", "value": 100000000, "min": 1000000, "max": 1000000000, "log": true },
+      { "id": "hitRate", "label": "Page cache hit rate", "value": 98, "min": 80, "max": 99.9, "step": 0.1, "unit": "%" },
+      { "id": "productKb", "label": "Stored size per product", "value": 5, "min": 1, "max": 50, "step": 1, "unit": "KB" }
+    ],
+    "outputs": [
+      { "id": "avgOrderQps", "label": "Orders per second, average", "expr": "ordersPerDay / 86400", "unit": "per s" },
+      { "id": "peakOrderQps", "label": "Orders per second at sale peak", "expr": "avgOrderQps * peakMult", "unit": "per s", "note": "These are the writes that must stay correct." },
+      { "id": "peakReadQps", "label": "Product page reads at sale peak", "expr": "ordersPerDay * viewsPerOrder / 86400 * peakMult", "unit": "per s" },
+      { "id": "originQps", "label": "Reads that miss the cache", "expr": "peakReadQps * (100 - hitRate) / 100", "unit": "per s", "note": "What the catalog database and search index must serve." },
+      { "id": "catalogTb", "label": "Catalog storage", "expr": "catalogSize * productKb / 1e9", "unit": "TB", "note": "Text and metadata. Images live in blob storage and the CDN." },
+      { "id": "holdsOpen", "label": "Stock holds open at peak", "expr": "peakOrderQps * 600", "unit": "holds", "note": "Assumes each hold lasts up to 10 minutes." }
+    ]
+  },
+  "api": [
+    { "call": "GET /products/{id}", "does": "Returns the product page data. Served from CDN and cache almost always." },
+    { "call": "GET /search?q&filters&cursor", "does": "Finds products in the search index and returns a page of cards." },
+    { "call": "PUT /cart/items  { sku, qty }", "does": "Changes the cart. The cart is per user or per session." },
+    { "call": "POST /checkout  { cartId, payment }  + Idempotency-Key", "does": "Reserves stock, charges, creates the order. Same key returns the same result." },
+    { "call": "GET /orders/{id}", "does": "Returns the order and its current status." }
+  ],
+  "data": [
+    { "entity": "Product", "fields": "sku, title, attrs, price, sellerId, images", "store": "Key-value or document store by sku.", "why": "Reads are by sku and rarely change, so they cache well. Search has its own index." },
+    { "entity": "Cart", "fields": "userId, [sku, qty], updatedAt", "store": "Key-value store with TTL.", "why": "One key per user, changes often, and abandoned carts expire. No joins needed." },
+    { "entity": "Stock and Hold", "fields": "sku, onHand, reserved; holdId, qty, expiresAt", "store": "Relational or strongly consistent store.", "why": "Atomic conditional update: decrement only if enough remains. A hold is a reservation with a deadline, and expiry returns stock." },
+    { "entity": "Order", "fields": "orderId, userId, items, total, status, idemKey", "store": "Relational store, sharded by userId.", "why": "Money and state changes need transactions. A unique idemKey makes checkout safe to retry." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Shoppers", "kind": "client", "x": 6, "y": 50, "since": 0 },
+    { "id": "app", "label": "Shop API", "kind": "service", "x": 26, "y": 50, "sub": "browse and checkout", "since": 0 },
+    { "id": "catdb", "label": "Catalog DB", "kind": "db", "x": 70, "y": 12, "sub": "products and prices", "since": 0 },
+    { "id": "cdn", "label": "CDN", "kind": "cdn", "x": 26, "y": 12, "sub": "pages and images", "since": 1 },
+    { "id": "cache", "label": "Product cache", "kind": "cache", "x": 48, "y": 12, "sub": "hot product pages", "since": 1 },
+    { "id": "search", "label": "Search index", "kind": "service", "x": 70, "y": 32, "sub": "text and filters", "since": 2 },
+    { "id": "cart", "label": "Cart store", "kind": "db", "x": 70, "y": 54, "sub": "key-value, TTL", "since": 3 },
+    { "id": "inv", "label": "Inventory", "kind": "service", "x": 48, "y": 88, "sub": "holds, atomic stock", "since": 4 },
+    { "id": "order", "label": "Order service", "kind": "service", "x": 70, "y": 76, "sub": "saga, order DB", "since": 5 },
+    { "id": "pay", "label": "Payment provider", "kind": "external", "x": 91, "y": 90, "sub": "charge, refund", "since": 5 },
+    { "id": "queue", "label": "Order events", "kind": "queue", "x": 91, "y": 54, "sub": "durable log", "since": 5 },
+    { "id": "ship", "label": "Fulfilment worker", "kind": "worker", "x": 91, "y": 32, "sub": "pick, pack, ship", "since": 5 },
+    { "id": "wait", "label": "Waiting room", "kind": "queue", "x": 26, "y": 88, "sub": "queue and rate limit", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "app", "since": 0 },
+    { "from": "app", "to": "catdb", "since": 0, "until": 1 },
+    { "from": "client", "to": "cdn", "label": "pages", "since": 1 },
+    { "from": "cdn", "to": "app", "label": "miss", "dashed": true, "since": 1 },
+    { "from": "app", "to": "cache", "since": 1 },
+    { "from": "cache", "to": "catdb", "label": "miss", "since": 1 },
+    { "from": "app", "to": "search", "since": 2 },
+    { "from": "app", "to": "cart", "since": 3 },
+    { "from": "app", "to": "inv", "label": "reserve", "since": 4 },
+    { "from": "app", "to": "order", "label": "place order", "since": 5 },
+    { "from": "order", "to": "inv", "label": "commit", "since": 5 },
+    { "from": "order", "to": "pay", "label": "charge", "since": 5 },
+    { "from": "order", "to": "queue", "label": "OrderPlaced", "since": 5 },
+    { "from": "queue", "to": "ship", "since": 5 },
+    { "from": "client", "to": "wait", "label": "checkout", "since": 6 },
+    { "from": "wait", "to": "app", "label": "admit", "since": 6 }
+  ],
+  "evolution": [
+    { "title": "One app, one database", "problem": "Start with what works: one server, one database for products, carts, stock and orders.", "change": "Product pages read the database. Checkout checks stock and writes an order in one request." },
+    { "title": "CDN and product cache", "problem": "Shoppers view about 50 pages for every order. At sale peak that is hundreds of thousands of reads a second against the same database that takes orders.", "change": "Serve images and static page parts from a CDN, and keep hot product pages in a cache in front of the catalog. A product page may be a few seconds stale.", "numbers": "the estimator shows reads that miss the cache" },
+    { "title": "A search index", "problem": "Finding products by words, brand and price with SQL LIKE scans millions of rows.", "change": "Keep a search index built from the catalog. Queries go to the index, which returns product ids, and cards come from the cache. Updates reach it a little late, and that is fine." },
+    { "title": "Cart in a key-value store", "problem": "Carts change on every click and most are abandoned. Writing them into the main database wastes it and slows orders.", "change": "Move carts to a key-value store keyed by user or session, with a time-to-live. A lost cart is annoying. A lost order is not, so the two get different stores." },
+    { "title": "Inventory with holds", "problem": "Two shoppers check out the last unit. Both read 'stock 1', both write an order, and we oversold.", "change": "A dedicated inventory service does an atomic conditional decrement: take 1 only if available is at least 1. Checkout reserves a hold with an expiry. Paid holds become sales, and unpaid ones expire and return the stock." },
+    { "title": "Orders as a saga", "problem": "An order touches payment, inventory and shipping, which are separate systems. No single transaction spans them, and any step can fail halfway.", "change": "The order service runs a saga: a chain of local steps, each with an undo. Reserve stock, charge, confirm, then publish OrderPlaced for fulfilment. If the charge fails, release the hold. A unique idempotency key makes retries safe." },
+    { "title": "Waiting room for flash sales", "problem": "A sale on 100 units draws a million shoppers in one minute. Checkout, inventory and payments all fall over, and the few winners are random.", "change": "Put a waiting room in front of checkout. It lets in only as many shoppers as the back end can handle, in order, and rate limits each user. Stock holds stay short so the line keeps moving.", "numbers": "peak order rate in the estimator" }
+  ],
+  "flows": [
+    {
+      "name": "Open a product page",
+      "steps": [
+        { "say": "The browser asks for a product page. Images and static parts come from the CDN.", "nodes": ["client", "cdn"], "edges": [["client", "cdn"]] },
+        { "say": "On a CDN miss the request reaches the shop API.", "nodes": ["cdn", "app"], "edges": [["cdn", "app"]] },
+        { "say": "The API reads the product cache. For popular items this ends the work.", "nodes": ["app", "cache"], "edges": [["app", "cache"]] },
+        { "say": "On a cache miss it reads the catalog database and fills the cache for the next shopper.", "nodes": ["cache", "catdb"], "edges": [["cache", "catdb"]] },
+        { "say": "Live stock shown as 'only 3 left' is a hint from inventory, not a promise. The real guard comes at checkout.", "nodes": ["app", "inv"], "edges": [["app", "inv"]] }
+      ]
+    },
+    {
+      "name": "Checkout",
+      "steps": [
+        { "say": "During a sale, checkout first goes through the waiting room. Normally this step is skipped.", "nodes": ["client", "wait"], "edges": [["client", "wait"]] },
+        { "say": "The waiting room admits shoppers at a safe rate and hands each an admit token.", "nodes": ["wait", "app"], "edges": [["wait", "app"]] },
+        { "say": "The API reads the cart, then asks inventory to reserve each item with an expiry.", "nodes": ["app", "cart", "inv"], "edges": [["app", "cart"], ["app", "inv"]] },
+        { "say": "Inventory does an atomic conditional decrement. If a unit is short, the whole reservation fails before any money moves.", "nodes": ["inv"], "edges": [] },
+        { "say": "The API passes the request, with its idempotency key, to the order service.", "nodes": ["app", "order"], "edges": [["app", "order"]] },
+        { "say": "The order service charges the payment provider using the same key, so a retry never double-charges.", "nodes": ["order", "pay"], "edges": [["order", "pay"]] },
+        { "say": "On success it commits the hold into a sale. On failure it releases the hold. This undo is the saga's compensation.", "nodes": ["order", "inv"], "edges": [["order", "inv"]] },
+        { "say": "It publishes OrderPlaced. Fulfilment picks it up later, so the shopper sees 'order confirmed' right away.", "nodes": ["order", "queue", "ship"], "edges": [["order", "queue"], ["queue", "ship"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Not overselling the last unit",
+      "question": "Many checkouts race for the same few units. How do we keep stock correct?",
+      "options": [
+        { "name": "Read, then write", "pros": "Simple code, and it works with one user at a time.", "cons": "Two checkouts both read 1 and both write. This is the lost update that causes overselling." },
+        { "name": "Row lock or atomic conditional update", "pros": "UPDATE stock SET available = available - 1 WHERE sku = ? AND available >= 1 is one atomic step. Correct and easy to reason about.", "cons": "A hot sku serialises on one row, so a flash sale queues behind it." },
+        { "name": "Shard the counter", "pros": "Split 100 units into 10 buckets of 10. Ten writers can work in parallel.", "cons": "More logic. A bucket can run dry while others still have stock, so you must retry another bucket." }
+      ],
+      "pick": "Atomic conditional update, sharded only for hot skus",
+      "because": "Correctness first: one conditional write per sku is simple and safe. Normal skus never get hot enough to matter. For a flash-sale sku, split the counter and let the waiting room limit the arrival rate."
+    },
+    {
+      "title": "When to reserve stock",
+      "question": "At add-to-cart, at checkout start, or after payment?",
+      "options": [
+        { "name": "At add to cart", "pros": "The shopper never loses an item they picked.", "cons": "Abandoned carts lock stock. Others see 'sold out' for nothing, and bots can lock a whole catalog." },
+        { "name": "At checkout, with an expiry", "pros": "Stock is held only by people about to pay. Holds expire in minutes, so abandoned ones heal themselves.", "cons": "Needs a hold table and an expiry sweep. A slow payer can lose the hold." },
+        { "name": "After payment", "pros": "Nothing is ever locked unpaid.", "cons": "You can take money and then find no stock, which means a refund and an angry customer." }
+      ],
+      "pick": "Reserve at checkout, with an expiry",
+      "because": "It keeps the lock short and tied to intent to buy. A background sweep, or a check when the hold is read, returns expired stock. Extend the hold a little while a payment is in flight."
+    },
+    {
+      "title": "Orders across services",
+      "question": "How do payment, inventory and shipping stay consistent without one big transaction?",
+      "options": [
+        { "name": "Two-phase commit", "pros": "All-or-nothing across systems, in theory.", "cons": "Needs every system to support it. Locks are held while waiting, and a stuck coordinator blocks everything. Payment providers do not take part." },
+        { "name": "Saga with compensation", "pros": "Each step is a local transaction with an undo. Works with external systems. No long locks.", "cons": "Intermediate states are visible. Every step needs a tested undo and idempotency." }
+      ],
+      "pick": "Saga, orchestrated by the order service",
+      "because": "Order has an explicit state machine: reserved, paid, confirmed, or cancelled. Persist it before each step so a crash resumes where it stopped. Orchestration keeps the flow in one place, which is easier to debug than services reacting to each other."
+    },
+    {
+      "title": "Coping with the sale spike",
+      "question": "A million shoppers arrive for 100 units. What protects the system?",
+      "options": [
+        { "name": "Just scale out", "pros": "No new parts.", "cons": "Scaling takes minutes, the hot sku is still a single bottleneck, and winners are random." },
+        { "name": "Rate limit and reject", "pros": "Cheap and protects the back end.", "cons": "Shoppers see errors and mash refresh, which makes the spike worse." },
+        { "name": "Waiting room with admission control", "pros": "Smooth, fair, ordered entry at a rate the back end can take. Refreshing does not lose your place.", "cons": "An extra component, and long waits feel bad even when they are fair." }
+      ],
+      "pick": "Waiting room plus per-user rate limits",
+      "because": "Admit shoppers at the rate inventory and payments can handle. Reject bots with limits per user and per IP. Product pages stay on the CDN, so browsing is never blocked, only checkout."
+    }
+  ],
+  "failures": [
+    { "what": "Payment succeeds but the order write fails", "impact": "The shopper is charged and has no order.", "fix": "Persist the saga state and the idempotency key first. A recovery job retries the order from the stored state, or refunds if it cannot finish." },
+    { "what": "Shopper double-clicks or the app retries checkout", "impact": "Two orders and two charges.", "fix": "The client sends an idempotency key. A unique constraint on it returns the first result for any repeat, and the payment call reuses the same key." },
+    { "what": "Holds never expire", "impact": "Stock stays locked by abandoned checkouts, and good items look sold out.", "fix": "Every hold has an expiry. A sweeper returns expired holds, and commit checks the hold is still valid. Alert on holds older than their limit." },
+    { "what": "The search index lags the catalog", "impact": "A search shows a product with the old price or one that was removed.", "fix": "Treat the index as a hint. The product page and checkout always read the source of truth. Alert on index lag." },
+    { "what": "Cache is cold after a restart", "impact": "A wave of reads hits the catalog database all at once.", "fix": "Collapse duplicate misses into one fetch, warm the hottest products first, and keep the CDN as a first shield." }
+  ],
+  "scaling": [
+    { "limit": "One hot sku in a flash sale", "lever": "Split its stock into buckets, rate limit at the waiting room, and keep the rest of the catalog on separate shards." },
+    { "limit": "Order and stock tables grow without bound", "lever": "Shard orders by user id and stock by sku. Archive old orders to cheaper storage, as reads go to recent ones." },
+    { "limit": "Shoppers across the world", "lever": "Serve pages from regional CDNs and caches. Keep stock writes in one home region per warehouse, and replicate reads." }
+  ],
+  "recap": {
+    "key": "Browsing is read-heavy and cacheable, so push it to the CDN and caches. Money and stock are not, so reserve stock with an atomic hold, run orders as an idempotent saga, and queue shoppers when a sale spikes.",
+    "numbers": "About 115 orders per second on average and 1.2K at a 10x sale peak. About 58K product reads per second at peak, and 1.2K reach the database at a 98% hit rate. Roughly half a TB of catalog text.",
+    "moves": ["Cache and CDN the catalog, and index it for search", "Keep carts in a key-value store with a TTL", "Hold stock with an atomic conditional decrement and an expiry", "Run orders as a saga with idempotent steps, and put a waiting room in front of sales"]
+  }
+}

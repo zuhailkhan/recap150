@@ -1,0 +1,168 @@
+{
+  "slug": "bookmyshow",
+  "title": "BookMyShow (Ticket Booking)",
+  "group": "Ride, food and marketplaces",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a system like a movie and event ticketing app. People browse shows, pick seats on a map, pay, and get a ticket. The hard part is a small, fixed number of seats that thousands of people want at the same moment, when a popular show goes on sale. No seat may be sold twice, and no seat may stay stuck on a person who walked away.",
+  "requirements": {
+    "functional": [
+      "Show the seat map of a show, with which seats are free.",
+      "Let a user pick seats and hold them for a few minutes.",
+      "Take payment and confirm the booking.",
+      "Release held seats if the user leaves or payment fails.",
+      "Send the ticket after a confirmed booking.",
+      "Protect the system when a popular show opens."
+    ],
+    "nonFunctional": [
+      { "name": "Correctness", "target": "A seat is never sold to two people" },
+      { "name": "Seat map", "target": "Loads in under 300 ms at the 99th percentile" },
+      { "name": "Hold", "target": "A seat is held for one user for a fixed time, then freed automatically" },
+      { "name": "Durability", "target": "A paid booking is never lost" },
+      { "name": "Availability", "target": "Browsing stays up even when booking is overloaded" }
+    ],
+    "outOfScope": ["Search and recommendations", "Pricing and offers", "Refund policy", "Seat selection for unreserved events"]
+  },
+  "estimate": {
+    "note": "All figures are assumptions for a system like this, not facts about any real service. The point is the ratio: a few hundred seats against hundreds of thousands of people.",
+    "inputs": [
+      { "id": "users", "label": "People waiting at on-sale time", "value": 500000, "min": 10000, "max": 5000000, "log": true },
+      { "id": "seats", "label": "Seats in the show", "value": 800, "min": 100, "max": 3000, "step": 50 },
+      { "id": "holdMin", "label": "Seat hold duration", "value": 5, "min": 1, "max": 15, "step": 1, "unit": "min" },
+      { "id": "attempts", "label": "Hold attempts per second at peak", "value": 5000, "min": 100, "max": 50000, "log": true },
+      { "id": "admit", "label": "Waiting room admit rate", "value": 500, "min": 50, "max": 5000, "log": true, "unit": "per s" }
+    ],
+    "outputs": [
+      { "id": "contention", "label": "Attempts per seat per second", "expr": "attempts / seats", "unit": "per s", "note": "How hard each seat is fought over. Almost all attempts must fail cleanly." },
+      { "id": "holdsLive", "label": "Most holds alive at once", "expr": "min(seats, admit * holdMin * 60)", "unit": "holds", "note": "A hold store this small fits on one machine." },
+      { "id": "burstQps", "label": "Arrival rate if all come in a minute", "expr": "users / 60", "unit": "per s", "note": "What the front door sees with no waiting room." },
+      { "id": "waitMin", "label": "Last person waits in the room", "expr": "users / admit / 60", "unit": "min", "note": "Raise the admit rate and the wait shrinks, but the booking path gets more load." },
+      { "id": "admitPerSeat", "label": "People admitted per seat per hold window", "expr": "admit * holdMin * 60 / seats", "unit": "people", "note": "Above 1 means the room admits more people than there are seats, so some will fail." }
+    ]
+  },
+  "api": [
+    { "call": "GET /shows/{id}/seats", "does": "Returns the seat map: each seat is free, held or sold. May be a few seconds stale." },
+    { "call": "POST /shows/{id}/holds  { seatIds, userId }", "does": "Tries to hold all the seats at once. All or none. Returns a holdId and its expiry time." },
+    { "call": "POST /holds/{holdId}/pay  { idempotencyKey }", "does": "Starts payment for the held seats. Repeating the call with the same key is safe." },
+    { "call": "GET /bookings/{id}", "does": "Returns the booking and its ticket once confirmed." },
+    { "call": "DELETE /holds/{holdId}", "does": "Lets the user give seats back before the timer ends." },
+    { "call": "POST /shows/{id}/queue", "does": "Joins the waiting room. Returns a place in line and, later, an entry token." }
+  ],
+  "data": [
+    { "entity": "Seat", "fields": "showId, seatId, status, bookingId", "store": "Relational database, one row per seat.", "why": "Fixed small set per show. A unique constraint on the sold seat is the final guard against a double sale." },
+    { "entity": "Hold", "fields": "key = showId:seatId, value = holdId, TTL", "store": "In-memory store with expiry.", "why": "Temporary by nature. Set-if-absent with a TTL is atomic, so two users cannot hold one seat, and expiry frees it with no cleanup job." },
+    { "entity": "Booking", "fields": "bookingId, userId, showId, seatIds, status, paymentRef, idempotencyKey", "store": "Relational database.", "why": "Money is involved. Needs transactions and a unique idempotency key, so a retry cannot book twice." },
+    { "entity": "Queue ticket", "fields": "userId, position, token, expiresAt", "store": "In-memory store.", "why": "Short lived and written at a very high rate during on-sale." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Client apps", "kind": "client", "x": 6, "y": 50, "since": 0 },
+    { "id": "waitroom", "label": "Waiting room", "kind": "queue", "x": 24, "y": 50, "sub": "admit N per second", "since": 4 },
+    { "id": "app", "label": "Booking service", "kind": "service", "x": 44, "y": 50, "sub": "stateless", "since": 0 },
+    { "id": "cache", "label": "Seat map cache", "kind": "cache", "x": 44, "y": 12, "sub": "short TTL", "since": 1 },
+    { "id": "holds", "label": "Hold store", "kind": "cache", "x": 68, "y": 30, "sub": "seat key with TTL", "since": 2 },
+    { "id": "db", "label": "Booking DB", "kind": "db", "x": 90, "y": 50, "sub": "seats, bookings", "since": 0 },
+    { "id": "pay", "label": "Payment service", "kind": "service", "x": 68, "y": 72, "sub": "idempotent confirm", "since": 3 },
+    { "id": "pgw", "label": "Payment gateway", "kind": "external", "x": 90, "y": 90, "sub": "cards, UPI", "since": 3 },
+    { "id": "recon", "label": "Recon worker", "kind": "worker", "x": 44, "y": 88, "sub": "settles unknowns", "since": 5 },
+    { "id": "notif", "label": "Ticket sender", "kind": "service", "x": 90, "y": 12, "sub": "SMS, email, push", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "app", "since": 0, "until": 4 },
+    { "from": "client", "to": "waitroom", "since": 4 },
+    { "from": "waitroom", "to": "app", "since": 4 },
+    { "from": "app", "to": "db", "since": 0 },
+    { "from": "app", "to": "cache", "label": "seat map", "since": 1 },
+    { "from": "app", "to": "holds", "label": "hold", "since": 2 },
+    { "from": "app", "to": "pay", "label": "pay", "since": 3 },
+    { "from": "pay", "to": "pgw", "since": 3 },
+    { "from": "pay", "to": "db", "label": "confirm", "since": 3 },
+    { "from": "recon", "to": "pay", "since": 5 },
+    { "from": "recon", "to": "pgw", "label": "status", "dashed": true, "since": 5 },
+    { "from": "db", "to": "notif", "label": "booked", "dashed": true, "since": 6 }
+  ],
+  "evolution": [
+    { "title": "One service, one database", "problem": "Start with the simplest thing that works: show the seats, let a user pick one.", "change": "The service reads seat rows from the database, and marks a seat sold when the user clicks buy." },
+    { "title": "Cache the seat map", "problem": "Everyone refreshes the map to see what is left. Reads outnumber bookings by a huge factor and the database is the bottleneck.", "change": "Serve the seat map from a cache with a short expiry of a second or two. Reads no longer touch the database. A slightly stale map is fine because the real check happens at hold time.", "numbers": "thousands of map reads per second become a few database reads" },
+    { "title": "Temporary holds", "problem": "Two users see the same seat free and both click. One of them pays for a seat that the other one also paid for.", "change": "Picking a seat sets a hold key in a fast store with set-if-absent and an expiry. Only one caller can win. A hold covers all chosen seats or none. If the user leaves, the key expires by itself.", "numbers": "5000 attempts per second on 800 seats: all but a few must fail fast" },
+    { "title": "Payment with a timeout", "problem": "Payment takes a minute and can fail or hang. The seat must not stay stuck, and a retried click must not charge twice.", "change": "A payment service calls the gateway with an idempotency key. On success it writes the booking in a transaction that checks the seat is still held by this user, with a unique constraint on the sold seat. If the timer ends first, the hold simply expires." },
+    { "title": "Waiting room at on-sale", "problem": "When a hit show opens, hundreds of thousands arrive in one minute. That swamps the booking path, even though only hundreds can win.", "change": "A virtual waiting room sits in front. People join a line and are admitted at a fixed rate with a signed entry token. The booking service sees a steady flow instead of a spike.", "numbers": "the estimator shows rate, wait and people per seat" },
+    { "title": "Settle unknown payments", "problem": "The gateway may time out, or a late success may arrive after the hold expired. The money moved but the booking state is unknown.", "change": "A reconciliation worker asks the gateway for the real status of every unfinished payment. Late success re-claims the seat if it is free, otherwise the money is refunded." },
+    { "title": "Tickets off the hot path", "problem": "Sending SMS and email inside the booking transaction makes confirmation slow and tied to outside providers.", "change": "After the booking commits, a ticket sender reads the new booking and sends the ticket. A retry never blocks or undoes the booking." }
+  ],
+  "flows": [
+    {
+      "name": "Pick seats and pay",
+      "steps": [
+        { "say": "The user is admitted from the waiting room with an entry token and opens the show.", "nodes": ["client", "waitroom", "app"], "edges": [["client", "waitroom"], ["waitroom", "app"]] },
+        { "say": "The booking service returns the seat map from the cache. Held and sold seats are shown as taken.", "nodes": ["app", "cache"], "edges": [["app", "cache"]] },
+        { "say": "The user picks two seats. The service tries to set a hold key for each, only if absent, with a TTL of a few minutes. Both must succeed or both are undone.", "nodes": ["app", "holds"], "edges": [["app", "holds"]] },
+        { "say": "The user pays. The payment service sends the charge to the gateway with an idempotency key.", "nodes": ["app", "pay", "pgw"], "edges": [["app", "pay"], ["pay", "pgw"]] },
+        { "say": "On success, one transaction checks the hold still belongs to this user and writes the booking. A unique constraint on the seat rejects any double sale.", "nodes": ["pay", "db"], "edges": [["pay", "db"]] },
+        { "say": "The ticket sender sees the new booking and sends the ticket.", "nodes": ["db", "notif"], "edges": [["db", "notif"]] }
+      ]
+    },
+    {
+      "name": "Hold expires or payment hangs",
+      "steps": [
+        { "say": "A user holds two seats and then closes the app. Nothing else is done.", "nodes": ["app", "holds"], "edges": [["app", "holds"]] },
+        { "say": "After the TTL the hold keys disappear on their own. The seats look free again on the next map refresh.", "nodes": ["holds", "cache"], "edges": [] },
+        { "say": "Another user now holds the same seat successfully.", "nodes": ["app", "holds"], "edges": [["app", "holds"]] },
+        { "say": "Meanwhile an earlier payment was still pending, and it finally succeeds at the gateway. The recon worker finds it unfinished.", "nodes": ["recon", "pgw"], "edges": [["recon", "pgw"]] },
+        { "say": "It asks the payment service to confirm. The seat now belongs to someone else, so the booking is refused.", "nodes": ["recon", "pay", "db"], "edges": [["recon", "pay"], ["pay", "db"]] },
+        { "say": "The payment service refunds the late payment and the user is told. No seat was sold twice.", "nodes": ["pay", "pgw"], "edges": [["pay", "pgw"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Where to enforce one owner per seat",
+      "question": "Two users click the same seat at the same moment. What guarantees only one wins?",
+      "options": [
+        { "name": "Row lock in the database", "pros": "One system. Strong and simple to reason about.", "cons": "Thousands of people contend for a few rows. Locks queue up and the database melts." },
+        { "name": "Hold key in a fast store", "pros": "Set-if-absent with a TTL is atomic and cheap. Expiry needs no cleanup job.", "cons": "A second store to run. If it loses data, holds are lost, so it cannot be the only guard." },
+        { "name": "Optimistic update with a unique constraint", "pros": "No locks. The database rejects the second sale for certain.", "cons": "The loser finds out late, after typing card details, which is a bad experience." }
+      ],
+      "pick": "Hold key in front, unique constraint behind",
+      "because": "The hold store rejects almost every loser in microseconds, cheaply. The unique constraint is the last guard that makes a double sale impossible even if the hold store fails. Use both, because each covers the other's weakness."
+    },
+    {
+      "title": "How long to hold, and what releases it",
+      "question": "How long should a seat stay held, and who frees it?",
+      "options": [
+        { "name": "Short fixed TTL", "pros": "Seats come back fast. Good for hot shows.", "cons": "Slow payers lose the seat mid-payment and feel cheated." },
+        { "name": "Long TTL", "pros": "Fewer lost payments.", "cons": "Abandoned seats stay locked. A show can look sold out when it is not." },
+        { "name": "TTL that extends once at payment start", "pros": "Fair to people who are actually paying. Idle people still time out.", "cons": "More states to test. Payment must be cancelled if the hold is lost." }
+      ],
+      "pick": "A few minutes, extended once when payment starts",
+      "because": "Users who are paying deserve a small grace. Idle users are what you want to evict. Expiry by TTL means the system heals even if a server crashes mid-flow."
+    },
+    {
+      "title": "Waiting room design",
+      "question": "How do we keep a spike from reaching the booking path?",
+      "options": [
+        { "name": "Rate limit and return errors", "pros": "Trivial to build.", "cons": "Fair for nobody: users hammer retry, the system stays hot, and the first people to retry win." },
+        { "name": "Virtual queue with signed tokens", "pros": "Fair by arrival order. Steady load. Users see their place.", "cons": "Needs its own scalable front end, and a way to stop people jumping the line." },
+        { "name": "Random lottery at open", "pros": "Removes the race to be first, and bots lose their edge.", "cons": "People dislike luck. Needs a pre-registration step." }
+      ],
+      "pick": "Virtual queue with signed, short-lived entry tokens",
+      "because": "It turns a spike into a flow the booking path can handle. The token proves a turn was granted and expires, so a shared link is useless. Serve the queue page from static and edge capacity so it survives."
+    }
+  ],
+  "failures": [
+    { "what": "Hold store loses its data", "impact": "Holds vanish and two users may both think they have a seat.", "fix": "The unique constraint on the sold seat stops a double sale. Rebuild holds from in-flight bookings. Run it replicated, and fail open to the database guard." },
+    { "what": "Payment succeeds but the app crashes before booking", "impact": "The user is charged and sees nothing.", "fix": "Persist the payment intent first, with its idempotency key. The recon worker finishes every intent that has no booking, or refunds it." },
+    { "what": "Double click or client retry on pay", "impact": "A second charge for the same seats.", "fix": "The idempotency key makes the second call return the first result. The booking row has a unique key on it." },
+    { "what": "Hold expires during a slow payment", "impact": "The seat goes to another user while the first user's money is in flight.", "fix": "Extend the hold when payment starts. If the seat is lost anyway, refund automatically and say so plainly." },
+    { "what": "Bots drain the seats", "impact": "Real users find every seat gone in seconds.", "fix": "Challenge on joining the queue, limit seats per account and per card, and tie the entry token to one user." }
+  ],
+  "scaling": [
+    { "limit": "One show is one hot spot, however many servers there are", "lever": "Everything for a show is keyed by showId, so route it to one partition. Scale by running many shows in parallel, and keep the hot path on the hold store." },
+    { "limit": "The waiting room must absorb the whole crowd", "lever": "Make it a separate, mostly static service on edge capacity. It only needs a counter and tokens. The booking path never sees the crowd." },
+    { "limit": "Reads on the seat map grow with the crowd", "lever": "Cache at the edge for a second or two. Send only a diff of changed seats over a push channel for the busiest shows." }
+  ],
+  "recap": {
+    "key": "Inventory is tiny and demand is huge, so reject losers early with an atomic expiring hold, protect the front with a waiting room, and let the database make a double sale impossible.",
+    "numbers": "800 seats against 500K people. 5000 hold attempts per second means about 6 per seat per second. At 500 admitted per second, the last person waits about 17 minutes.",
+    "moves": ["Cache the seat map and accept slight staleness", "Hold seats with an atomic key and a TTL", "Confirm with an idempotency key and a unique constraint", "Admit people through a waiting room, and reconcile unknown payments"]
+  }
+}

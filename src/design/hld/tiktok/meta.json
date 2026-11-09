@@ -1,0 +1,188 @@
+{
+  "slug": "tiktok",
+  "title": "TikTok",
+  "group": "Social and messaging",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a system like TikTok: people swipe through an endless stream of short videos picked for them, not by who they follow. What makes it hard is the For You feed: choosing a few videos out of billions per swipe, learning from every watch, and handling brand-new videos and users that have no history.",
+  "requirements": {
+    "functional": [
+      "Upload a short video with a caption.",
+      "Open a For You feed and swipe to the next video.",
+      "The next video starts instantly.",
+      "Like, share and follow, and see counts.",
+      "A new video gets a fair chance to be seen.",
+      "A new user gets a sensible feed on the first day."
+    ],
+    "nonFunctional": [
+      { "name": "Swipe latency", "target": "The next video starts in under 200 ms, because it was prefetched" },
+      { "name": "Feed latency", "target": "A feed request returns its page in under 300 ms at the 99th percentile" },
+      { "name": "Learning delay", "target": "A like or a skip changes recommendations within minutes" },
+      { "name": "Availability", "target": "Videos keep playing at 99.95% even if the recommender is degraded" }
+    ],
+    "outOfScope": ["Live streaming", "Comments and direct messages", "Ads and creator payments", "The ML model internals"]
+  },
+  "estimate": {
+    "note": "All numbers are assumptions. A feed request returns a batch of 5 videos. New uploads are assumed to be 2% of daily users per day, with 4 stored versions per video. One watch creates a few signals.",
+    "inputs": [
+      { "id": "dau", "label": "Daily active users", "value": 500000000, "min": 10000000, "max": 2000000000, "log": true },
+      { "id": "sessions", "label": "Sessions per user per day", "value": 5, "min": 1, "max": 20, "step": 1 },
+      { "id": "perSession", "label": "Videos watched per session", "value": 30, "min": 5, "max": 100, "step": 5 },
+      { "id": "videoMB", "label": "Average video size delivered", "value": 3, "min": 1, "max": 15, "step": 0.5, "unit": "MB" },
+      { "id": "pool", "label": "Candidates pulled per request", "value": 1000, "min": 100, "max": 10000, "log": true },
+      { "id": "eventsPer", "label": "Signals per video watched", "value": 4, "min": 1, "max": 10, "step": 1 }
+    ],
+    "outputs": [
+      { "id": "views", "label": "Videos watched per day", "expr": "dau * sessions * perSession", "unit": "views" },
+      { "id": "feedQps", "label": "Feed requests per second", "expr": "views / 5 / 86400", "unit": "per s", "note": "One request fetches a batch of 5." },
+      { "id": "scored", "label": "Candidates scored per second", "expr": "feedQps * pool", "unit": "per s", "note": "Why candidate generation must be cheap." },
+      { "id": "heavy", "label": "Rows the heavy ranker sees", "expr": "feedQps * min(pool, 200)", "unit": "per s", "note": "After stage one keeps the best 200 per request." },
+      { "id": "signalsQps", "label": "Signals per second", "expr": "views * eventsPer / 86400", "unit": "per s", "note": "Watch time, likes, shares, skips." },
+      { "id": "cdnGbps", "label": "CDN egress, average", "expr": "views * videoMB * 8 / 86400 / 1000", "unit": "Gbit/s", "note": "Prefetching wastes some. Add maybe a fifth." },
+      { "id": "storageTb", "label": "New video storage per day", "expr": "dau * 0.02 * videoMB * 4 / 1e6", "unit": "TB" }
+    ]
+  },
+  "api": [
+    { "call": "POST /uploads  { size }", "does": "Returns a presigned URL. The video goes straight to blob storage." },
+    { "call": "GET /foryou?cursor=&deviceId", "does": "Returns the next batch of video cards: ids, CDN URLs, captions and a ranking trace id." },
+    { "call": "POST /events  [{ videoId, type, ms }]", "does": "Sends batched signals: watch time, like, share, skip. Fire and forget." },
+    { "call": "POST /videos/{id}/like", "does": "Counts a like and also records it as a signal." },
+    { "call": "GET /videos/{id}", "does": "Returns one video's metadata, used for shares and profile pages." }
+  ],
+  "data": [
+    { "entity": "Video", "fields": "videoId, authorId, caption, state, renditions[], createdAt", "store": "Sharded key-value store by videoId.", "why": "Read by id after candidate ids come back. State goes from processing to ready." },
+    { "entity": "Video embedding", "fields": "videoId, vector, topicTags", "store": "Vector index, rebuilt in the background.", "why": "Candidate generation asks for the vectors nearest to a user's taste vector." },
+    { "entity": "User features", "fields": "userId, recentTopics, avgWatchRatio, taste vector", "store": "Low-latency feature store.", "why": "Ranking reads these in a few milliseconds, and the stream keeps them fresh." },
+    { "entity": "Video features", "fields": "videoId, views, completion rate, like rate, age", "store": "Feature store, updated by the stream.", "why": "The heavy ranker needs recent stats per candidate, not a nightly number." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Phone app", "kind": "client", "x": 8, "y": 50, "since": 0 },
+    { "id": "app", "label": "Feed service", "kind": "service", "x": 28, "y": 50, "sub": "feed, upload, events", "since": 0 },
+    { "id": "meta", "label": "Video store", "kind": "db", "x": 48, "y": 50, "sub": "video rows", "since": 0 },
+    { "id": "blob", "label": "Blob storage", "kind": "blob", "x": 28, "y": 88, "sub": "originals and bitrates", "since": 1 },
+    { "id": "queue", "label": "Transcode queue", "kind": "queue", "x": 69, "y": 88, "sub": "job per upload", "since": 1 },
+    { "id": "worker", "label": "Transcode workers", "kind": "worker", "x": 48, "y": 70, "sub": "bitrates, thumbnails", "since": 1 },
+    { "id": "cdn", "label": "CDN", "kind": "cdn", "x": 8, "y": 88, "sub": "edge, prefetch", "since": 2 },
+    { "id": "candgen", "label": "Retrieval", "kind": "service", "x": 69, "y": 12, "sub": "cheap, wide", "since": 3 },
+    { "id": "ranker", "label": "Ranker", "kind": "service", "x": 48, "y": 12, "sub": "heavy model", "since": 4 },
+    { "id": "stream", "label": "Event stream", "kind": "queue", "x": 8, "y": 12, "sub": "watch, like, share", "since": 5 },
+    { "id": "features", "label": "Feature store", "kind": "cache", "x": 28, "y": 12, "sub": "user and video stats", "since": 5 },
+    { "id": "pool", "label": "New video pool", "kind": "service", "x": 90, "y": 12, "sub": "test traffic", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "app", "since": 0 },
+    { "from": "app", "to": "meta", "since": 0 },
+    { "from": "client", "to": "blob", "label": "presigned PUT", "since": 1 },
+    { "from": "blob", "to": "queue", "label": "uploaded", "since": 1 },
+    { "from": "queue", "to": "worker", "since": 1 },
+    { "from": "worker", "to": "blob", "since": 1 },
+    { "from": "worker", "to": "meta", "since": 1 },
+    { "from": "blob", "to": "cdn", "since": 2 },
+    { "from": "cdn", "to": "client", "since": 2 },
+    { "from": "app", "to": "candgen", "label": "retrieve", "since": 3 },
+    { "from": "candgen", "to": "ranker", "since": 4 },
+    { "from": "ranker", "to": "app", "label": "top 5", "since": 4 },
+    { "from": "client", "to": "stream", "label": "events", "since": 5 },
+    { "from": "stream", "to": "features", "since": 5 },
+    { "from": "features", "to": "ranker", "since": 5 },
+    { "from": "pool", "to": "candgen", "since": 6 }
+  ],
+  "evolution": [
+    { "title": "One list for everyone", "problem": "Start with what works: a service that returns the most-liked recent videos from one store. There is no follow graph to build a feed from.", "change": "One feed service and one video store. Every user gets the same trending list, so swiping soon shows repeats and nothing personal." },
+    { "title": "Upload and transcode", "problem": "Videos are large and phones play different formats on different networks. Sending bytes through the service and serving the original breaks both.", "change": "Presigned URL to blob storage, then a queue and workers that transcode each video into several bitrates and a thumbnail. Only then is the row marked ready.", "numbers": "new storage per day in the estimator" },
+    { "title": "CDN and prefetch", "problem": "Each swipe must start instantly, but a round trip to origin takes longer than a swipe lasts. Egress is also large.", "change": "Serve video from a CDN. The client prefetches the first seconds of the next few videos while you watch the current one, so a swipe starts from local data. Some prefetches are never watched, and that waste is the price.", "numbers": "the estimator shows Tbit/s of egress" },
+    { "title": "Candidate generation", "problem": "A user should see videos they will like, chosen from billions. Scoring every video per request is impossible.", "change": "Stage one: candidate generation. Using the user's taste, fetch a few thousand videos from several cheap sources: nearest vectors, topics they watch, trending in their region. Be fast and wide, not precise.", "numbers": "candidates scored per second in the estimator" },
+    { "title": "A heavy ranker as stage two", "problem": "A few thousand rough candidates still include many poor ones, and the first video of a batch matters most.", "change": "Stage two: a slower, richer model scores the best couple of hundred candidates and returns the top five, with a rule layer for variety. Two stages put the cost where it matters most." },
+    { "title": "Signals feed the models", "problem": "The ranker only knows what happened when it last learned. A like or a quick skip tells it more than any profile, but nothing records it.", "change": "The app sends events: watch time, completion, like, share, skip. They go through a stream into a feature store of user and video stats, which the ranker reads at request time. Learning takes minutes, not a day.", "numbers": "signals per second in the estimator" },
+    { "title": "Cold start", "problem": "A new video has no views, so ranking never picks it. A new user has no history, so everything looks equal to them.", "change": "A new video pool gives each fresh video a small test audience. If its completion and like rates beat similar videos, it gets more. New users see popular videos for their region, and their first swipes are weighted heavily to learn their taste fast." }
+  ],
+  "flows": [
+    {
+      "name": "Upload a video",
+      "steps": [
+        { "say": "The app asks for an upload slot. The service creates a processing row and returns a presigned URL.", "nodes": ["client", "app", "meta"], "edges": [["client", "app"], ["app", "meta"]] },
+        { "say": "The phone uploads the file straight to blob storage.", "nodes": ["client", "blob"], "edges": [["client", "blob"]] },
+        { "say": "Blob storage emits an uploaded event onto the transcode queue.", "nodes": ["blob", "queue"], "edges": [["blob", "queue"]] },
+        { "say": "A worker takes the job.", "nodes": ["queue", "worker"], "edges": [["queue", "worker"]] },
+        { "say": "It creates several bitrates and a thumbnail and writes them back to blob storage.", "nodes": ["worker", "blob"], "edges": [["worker", "blob"]] },
+        { "say": "It marks the row ready and the video enters the new video pool for test traffic.", "nodes": ["worker", "meta", "pool"], "edges": [["worker", "meta"]] }
+      ]
+    },
+    {
+      "name": "Fill the For You feed",
+      "steps": [
+        { "say": "The app asks for the next batch. It does this while the user is still watching video 2 of the current batch.", "nodes": ["client", "app"], "edges": [["client", "app"]] },
+        { "say": "The service asks candidate generation for videos for this user.", "nodes": ["app", "candgen"], "edges": [["app", "candgen"]] },
+        { "say": "Candidate generation pulls a few thousand ids from cheap sources, and mixes in fresh videos from the new video pool.", "nodes": ["candgen", "pool"], "edges": [["pool", "candgen"]] },
+        { "say": "It trims them to about 200 and passes them to the ranker.", "nodes": ["candgen", "ranker"], "edges": [["candgen", "ranker"]] },
+        { "say": "The ranker reads the user's and the videos' recent stats from the feature store and scores each candidate.", "nodes": ["ranker", "features"], "edges": [["features", "ranker"]] },
+        { "say": "The top five go back to the service, which hydrates them from the video store.", "nodes": ["ranker", "app", "meta"], "edges": [["ranker", "app"], ["app", "meta"]] },
+        { "say": "The response carries CDN URLs. The phone prefetches the first seconds of the next few videos.", "nodes": ["cdn", "client"], "edges": [["cdn", "client"]] },
+        { "say": "As the user watches, skips and likes, the app batches signals onto the event stream. They update the feature store.", "nodes": ["client", "stream", "features"], "edges": [["client", "stream"], ["stream", "features"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "One stage or two",
+      "question": "How do we pick five videos out of billions in a few hundred milliseconds?",
+      "options": [
+        { "name": "One big model over everything", "pros": "Simple and in theory the best answer.", "cons": "Impossible: billions of videos per request is far beyond any time budget." },
+        { "name": "Two stages: retrieve then rank", "pros": "Stage one is cheap and wide. Stage two is heavy but sees only about 200 rows.", "cons": "Stage one can miss a great video, and no ranker can fix that. Two systems to run." },
+        { "name": "Precompute a list per user", "pros": "Request time is a lookup.", "cons": "Stale. It ignores what the user just did, which is the key signal." }
+      ],
+      "pick": "Two stages with several retrieval sources",
+      "because": "Use many cheap retrievers, for example nearest vectors, topics, and trending, so a miss in one is covered by another. Then rank a small set with the rich model. Quality is capped by recall, so measure it."
+    },
+    {
+      "title": "Cold start",
+      "question": "How does a new video or new user get a fair start?",
+      "options": [
+        { "name": "Pure engagement ranking", "pros": "Simple, and shows proven videos.", "cons": "Rich get richer. New videos never get a view, new creators give up." },
+        { "name": "Test pool with explore budget", "pros": "Every video gets a small, fixed audience. Strong results get more.", "cons": "Costs some quality: the test audience sees unproven videos. Needs a promotion rule." },
+        { "name": "Content features only", "pros": "Uses caption, audio and visuals without needing views.", "cons": "Content alone says little about whether people enjoy a video." }
+      ],
+      "pick": "Test pool, and content features for the first guess",
+      "because": "Give each new video a few hundred views, chosen by content similarity, and compare its completion rate with its peers. Promote in stages. For new users, start from region and device popular lists and weight their first swipes heavily."
+    },
+    {
+      "title": "Prefetching",
+      "question": "How does the next video start instantly?",
+      "options": [
+        { "name": "Fetch on swipe", "pros": "No wasted bytes.", "cons": "Each swipe waits for a network round trip. It feels slow." },
+        { "name": "Prefetch whole next videos", "pros": "Always instant.", "cons": "Wastes bandwidth and battery when the user skips. Costly at scale." },
+        { "name": "Prefetch the first seconds of the next few", "pros": "Instant start, small waste. Fetch the rest as the user stays.", "cons": "Needs client logic and a CDN that supports partial fetches. Depends on the network." }
+      ],
+      "pick": "Prefetch the first seconds of the next 2 or 3",
+      "because": "Skips are common, so do not fetch what may be skipped in full. A short head hides the network delay. Adapt depth to the network: less on cellular, more on wifi."
+    },
+    {
+      "title": "Signal pipeline",
+      "question": "How quickly should a like or skip change what we show?",
+      "options": [
+        { "name": "Nightly batch only", "pros": "Cheap and simple. Models can be trained carefully.", "cons": "A user's tastes in the last hour are invisible. Trending videos are found a day late." },
+        { "name": "Stream into a feature store", "pros": "Recent stats are readable in minutes. The model sees fresh features while its weights stay stable.", "cons": "A streaming system to run. Features must be computed the same way in training and serving." },
+        { "name": "Retrain continuously", "pros": "The model itself adapts quickly.", "cons": "Risky and costly. A bad batch can degrade everyone." }
+      ],
+      "pick": "Stream into a feature store, retrain on a schedule",
+      "because": "Fresh features give fast adaptation with a stable model. Batch jobs from the same stream train the models offline. Sample or aggregate events, since signal volume is millions per second."
+    }
+  ],
+  "failures": [
+    { "what": "The ranker is slow or down", "impact": "Feed requests time out and users see a blank screen.", "fix": "Set a deadline. On a miss return the candidates ordered by a cheap score, or a cached list for this user. Videos keep playing, just less personal." },
+    { "what": "The event stream lags", "impact": "Features go stale, and recommendations repeat what a user just skipped.", "fix": "Also keep a small recent-watched list on the client and in the feed service to filter repeats. Alert on stream lag." },
+    { "what": "A filter bubble", "impact": "Users see a narrow set of topics, and engagement drops over time.", "fix": "Reserve part of each batch for exploration and variety rules. Measure topic diversity next to watch time." },
+    { "what": "A viral video overloads the CDN", "impact": "Many edges miss at once and hit blob storage.", "fix": "Collapse requests at the edge, add a mid-tier cache, and warm popular videos into more edges as their views climb." },
+    { "what": "Duplicate or fake signals", "impact": "Bots inflate a video's stats and it gets promoted.", "fix": "Dedupe events by an id from the client. Filter suspicious devices before features are updated, and cap how much one user can move a video." }
+  ],
+  "scaling": [
+    { "limit": "Candidate scoring per second", "lever": "Approximate nearest-neighbour indexes, sharded by region. Cache candidate lists for a few seconds and tighten the cheap stage so fewer rows reach the ranker." },
+    { "limit": "Signals reach millions per second", "lever": "Partition the stream by user or video id. Aggregate in windows before writing features and sample low-value events." },
+    { "limit": "CDN egress and storage", "lever": "Drop unused bitrates, tune prefetch depth, serve popular videos from many edges, and tier old videos to cold storage." }
+  ],
+  "recap": {
+    "key": "The feed is a recommender, not a follow graph: cheap candidate generation, a heavy ranker, fresh signals through a stream into feature stores, and a test pool for new videos.",
+    "numbers": "With 500M daily users: about 75B views a day, 170K feed requests per second, 170M candidates scored per second, 3.5M signals per second and around 21K Gbit/s of CDN egress.",
+    "moves": ["Retrieve thousands cheaply, then rank a couple of hundred with a rich model", "Stream watch and like signals into a feature store for fresh ranking", "Give each new video test traffic, and give new users popular lists", "Prefetch the first seconds of the next videos so swipes are instant"]
+  }
+}

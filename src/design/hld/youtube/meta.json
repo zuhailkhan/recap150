@@ -1,0 +1,192 @@
+{
+  "slug": "youtube",
+  "title": "YouTube",
+  "group": "Media and streaming",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a video platform like YouTube, where anyone can upload and anyone can watch. Unlike a curated catalog, new video arrives constantly, most of it is rarely watched, and a few videos get enormous traffic. This page is a general design for a system like it, not a description of how any real company builds it.",
+  "requirements": {
+    "functional": [
+      "Upload a large video, and resume if the connection drops.",
+      "Watch any public video at a quality that fits the connection.",
+      "Search videos by title and description.",
+      "See a view count, and comment on a video.",
+      "Get suggested videos to watch next.",
+      "Block content that is abusive or copyrighted."
+    ],
+    "nonFunctional": [
+      { "name": "Upload to playable", "target": "A typical video is watchable within minutes of upload" },
+      { "name": "Playback start", "target": "Starts in under 2 seconds at the 95th percentile" },
+      { "name": "Durability", "target": "An accepted upload is never lost" },
+      { "name": "View counts", "target": "Approximate and a few minutes behind is fine" },
+      { "name": "Availability", "target": "Watching stays up even if upload or search is down" }
+    ],
+    "outOfScope": ["Live streaming", "Ads and payments", "Creator studio analytics", "The recommendation model itself"]
+  },
+  "estimate": {
+    "note": "Assumptions you can move. Two numbers shape the design: new video to process and store each day, and view events per second. One database write per view would crush it, so views are batched.",
+    "inputs": [
+      { "id": "hoursPerMin", "label": "Hours of video uploaded per minute", "value": 500, "min": 50, "max": 2000, "log": true },
+      { "id": "renditions", "label": "Renditions per video", "value": 8, "min": 3, "max": 20, "step": 1, "note": "Resolutions times codecs." },
+      { "id": "mbps", "label": "Average rendition bitrate", "value": 1.5, "min": 0.5, "max": 8, "log": true, "unit": "Mbit/s" },
+      { "id": "viewsPerSec", "label": "Views per second at peak", "value": 100000, "min": 10000, "max": 1000000, "log": true },
+      { "id": "batch", "label": "Views folded into one count write", "value": 100, "min": 1, "max": 1000, "log": true, "note": "Average over the flush window. Popular videos fold many, rare ones fold few." },
+      { "id": "edgeHit", "label": "Views served from edge caches", "value": 90, "min": 50, "max": 99, "step": 1, "unit": "%" }
+    ],
+    "outputs": [
+      { "id": "hoursDay", "label": "Video uploaded per day", "expr": "hoursPerMin * 1440", "unit": "hours" },
+      { "id": "storageTbDay", "label": "New storage per day", "expr": "hoursDay * 3600 * renditions * mbps / 8 / 1e6", "unit": "TB", "note": "Renditions only. Originals add more." },
+      { "id": "tasksPerSec", "label": "Transcode tasks per second", "expr": "hoursPerMin * 60 / 10 * renditions", "unit": "per s", "note": "10 second chunks, each encoded once per rendition." },
+      { "id": "writesNaive", "label": "View writes, one per view", "expr": "viewsPerSec", "unit": "per s", "note": "Hot videos would all hit one row." },
+      { "id": "writesBatched", "label": "View writes after batching", "expr": "ceil(viewsPerSec / batch)", "unit": "per s" },
+      { "id": "originViews", "label": "Views that reach the origin", "expr": "viewsPerSec * (100 - edgeHit) / 100", "unit": "per s", "note": "The long tail. Each one is a cold read." }
+    ]
+  },
+  "api": [
+    { "call": "POST /uploads  { size, title }", "does": "Opens an upload session and returns a session URL. Bytes go to the upload service, not the app servers." },
+    { "call": "PUT {sessionUrl}  Content-Range", "does": "Sends one chunk. After a drop, a status query tells the client where to resume." },
+    { "call": "GET /videos/{id}", "does": "Returns title, counts, comments preview and the manifest URL." },
+    { "call": "GET /search?q=&page=", "does": "Returns ranked video cards that match the query." },
+    { "call": "POST /videos/{id}/view", "does": "Records a view event. Fire and forget, and it never blocks playback." },
+    { "call": "POST /videos/{id}/comments", "does": "Adds a comment. Listing is paged, newest or top first." }
+  ],
+  "data": [
+    { "entity": "Video", "fields": "videoId, ownerId, title, status, manifestUrl, createdAt", "store": "Sharded key-value or SQL store by videoId.", "why": "Every read is by id. Status moves from uploaded to processing to live or blocked." },
+    { "entity": "Renditions and segments", "fields": "videoId, renditionId, segmentKeys[]", "store": "Object storage.", "why": "Large immutable files. Cheap per byte and cache friendly." },
+    { "entity": "View count", "fields": "videoId, count, updatedAt", "store": "In-memory buffer, flushed to the video store.", "why": "Incremented a huge number of times. Batch in memory and flush as one add." },
+    { "entity": "Comment", "fields": "videoId, commentId, authorId, text, createdAt", "store": "Wide-column store, partition by videoId.", "why": "Always read as a page of one video's comments. Hot videos need a cached first page." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Apps and web", "kind": "client", "x": 8, "y": 50, "since": 0 },
+    { "id": "api", "label": "App servers", "kind": "service", "x": 28, "y": 26, "sub": "watch page, API", "since": 0 },
+    { "id": "blob", "label": "Video storage", "kind": "blob", "x": 50, "y": 86, "sub": "object storage", "since": 0 },
+    { "id": "upload", "label": "Upload service", "kind": "service", "x": 28, "y": 86, "sub": "resumable chunks", "since": 1 },
+    { "id": "queue", "label": "Transcode jobs", "kind": "queue", "x": 72, "y": 50, "sub": "DAG of tasks", "since": 2 },
+    { "id": "workers", "label": "Transcoders", "kind": "worker", "x": 72, "y": 86, "sub": "split, encode, stitch", "since": 2 },
+    { "id": "meta", "label": "Video metadata", "kind": "db", "x": 50, "y": 26, "sub": "by videoId", "since": 3 },
+    { "id": "search", "label": "Search index", "kind": "service", "x": 50, "y": 8, "sub": "titles, text", "since": 3 },
+    { "id": "comments", "label": "Comments", "kind": "db", "x": 28, "y": 8, "sub": "by video", "since": 3 },
+    { "id": "cdn", "label": "CDN edges", "kind": "cdn", "x": 28, "y": 62, "sub": "popular videos", "since": 4 },
+    { "id": "views", "label": "View counter", "kind": "cache", "x": 50, "y": 50, "sub": "batch and flush", "since": 5 },
+    { "id": "recs", "label": "Recommender", "kind": "service", "x": 72, "y": 8, "sub": "next videos", "since": 5 },
+    { "id": "policy", "label": "Abuse checks", "kind": "worker", "x": 92, "y": 38, "sub": "async scan", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "api", "since": 0 },
+    { "from": "api", "to": "blob", "label": "file", "since": 0, "until": 1 },
+    { "from": "client", "to": "upload", "label": "chunks", "since": 1 },
+    { "from": "upload", "to": "blob", "label": "raw", "since": 1 },
+    { "from": "upload", "to": "queue", "label": "uploaded", "since": 2 },
+    { "from": "queue", "to": "workers", "since": 2 },
+    { "from": "workers", "to": "blob", "label": "renditions", "since": 2 },
+    { "from": "api", "to": "meta", "since": 3 },
+    { "from": "api", "to": "comments", "since": 3 },
+    { "from": "api", "to": "search", "since": 3 },
+    { "from": "meta", "to": "search", "label": "index", "dashed": true, "since": 3 },
+    { "from": "client", "to": "cdn", "label": "segments", "since": 4 },
+    { "from": "cdn", "to": "blob", "label": "miss", "since": 4 },
+    { "from": "api", "to": "views", "label": "view ping", "since": 5 },
+    { "from": "views", "to": "meta", "label": "flush", "since": 5 },
+    { "from": "recs", "to": "meta", "label": "candidates", "dashed": true, "since": 5 },
+    { "from": "views", "to": "recs", "label": "signals", "dashed": true, "since": 5 },
+    { "from": "workers", "to": "policy", "label": "scan", "since": 6 },
+    { "from": "policy", "to": "meta", "label": "publish or block", "since": 6 }
+  ],
+  "evolution": [
+    { "title": "Upload a file, serve it back", "problem": "Start with what works: the app server accepts a video file, stores it, and sends the same file to every viewer.", "change": "One server, one stored file per video. Anyone can upload and anyone can watch, but only one quality." },
+    { "title": "Resumable upload", "problem": "Videos are gigabytes and mobile connections drop. Pushing the whole file through the app servers ties them up, and one failure restarts a long upload.", "change": "A dedicated upload service opens a session and takes the file in chunks. The client asks where it stopped and resumes from there. Chunks land in object storage, so app servers never carry the bytes." },
+    { "title": "A transcoding DAG", "problem": "The upload is in whatever format the creator had. It is too big for phones and cannot adapt to bandwidth. One machine encoding a long video takes ages.", "change": "A finished upload queues a job: split into chunks, encode each chunk into every rendition in parallel, stitch the results, make thumbnails, write a manifest. This is a DAG, a graph of tasks where each waits only for its inputs.", "numbers": "tasks per second and storage per day in the estimator" },
+    { "title": "Metadata, search and comments", "problem": "Listing videos by scanning storage is impossible, and people need to find videos and discuss them.", "change": "Keep video records in a metadata store keyed by id. Feed a search index from it. Store comments by video in their own store so a busy comment section does not slow the watch page." },
+    { "title": "CDN for the head, origin for the tail", "problem": "Watching is the bulk of the bytes. A small share of videos draws most of the views, and the rest are watched rarely.", "change": "Serve segments through CDN edges that keep popular videos. A rare video misses and is read from storage. Do not push the long tail to the edge. It would fill caches with things nobody asks for.", "numbers": "the share served from edge decides origin load" },
+    { "title": "Batched view counts and suggestions", "problem": "At 100K views per second, one database write per view is 100K writes per second, and a viral video makes them all hit one row.", "change": "App servers send a view ping to a counter that adds up in memory and flushes a total every few seconds. The same stream of signals feeds the recommender, which writes candidate lists back. Counts are approximate and slightly late, and that is fine.", "numbers": "view writes before and after batching" },
+    { "title": "Abuse and copyright as an async stage", "problem": "Some uploads are harmful or copied. Scanning inline would make every upload wait, and checks improve over time.", "change": "After transcoding, a separate worker fingerprints the video, runs checks and then publishes or blocks it in the metadata store. Uploads are accepted at once, and a video becomes public only when the checks pass." }
+  ],
+  "flows": [
+    {
+      "name": "Upload a video",
+      "steps": [
+        { "say": "The client opens an upload session and sends the file in chunks to the upload service.", "nodes": ["client", "upload"], "edges": [["client", "upload"]] },
+        { "say": "Each chunk is written to object storage. If the link drops, the client asks what was received and continues from there.", "nodes": ["upload", "blob"], "edges": [["upload", "blob"]] },
+        { "say": "When the last chunk lands, the upload service queues a transcode job.", "nodes": ["upload", "queue"], "edges": [["upload", "queue"]] },
+        { "say": "Workers split the video, encode chunks into every rendition in parallel and stitch them.", "nodes": ["queue", "workers"], "edges": [["queue", "workers"]] },
+        { "say": "Renditions, thumbnails and the manifest are written to object storage.", "nodes": ["workers", "blob"], "edges": [["workers", "blob"]] },
+        { "say": "The abuse stage fingerprints the video and runs its checks.", "nodes": ["workers", "policy"], "edges": [["workers", "policy"]] },
+        { "say": "If clean, the video is marked live in the metadata store. The search index is updated from it.", "nodes": ["policy", "meta", "search"], "edges": [["policy", "meta"], ["meta", "search"]] }
+      ]
+    },
+    {
+      "name": "Watch a video",
+      "steps": [
+        { "say": "The client asks the app servers for the watch page of a video.", "nodes": ["client", "api"], "edges": [["client", "api"]] },
+        { "say": "The server reads the video record, with title, counts and manifest URL.", "nodes": ["api", "meta"], "edges": [["api", "meta"]] },
+        { "say": "It reads the first page of comments from their own store.", "nodes": ["api", "comments"], "edges": [["api", "comments"]] },
+        { "say": "The player fetches the manifest and segments from the CDN edge.", "nodes": ["client", "cdn"], "edges": [["client", "cdn"]] },
+        { "say": "A popular video is already cached. A rare one misses and the edge reads it from storage.", "nodes": ["cdn", "blob"], "edges": [["cdn", "blob"]] },
+        { "say": "The page sends a view ping. The counter adds it in memory and does not write to the database yet.", "nodes": ["api", "views"], "edges": [["api", "views"]] },
+        { "say": "Every few seconds the counter flushes one total per video to the metadata store.", "nodes": ["views", "meta"], "edges": [["views", "meta"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Counting views",
+      "question": "How do we count views without a write per view?",
+      "options": [
+        { "name": "Write on every view", "pros": "Exact and simple.", "cons": "100K writes per second, and a viral video makes one hot row everyone fights over." },
+        { "name": "Batch in memory, flush", "pros": "Writes drop by the batch size. Hot rows get one add per flush.", "cons": "A crash loses the last few seconds. Counts lag." },
+        { "name": "Event log, aggregate later", "pros": "Every event is kept. Allows spam filtering and exact recounts.", "cons": "More moving parts and a larger delay before the number moves." }
+      ],
+      "pick": "Batch for the live number, log for the truth",
+      "because": "Nobody needs the exact number every second. Show the batched count, and log events so a slower job can remove bots and fix totals."
+    },
+    {
+      "title": "What the CDN keeps",
+      "question": "Which videos belong at the edge?",
+      "options": [
+        { "name": "Everything everywhere", "pros": "Never a cold read.", "cons": "Storage cost is huge and most copies are never used." },
+        { "name": "Pull on demand with LRU", "pros": "Automatic. Edges hold what was recently watched.", "cons": "One-off views of rare videos push out hot ones." },
+        { "name": "Admit on repeat, keep the head", "pros": "Cache a segment only after a few requests. The tail stays out.", "cons": "The second viewer of a rising video still misses." }
+      ],
+      "pick": "Pull with admission after repeats",
+      "because": "Popularity is extremely skewed. Admitting only repeated requests protects the cache from the tail, and a mid-tier cache softens the misses."
+    },
+    {
+      "title": "Transcoding as a DAG",
+      "question": "How do we make encoding fast and safe?",
+      "options": [
+        { "name": "One job per video", "pros": "Simple to run.", "cons": "A long video takes hours, and a failure restarts everything." },
+        { "name": "Chunk-level DAG", "pros": "Chunks encode in parallel. A failed chunk is retried alone. Time depends on chunk count, not video length.", "cons": "Needs a scheduler, stitching and care at chunk boundaries." }
+      ],
+      "pick": "Chunk-level DAG, tasks made idempotent",
+      "because": "Output names come from the video id and chunk number, so a retry overwrites with the same bytes. Start a video's lower renditions first so it can be watched early."
+    },
+    {
+      "title": "Abuse and copyright checks",
+      "question": "When do we check an upload, and what do we do on a match?",
+      "options": [
+        { "name": "Block until clean", "pros": "Nothing harmful ever goes live.", "cons": "Every upload waits on the slowest check." },
+        { "name": "Publish, then scan", "pros": "Fast for creators.", "cons": "Bad content is visible until found." },
+        { "name": "Scan async, publish when clear", "pros": "Uploads accepted at once. Public only after checks pass.", "cons": "A delay before going live. Needs a review queue for edge cases." }
+      ],
+      "pick": "Scan async, publish when clear",
+      "because": "Fingerprint matching and classifiers can run alongside transcoding. New checks can be re-run over stored videos without touching the upload path."
+    }
+  ],
+  "failures": [
+    { "what": "A transcoder dies mid-task", "impact": "One chunk of one rendition is missing, and the video cannot go live.", "fix": "Tasks are idempotent and time-limited. The scheduler retries on another worker. Mark the video live only when every required rendition is complete." },
+    { "what": "Upload session lost", "impact": "A creator would have to start a multi-gigabyte upload again.", "fix": "Chunks are durable the moment they are acknowledged. Session state lives in a store, so any upload server can answer where the client resumed." },
+    { "what": "Viral video floods one origin object", "impact": "Thousands of edges miss at once and hammer one storage key.", "fix": "Collapse concurrent misses into one fetch, put a mid-tier cache between edges and storage, and replicate the hot objects." },
+    { "what": "View counter crashes", "impact": "Counts from the last few seconds are lost.", "fix": "Accept it for the live number. Events are also logged, so a periodic job recomputes totals and fixes drift." },
+    { "what": "Search index lags behind", "impact": "A new video does not show in search for a while.", "fix": "Index from change events, and show the owner a direct link. A short delay is acceptable for discovery." }
+  ],
+  "scaling": [
+    { "limit": "Storage grows by petabytes a day", "lever": "Keep fewer renditions for rarely watched videos, move cold videos to cheaper storage and re-encode older uploads with better codecs." },
+    { "limit": "Transcoding compute follows uploads", "lever": "Scale workers with queue depth, use spot capacity and prioritise new uploads from creators with fresh audiences." },
+    { "limit": "Egress at peak", "lever": "More edge sites and ISP caches for the head, and tune admission so the cache holds only what repeats." }
+  ],
+  "recap": {
+    "key": "Process each upload once through a parallel transcoding DAG, serve the popular head from the edge and the long tail from storage, and batch view counts instead of writing one per view.",
+    "numbers": "500 hours per minute is 720K hours a day, about 3.9 PB of renditions a day. 100K views per second is 1K writes per second after batching 100 per write.",
+    "moves": ["Resumable chunked upload straight to object storage", "Chunk-level transcoding DAG, idempotent tasks", "CDN for the head, origin for the tail", "Batch view counts and run abuse checks asynchronously"]
+  }
+}
