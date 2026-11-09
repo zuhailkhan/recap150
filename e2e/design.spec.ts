@@ -118,3 +118,22 @@ test('recap home switches decks', async ({ page }) => {
   await decks.getByRole('button', { name: 'HLD', exact: true }).click()
   await expect(page.getByText(/High-level design\./)).toBeVisible()
 })
+
+test.describe('mark complete', () => {
+  for (const [name, path] of [['DSA', '/#/p/two-sum'], ['LLD', '/#/lld/parking-lot'], ['HLD', '/#/hld/url-shortener']] as const) {
+    test(`${name}: mark complete, undo, and it persists`, async ({ page }) => {
+      await page.goto(path)
+      const mark = page.getByRole('button', { name: 'Mark complete', exact: true })
+      await expect(mark).toBeVisible()
+      await mark.click()
+      await expect(page.getByRole('status').filter({ hasText: 'Completed' })).toBeVisible()
+      await page.getByRole('button', { name: 'Undo', exact: true }).click()
+      await expect(mark).toBeVisible()
+      await mark.click()
+      await expect(page.getByRole('status').filter({ hasText: 'Completed' })).toBeVisible()
+      await page.reload()
+      await expect(page.getByRole('status').filter({ hasText: 'Completed' })).toBeVisible()
+      await expect(mark).toHaveCount(0)
+    })
+  }
+})

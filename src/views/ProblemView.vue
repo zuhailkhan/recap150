@@ -10,6 +10,7 @@ import ComplexityPlay from '@/components/ComplexityPlay.vue'
 import CodeSection from '@/components/CodeSection.vue'
 import EdgeCards from '@/components/EdgeCards.vue'
 import RecapCard from '@/components/RecapCard.vue'
+import MarkComplete from '@/components/MarkComplete.vue'
 import { DEMOS } from '@/demos'
 
 const route = useRoute()
@@ -60,6 +61,7 @@ const runner = computed(() => (args: unknown[]) => runTrace(variants.value[0].fn
           <a v-if="official?.video" :href="videoUrl(official.video)" target="_blank" rel="noopener">NeetCode video</a>
           <a :href="NEETCODE_LIST_URL" target="_blank" rel="noopener">NeetCode 150</a>
         </p>
+        <MarkComplete :card-id="ready.slug" class="hd-done" />
       </div>
       <ExampleVisual :example="ready.example" />
     </header>
@@ -131,6 +133,7 @@ section { min-width: 0; }
 .cat { font-weight: 560; color: var(--ink); }
 .hd h1 { margin-bottom: .3em; }
 .statement { font-size: 1.18rem; line-height: 1.55; max-width: 58ch; color: var(--ink); }
+.hd-done { margin-top: 20px; }
 .links { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 22px; }
 
 .idea-sec { display: grid; gap: 22px; align-items: stretch; }

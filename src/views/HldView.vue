@@ -7,6 +7,7 @@ import type { TraceResult } from '@/core/tracer'
 import { catalogBySlug, hldMetas } from '@/data/design'
 import Stepper from '@/components/Stepper.vue'
 import Estimator from '@/components/Estimator.vue'
+import MarkComplete from '@/components/MarkComplete.vue'
 
 const route = useRoute()
 const slug = computed(() => String(route.params.slug))
@@ -70,6 +71,7 @@ const flowRun = (m: HldMeta) => (args: unknown[]): TraceResult => {
         <p class="meta"><span class="cat">High-level design</span><span class="cat soft">{{ ready.group }}</span><span class="chip" :class="ready.difficulty">{{ ready.difficulty }}</span></p>
         <h1>{{ ready.title }}</h1>
         <p class="statement">{{ ready.brief }}</p>
+        <MarkComplete :card-id="`hld:${ready.slug}`" class="hd-done" />
       </div>
       <div class="reqs">
         <h2 class="h3">It must</h2>
@@ -157,6 +159,7 @@ section { min-width: 0; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: 0 0 14px; font-size: .9rem; }
 .cat { font-weight: 600; } .cat.soft { font-weight: 500; color: var(--ink-2); }
 .statement { font-size: 1.18rem; line-height: 1.55; max-width: 58ch; }
+.hd-done { margin-top: 20px; }
 .reqs { padding: 18px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 .h3 { font: 650 .95rem var(--font-ui); letter-spacing: 0; margin: 0 0 8px; color: var(--ink-2); }
 .reqs ul { margin: 0 0 16px; padding-left: 18px; display: grid; gap: 4px; }

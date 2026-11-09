@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 import { z } from 'zod'
-import { getAll, put, replaceAll } from '@/storage/db'
+import { getAll, put, remove, replaceAll } from '@/storage/db'
 import { dayNumber, newCard, review, type CardState } from './sm2'
 import type { Grade } from './config'
 
@@ -54,6 +54,26 @@ export async function rateCard(id: string, grade: Grade, nowMs = Date.now()): Pr
     progress.storageError = 'Could not save that review to this browser.'
   }
   return next
+}
+
+/**
+ * "Mark complete" on a topic page: treat it as one easy recall, so it is scheduled like any
+ * other known card. Not logged and does not touch the streak (those are for real review sessions).
+ * Returns what the card was before, so the caller can undo.
+ */
+export async function markComplete(id: string, nowMs = Date.now()): Promise<CardState | undefined> {
+  const prev = progress.cards.get(id)
+  const next = review(prev ?? newCard(id), 'easy', nowMs)
+  progress.cards.set(id, next)
+  try { await put('cards', next) } catch { progress.storageError = 'Could not save that to this browser.' }
+  return prev
+}
+
+export async function restoreCard(id: string, prev: CardState | undefined): Promise<void> {
+  try {
+    if (prev) { progress.cards.set(id, prev); await put('cards', prev) }
+    else { progress.cards.delete(id); await remove('cards', id) }
+  } catch { progress.storageError = 'Could not save that to this browser.' }
 }
 
 // ---------- export / import ----------

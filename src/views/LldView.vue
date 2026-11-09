@@ -9,6 +9,7 @@ import Stepper from '@/components/Stepper.vue'
 import CodeSection from '@/components/CodeSection.vue'
 import EdgeCards from '@/components/EdgeCards.vue'
 import RecapCard from '@/components/RecapCard.vue'
+import MarkComplete from '@/components/MarkComplete.vue'
 import PanelView from '@/visuals/PanelView.vue'
 
 const route = useRoute()
@@ -51,6 +52,7 @@ const modelPanel = computed(() => (ready.value ? classes(ready.value.model.class
         <p class="meta"><span class="cat">Low-level design</span><span class="cat soft">{{ ready.group }}</span><span class="chip" :class="ready.difficulty">{{ ready.difficulty }}</span></p>
         <h1>{{ ready.title }}</h1>
         <p class="statement">{{ ready.brief }}</p>
+        <MarkComplete :card-id="`lld:${ready.slug}`" class="hd-done" />
       </div>
       <div class="reqs">
         <h2 class="h3">It must</h2>
@@ -133,6 +135,7 @@ section { min-width: 0; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: 0 0 14px; font-size: .9rem; }
 .cat { font-weight: 600; } .cat.soft { font-weight: 500; color: var(--ink-2); }
 .statement { font-size: 1.18rem; line-height: 1.55; max-width: 58ch; }
+.hd-done { margin-top: 20px; }
 .reqs { padding: 18px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 .h3 { font: 650 .95rem var(--font-ui); letter-spacing: 0; margin: 0 0 8px; color: var(--ink-2); }
 .reqs ul { margin: 0 0 12px; padding-left: 18px; display: grid; gap: 4px; }

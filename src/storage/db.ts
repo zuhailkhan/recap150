@@ -42,3 +42,10 @@ export async function replaceAll(data: { cards: unknown[]; meta: unknown[]; log:
   for (const l of data.log) tx.objectStore('log').add(l)
   await new Promise<void>((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error) })
 }
+
+export async function remove(store: 'cards' | 'meta', key: string): Promise<void> {
+  const db = await open()
+  const tx = db.transaction(store, 'readwrite')
+  tx.objectStore(store).delete(key)
+  await new Promise<void>((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error) })
+}

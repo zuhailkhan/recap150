@@ -13,6 +13,7 @@ Product pages are "a system like X", designed from public, general knowledge and
 Each track has its own recap deck, so the 150 DSA cards are not diluted by design topics.
 
 - **One interactive explainer per problem.** A one-sentence idea with a tiny demo, a step-by-step run driven by the real TypeScript solution, a brute-force vs optimal comparison, code in pseudocode, TypeScript and Go (each hidden until you ask), edge cases, gotchas and a 30-second recap.
+- **Mark complete.** Every topic page has a Mark complete button for things you already know (scheduled like an easy recall, with Undo until you leave the page).
 - **Recap mode.** Daily mix, category drill and weak spots, with SM-2-style scheduling. Progress is stored in your browser (IndexedDB). No accounts, no backend, no network calls at runtime.
 - **Installable and offline.** It is a PWA. After the first visit everything works without a connection.
 
