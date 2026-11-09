@@ -1,0 +1,282 @@
+{
+  "slug": "traffic-signal",
+  "title": "Traffic Signal",
+  "group": "State machines",
+  "difficulty": "Easy",
+  "status": "ready",
+  "brief": "Design the controller for a four-way junction. North and south share a signal, east and west share another. Each signal cycles green, yellow, red for a set number of ticks. Opposing axes must never be green together. A pedestrian button asks for a crossing, which starts at the next safe moment. Time comes in as ticks, so the whole thing is deterministic.",
+  "requirements": {
+    "functional": [
+      "Two signals, one per axis. Each has a green time and a yellow time in ticks.",
+      "A signal goes green, then yellow, then red. Red lasts until the other axis is done.",
+      "Two axes are never lit at the same time, so opposing directions are never both green.",
+      "A press of the pedestrian button is remembered. The crossing starts when the active axis turns red.",
+      "During the walk every signal is red. When it ends, the next axis starts.",
+      "A press while a request waits, or during the walk, adds nothing.",
+      "Time moves only when tick() is called. No clock reads inside the design."
+    ],
+    "outOfScope": [
+      "Turn arrows and sensors that change the timing",
+      "An all-red gap between axes (yellow covers clearance here)",
+      "Power failure, flashing mode and hardware faults"
+    ]
+  },
+  "idea": {
+    "sentence": "Let the junction light only one axis at a time, so a clash is impossible by construction, and hand the road over only when the active signal has turned red.",
+    "jargon": [
+      {
+        "term": "tick",
+        "plain": "One step of an injected clock. The design never reads the real time, so a test can run a whole day in a loop."
+      },
+      {
+        "term": "invariant",
+        "plain": "A rule that must be true after every operation. Here: at most one axis is lit, and none during the walk."
+      },
+      {
+        "term": "by construction",
+        "plain": "Safe because of how the code is shaped, not because a check catches a mistake afterwards."
+      }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      {
+        "name": "Junction",
+        "fields": [
+          "signals: Signal[]",
+          "crossing: Crossing",
+          "active: index"
+        ],
+        "methods": [
+          "tick()",
+          "press(): boolean",
+          "safe(): boolean",
+          "look(): string"
+        ],
+        "x": 1,
+        "y": 0
+      },
+      {
+        "name": "Signal",
+        "fields": [
+          "name: NS | EW",
+          "color: Color",
+          "left: ticks"
+        ],
+        "methods": [
+          "go()",
+          "tick(): turnedRed"
+        ],
+        "x": 0,
+        "y": 1
+      },
+      {
+        "name": "Crossing",
+        "fields": [
+          "waiting: boolean",
+          "left: ticks"
+        ],
+        "methods": [
+          "press(): queued",
+          "open(): started",
+          "tick(): ended"
+        ],
+        "x": 2,
+        "y": 1
+      },
+      {
+        "name": "Color",
+        "kind": "enum",
+        "fields": [
+          "green",
+          "yellow",
+          "red"
+        ],
+        "x": 0,
+        "y": 2
+      }
+    ],
+    "relations": [
+      {
+        "from": "Junction",
+        "to": "Signal",
+        "kind": "has",
+        "label": "one per axis"
+      },
+      {
+        "from": "Junction",
+        "to": "Crossing",
+        "kind": "has"
+      },
+      {
+        "from": "Signal",
+        "to": "Color",
+        "kind": "uses",
+        "label": "NEXT table"
+      }
+    ]
+  },
+  "patterns": [
+    {
+      "name": "State machine as a table",
+      "where": "Signal.color moves along NEXT: green to yellow to red to green. The only data per state is a tick count.",
+      "why": "Three states with no different behaviour need no class each. A lookup table is shorter than a State class per colour. Use classes when states carry behaviour."
+    },
+    {
+      "name": "Coordinator (mediator)",
+      "where": "Junction decides who moves on every tick and when the road changes hands. Signals and Crossing never talk to each other.",
+      "why": "The safety rule lives in one place. The parts stay small and can be tested alone."
+    }
+  ],
+  "decisions": [
+    {
+      "question": "How do you guarantee two opposing greens never happen?",
+      "choice": "Only the active signal is ever ticked, and the next axis starts only when it has turned red",
+      "because": "A bug in timing can then change how long things last, but not create a clash. A safe() check is kept for tests as a second line.",
+      "instead": "Give each signal its own timer and a repeating cycle, then hope the numbers line up. One wrong duration puts two axes green."
+    },
+    {
+      "question": "Does red have a duration?",
+      "choice": "No. Red lasts until the junction starts that axis",
+      "because": "How long an axis waits is the sum of the others' green, yellow and any walk. Storing it as a number would copy information and drift when a time is changed.",
+      "instead": "A red time on every signal that must always equal the rest of the cycle."
+    },
+    {
+      "question": "When does a pedestrian request take effect?",
+      "choice": "At the next moment the active axis turns red, and it has priority over the next axis",
+      "because": "That is the first moment every direction is stopped. Waiting is bounded by one green plus one yellow, and no signal is cut short.",
+      "instead": "Cut the active green short on a press. It is faster but is unsafe and needs a rule for how short is allowed."
+    },
+    {
+      "question": "Where does time come from?",
+      "choice": "The caller invokes tick(), an integer step",
+      "because": "No Date or timer in the design means tests are exact and fast. In production one scheduler calls tick() every second.",
+      "instead": "setTimeout or time.Ticker inside each signal, which makes tests slow and order-dependent."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "A button press and the tick arrive at the same moment.",
+      "answer": "Both touch the same state, so put them behind one mutex (sync.Mutex in Go), or send both as messages to a single goroutine that owns the junction. Order does not matter for safety: a press only sets a flag that the next tick reads."
+    },
+    {
+      "ask": "Add an all-red gap of 2 ticks between axes.",
+      "answer": "Make it a phase like the walk: when the active axis turns red, count down a gap with every signal red, then start the next axis. It is the same shape as Crossing, and the walk and the gap can share a small Phase with a tick count."
+    },
+    {
+      "ask": "Make it a three-way or five-way junction.",
+      "answer": "The junction already takes a list of signals and rotates through them by index. Signals that cannot conflict (two left turns that do not cross) can be grouped into one signal head. The conflict rule decides the grouping, not the code."
+    },
+    {
+      "ask": "A sensor should extend green when cars are waiting.",
+      "answer": "Give Signal a maxGreen and let a small policy object answer extend() at each tick. The Junction asks the policy before it lets green run out. The safe invariant is untouched because only the active axis ever moves."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: operation names, then each one's arguments. The constructor takes [NS green, NS yellow, EW green, EW yellow, walk ticks]. tick takes a count. Example: [\"Junction\",\"tick\",\"press\",\"tick\"], [[3,1,2,1,2],[2],[],[6]]",
+    "presets": [
+      {
+        "label": "Button during green",
+        "args": [
+          ["Junction", "tick", "press", "tick"],
+          [[2, 1, 2, 1, 2], [1], [], [7]]
+        ]
+      },
+      {
+        "label": "One full cycle",
+        "args": [
+          ["Junction", "tick"],
+          [[3, 1, 2, 1, 2], [7]]
+        ]
+      },
+      {
+        "label": "Button while EW is green",
+        "args": [
+          ["Junction", "tick", "press", "tick"],
+          [[3, 1, 2, 1, 2], [5], [], [4]]
+        ]
+      },
+      {
+        "label": "Pressing twice",
+        "args": [
+          ["Junction", "press", "press"],
+          [[3, 1, 2, 1, 2], [], []]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "controller",
+      "label": "Tick-driven controller",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        {
+          "n": 1,
+          "title": "Build the junction",
+          "note": "One signal per axis and one crossing. The first axis starts green and every other signal is red."
+        },
+        {
+          "n": 2,
+          "title": "One tick",
+          "note": "The junction gets the tick and moves exactly one thing: the walk if there is one, otherwise the active signal."
+        },
+        {
+          "n": 3,
+          "title": "Active signal counts",
+          "note": "The signal counts down. At zero it moves on: green to yellow, then yellow to red. It tells the junction when it is red."
+        },
+        {
+          "n": 4,
+          "title": "Safe moment: hand over",
+          "note": "Red means every direction is stopped. A waiting pedestrian goes first, otherwise the next axis starts."
+        },
+        {
+          "n": 5,
+          "title": "Pedestrian press",
+          "note": "The button only records a request. Nothing on the road changes until the safe moment."
+        }
+      ]
+    }
+  ],
+  "goArgs": [
+    "[]string",
+    "[][]any"
+  ],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    {
+      "lang": "General",
+      "text": "Off-by-one in durations. A green of 3 ticks means three observations of green, then yellow on the third tick. Decide whether the colour changes at the start or the end of a tick and test the first and last tick."
+    },
+    {
+      "lang": "General",
+      "text": "Do not store time in each signal as a clock reading. Keep a countdown that only the junction advances, so there is one source of truth."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "A string-union Color with a Record<Color, Color> table is checked by the compiler: add a colour and every missing key is an error. An enum with a switch needs a default branch to get the same safety."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "A getter such as walking reads as a field but runs code each time. Fine here, but do not put a getter in a hot loop if it hides work."
+    },
+    {
+      "lang": "Go",
+      "text": "Use a string type for Color, not iota ints, if the value is printed or compared with JSON. A map lookup on a missing key returns the zero value (empty string), so every colour needs an entry."
+    }
+  ],
+  "recap": {
+    "pattern": "One owner of order: light one axis at a time",
+    "key": "The junction ticks only the active signal and hands over when it is red, so a clash cannot happen. A pedestrian request is a flag served at that same safe moment.",
+    "moves": [
+      "Name the invariant first: never two lit axes",
+      "Shape the code so the invariant cannot be broken, then add a safe() check for tests",
+      "Inject time as ticks and keep every duration as data",
+      "Queue the pedestrian request and serve it at the next safe moment"
+    ]
+  }
+}

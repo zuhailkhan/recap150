@@ -1,0 +1,454 @@
+{
+  "slug": "rate-limiter-lld",
+  "title": "Rate Limiter",
+  "group": "Money and rules",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the in-process core of a rate limiter. Each user may make only so many requests in a stretch of time, and the rest are refused. Teams disagree on how to count, so the counting algorithm has to be swappable: a token bucket, a fixed window counter or a sliding window log. Time is passed in as whole seconds so everything is predictable.",
+  "requirements": {
+    "functional": [
+      "allow(key, now) answers yes or no for one request from one key, such as a user id.",
+      "Each key is limited on its own. One user's traffic never uses up another's.",
+      "Token bucket: capacity tokens, one earned every N seconds, each request spends one. A full bucket allows a burst.",
+      "Fixed window: at most limit requests in each slot [0, size), [size, 2*size), and so on, with the count reset at each slot start.",
+      "Sliding window log: at most limit allowed requests in the last size seconds, counted from now. Denied requests are not counted.",
+      "The algorithm is chosen once, when the limiter is built, and the caller code does not change."
+    ],
+    "outOfScope": [
+      "Sharing counters across servers",
+      "Reading the real clock",
+      "Different limits for different users",
+      "HTTP headers such as Retry-After"
+    ]
+  },
+  "idea": {
+    "sentence": "Put each counting algorithm behind one tiny interface, give every key its own instance, and the differences left are the edge cases: what each algorithm does when a burst straddles a boundary.",
+    "jargon": [
+      {
+        "term": "Strategy pattern",
+        "plain": "Put one way of doing a job behind an interface so you can swap it without touching the caller. Each algorithm here is a strategy."
+      },
+      {
+        "term": "token bucket",
+        "plain": "A bucket that refills at a steady rate up to a maximum. Each request takes a token. Because it can fill up, it allows a burst, then a steady trickle."
+      },
+      {
+        "term": "boundary burst",
+        "plain": "Fixed windows reset at set times. A client can send a full quota just before a reset and another full quota just after, so up to double the limit passes in a short stretch."
+      },
+      {
+        "term": "injected time",
+        "plain": "The caller passes the current time in instead of the code reading a clock. Tests then need no sleeping, and every run gives the same answer."
+      }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      {
+        "name": "RateLimiter",
+        "fields": [
+          "byKey: Map<key, Limiter>",
+          "make: NewLimiter"
+        ],
+        "methods": [
+          "allow(key, now): boolean"
+        ],
+        "x": 1,
+        "y": 0
+      },
+      {
+        "name": "Limiter",
+        "kind": "interface",
+        "methods": [
+          "allow(now): boolean"
+        ],
+        "x": 1,
+        "y": 1
+      },
+      {
+        "name": "TokenBucket",
+        "fields": [
+          "tokens",
+          "last",
+          "capacity, every"
+        ],
+        "methods": [
+          "allow(now)"
+        ],
+        "x": 0,
+        "y": 2
+      },
+      {
+        "name": "FixedWindow",
+        "fields": [
+          "start",
+          "count",
+          "limit, size"
+        ],
+        "methods": [
+          "allow(now)"
+        ],
+        "x": 1,
+        "y": 2
+      },
+      {
+        "name": "SlidingWindowLog",
+        "fields": [
+          "log: number[]",
+          "limit, size"
+        ],
+        "methods": [
+          "allow(now)"
+        ],
+        "x": 2,
+        "y": 2
+      }
+    ],
+    "relations": [
+      {
+        "from": "RateLimiter",
+        "to": "Limiter",
+        "kind": "has",
+        "label": "one per key"
+      },
+      {
+        "from": "TokenBucket",
+        "to": "Limiter",
+        "kind": "implements"
+      },
+      {
+        "from": "FixedWindow",
+        "to": "Limiter",
+        "kind": "implements"
+      },
+      {
+        "from": "SlidingWindowLog",
+        "to": "Limiter",
+        "kind": "implements"
+      }
+    ]
+  },
+  "patterns": [
+    {
+      "name": "Strategy",
+      "where": "The Limiter interface, with TokenBucket, FixedWindow and SlidingWindowLog.",
+      "why": "The three algorithms count differently but answer the same question. RateLimiter treats them alike, so adding a fourth, such as a leaky bucket, touches nothing else."
+    },
+    {
+      "name": "Factory function",
+      "where": "NewLimiter, a function that RateLimiter calls once for each new key.",
+      "why": "RateLimiter needs a fresh instance per key but must not know which class. Passing a function is the lightest way to say that."
+    },
+    {
+      "name": "Lazy creation",
+      "where": "RateLimiter.allow makes a key's limiter on its first request.",
+      "why": "Most keys may never appear. Making limiters on demand means memory is used only by keys that were actually seen."
+    }
+  ],
+  "decisions": [
+    {
+      "question": "Where does per-key state live?",
+      "choice": "One Limiter instance per key, created by a factory, each holding only its own small state",
+      "because": "Each algorithm stays a simple class with two or three fields. Keys cannot interfere, and the key never appears inside an algorithm.",
+      "instead": "One limiter holding a map from key to state. Every algorithm then repeats the same map handling, and a bug in it hits all of them."
+    },
+    {
+      "question": "How is time handled?",
+      "choice": "The caller passes now as whole seconds, and it must not go backwards",
+      "because": "No clock means no sleeping in tests and no flaky results. Whole seconds mean no float rounding, so the burst-at-the-edge cases can be checked exactly.",
+      "instead": "Reading the clock inside the limiter, which makes tests slow and non-repeatable."
+    },
+    {
+      "question": "How does the token bucket refill?",
+      "choice": "On each request, work out whole tokens earned since the last refill, and advance the clock only by those whole intervals",
+      "because": "No timer thread is needed. Advancing by whole intervals keeps a half-earned token for next time, so the long-run rate is exact.",
+      "instead": "Setting the refill time to now on every call, which quietly throws away the partial interval and makes the bucket slower than promised."
+    },
+    {
+      "question": "Which algorithm should a team pick?",
+      "choice": "Offer all three, and say what each costs: the fixed window is the cheapest but can let double the limit through at an edge",
+      "because": "The fixed window needs two numbers per key. The sliding log is exact but remembers every request, so memory grows with the limit. The token bucket needs two numbers and allows controlled bursts.",
+      "instead": "Picking one and hiding the trade-off. Interviews and incidents both come down to which edge case the team can live with."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two requests for the same key arrive at the same moment. What breaks?",
+      "answer": "Each algorithm reads, decides and then writes. Two threads can both read count = 2 and both allow the third, so the limit is exceeded. Give each Limiter a mutex around allow. In Go use sync.Mutex in each limiter, and a lock or sync.Map in RateLimiter for the key map. Per-key locks keep other users from waiting."
+    },
+    {
+      "ask": "The sliding log uses too much memory at a high limit. What is the cheaper option?",
+      "answer": "A sliding window counter. Keep the counts for the current and the previous fixed slot, and estimate the sliding count as previous * (fraction of the window not yet passed) + current. It is two numbers per key, not a list, and is close to exact for steady traffic."
+    },
+    {
+      "ask": "How do you run this across many servers?",
+      "answer": "The state has to be shared. Keep each key's state in a store such as Redis, and make the read-decide-write a single atomic step, for example a small server-side script. Or route each key to one server with consistent hashing, so a key's state stays local."
+    },
+    {
+      "ask": "Keys never expire, so memory grows. What do you do?",
+      "answer": "Drop a key's limiter once it holds no information: a full token bucket, an empty log, or a fixed window that has ended. Do it lazily on access or with a periodic sweep. A fresh limiter for that key behaves exactly the same."
+    },
+    {
+      "ask": "Different users get different limits, such as free and paid plans.",
+      "answer": "Change the factory to take the key: NewLimiter(key) looks up the plan and builds the right algorithm and numbers. RateLimiter and the Limiter interface do not change."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Start with RateLimiter taking [\"token\" | \"fixed\" | \"sliding\", a, b]: token is capacity and seconds per token, fixed and sliding are the limit and the window in seconds. Then allow(key, t) with t in whole seconds. Example: [\"RateLimiter\",\"allow\",\"allow\"], [[\"fixed\",2,10],[\"ana\",0],[\"ana\",1]]",
+    "presets": [
+      {
+        "label": "Burst at the edge, three ways",
+        "args": [
+          [
+            "RateLimiter",
+            "allow",
+            "allow",
+            "allow",
+            "allow",
+            "RateLimiter",
+            "allow",
+            "allow",
+            "allow",
+            "allow",
+            "RateLimiter",
+            "allow",
+            "allow",
+            "allow",
+            "allow"
+          ],
+          [
+            [
+              "fixed",
+              2,
+              10
+            ],
+            [
+              "ana",
+              9
+            ],
+            [
+              "ana",
+              9
+            ],
+            [
+              "ana",
+              10
+            ],
+            [
+              "ana",
+              10
+            ],
+            [
+              "sliding",
+              2,
+              10
+            ],
+            [
+              "ana",
+              9
+            ],
+            [
+              "ana",
+              9
+            ],
+            [
+              "ana",
+              10
+            ],
+            [
+              "ana",
+              10
+            ],
+            [
+              "token",
+              2,
+              10
+            ],
+            [
+              "ana",
+              9
+            ],
+            [
+              "ana",
+              9
+            ],
+            [
+              "ana",
+              10
+            ],
+            [
+              "ana",
+              19
+            ]
+          ]
+        ]
+      },
+      {
+        "label": "Sliding window recovers",
+        "args": [
+          [
+            "RateLimiter",
+            "allow",
+            "allow",
+            "allow",
+            "allow",
+            "allow",
+            "allow"
+          ],
+          [
+            [
+              "sliding",
+              2,
+              10
+            ],
+            [
+              "ana",
+              0
+            ],
+            [
+              "ana",
+              1
+            ],
+            [
+              "ana",
+              2
+            ],
+            [
+              "ana",
+              10
+            ],
+            [
+              "ana",
+              11
+            ],
+            [
+              "ana",
+              12
+            ]
+          ]
+        ]
+      },
+      {
+        "label": "Two users, one bucket each",
+        "args": [
+          [
+            "RateLimiter",
+            "allow",
+            "allow",
+            "allow",
+            "allow",
+            "allow"
+          ],
+          [
+            [
+              "token",
+              1,
+              5
+            ],
+            [
+              "ana",
+              0
+            ],
+            [
+              "ana",
+              1
+            ],
+            [
+              "bo",
+              1
+            ],
+            [
+              "ana",
+              5
+            ],
+            [
+              "bo",
+              5
+            ]
+          ]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Strategy per key",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        {
+          "n": 1,
+          "title": "One limiter per key",
+          "note": "RateLimiter looks up the key's limiter and, if there is none, asks the factory for a new one. Keys never share state."
+        },
+        {
+          "n": 2,
+          "title": "Token bucket refills and spends",
+          "note": "Count the whole tokens earned since the last refill, cap at capacity, advance the clock by whole intervals only, then spend one if any is left."
+        },
+        {
+          "n": 3,
+          "title": "Fixed window counts",
+          "note": "Find the slot that now falls in. If it is a new slot, reset the count. Allow while the count is below the limit."
+        },
+        {
+          "n": 4,
+          "title": "Sliding window slides",
+          "note": "Drop remembered requests older than the window, then allow if fewer than limit remain. Only allowed requests are remembered."
+        }
+      ]
+    }
+  ],
+  "goArgs": [
+    "[]string",
+    "[][]any"
+  ],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    {
+      "lang": "General",
+      "text": "The fixed window can pass up to twice the limit in a short stretch: a full quota in the last second of one slot and another in the first second of the next. Sliding window and token bucket do not have this edge."
+    },
+    {
+      "lang": "General",
+      "text": "Decide whether the window edge is open or closed and test it. Here a request exactly one window old has left the window, so one request per 10s is allowed again at t=10, not t=11."
+    },
+    {
+      "lang": "General",
+      "text": "If the clock can go backwards, a limiter must not give negative tokens or negative time. Here the token bucket treats a stale time as no time passing. Callers should pass a monotonic clock."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "Array.shift() on a long log moves every element, so each eviction costs O(n). Fine for small limits. For big ones keep a head index or use a ring buffer."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "Math.floor(now / size) * size is the slot start. Writing now - (now % size) looks the same but behaves differently for negative times. Keep times at 0 or above."
+    },
+    {
+      "lang": "Go",
+      "text": "Integer division already truncates, so now / size * size is the slot start for non-negative times. Floats would be both slower and inexact here."
+    },
+    {
+      "lang": "Go",
+      "text": "w.log = w.log[1:] drops the front without copying, but the backing array keeps the old values alive until append reallocates. Fine for a limiter, but copy into a fresh slice if the log can be huge."
+    },
+    {
+      "lang": "Go",
+      "text": "A factory is just a func() Limiter. Two closures made in a loop share the loop variable in older Go versions, so copy the value into a new variable before creating the closure."
+    }
+  ],
+  "recap": {
+    "pattern": "Strategy per key: bucket, fixed window, sliding log",
+    "key": "One Limiter interface, one instance per key, time passed in. The algorithms differ only at the edges, and the fixed window's edge lets double the limit through.",
+    "moves": [
+      "Define Limiter.allow(now) and make one per key from a factory",
+      "Token bucket: earn whole tokens, advance by whole intervals",
+      "Fixed window: reset the count at each slot start, and know the burst",
+      "Sliding log: drop old entries, count what is left, skip denied requests"
+    ]
+  }
+}

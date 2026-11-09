@@ -1,0 +1,143 @@
+{
+  "slug": "hotel-reservation",
+  "title": "Hotel Reservation",
+  "group": "Booking and reservation",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the booking core of a hotel. It has rooms of a few types. A guest asks for a type of room for a range of days and gets a room, or is told none is free. Bookings can be cancelled. Prices change by day, for example dearer on weekends, and the hotel wants to change that rule without touching the booking code.",
+  "requirements": {
+    "functional": [
+      "Days are integers. A stay runs from a check-in day (included) to a check-out day (excluded).",
+      "A room is free for a stay when no existing stay overlaps it. A guest may check in on the day another checks out.",
+      "Book a room of a type: the hotel picks the first free room in room order and returns a booking id.",
+      "Search which rooms of a type are free for a range.",
+      "Price a stay night by night with a rule that can be swapped: a flat rate, or the same plus a weekend surcharge.",
+      "Cancel a booking: the nights become free and the guest gets the full price back.",
+      "Refuse an empty range, a range that starts before day 0, an unknown type, and an unknown booking."
+    ],
+    "outOfScope": ["Payment and deposits", "Partial refunds and cancellation fees", "Overbooking", "Moving a guest to another room"]
+  },
+  "idea": {
+    "sentence": "Treat a stay as the half-open range [from, to), so two stays overlap only when each starts before the other ends and back-to-back stays never clash.",
+    "jargon": [
+      { "term": "half-open range", "plain": "Includes the start, excludes the end. [3, 5) is nights 3 and 4. It makes [0, 3) and [3, 5) touch without sharing a night." },
+      { "term": "Decorator pattern", "plain": "An object wraps another one with the same interface and adds behaviour. The weekend surcharge wraps a flat rate." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "Room", "fields": ["id", "type", "stays: Booking[]"], "methods": ["isFree(from, to): bool", "add(b), remove(id)"], "x": 0, "y": 0 },
+      { "name": "Hotel", "fields": ["rooms: Room[]", "bookings: Map<id, Booking>", "pricing: Pricing"], "methods": ["search(type, from, to): Room[]", "quote(type, from, to): price", "book(guest, type, from, to): id", "cancel(id): refund"], "x": 1, "y": 0 },
+      { "name": "Pricing", "kind": "interface", "methods": ["nightly(type, day): price"], "x": 2, "y": 0 },
+      { "name": "Booking", "fields": ["id, guest, roomId", "from, to", "price"], "x": 1, "y": 1 },
+      { "name": "FlatRates", "fields": ["rates: type -> price"], "x": 2, "y": 1 },
+      { "name": "WeekendSurcharge", "fields": ["inner: Pricing", "percent"], "x": 3, "y": 0 }
+    ],
+    "relations": [
+      { "from": "Hotel", "to": "Room", "kind": "has", "label": "owns" },
+      { "from": "Hotel", "to": "Pricing", "kind": "uses", "label": "asks" },
+      { "from": "Hotel", "to": "Booking", "kind": "creates" },
+      { "from": "Room", "to": "Booking", "kind": "has", "label": "stays" },
+      { "from": "FlatRates", "to": "Pricing", "kind": "implements" },
+      { "from": "WeekendSurcharge", "to": "Pricing", "kind": "implements", "label": "wraps one" }
+    ]
+  },
+  "patterns": [
+    { "name": "Strategy", "where": "Pricing, with FlatRates and WeekendSurcharge.", "why": "The price rule changes with the season. Hotel only calls nightly(type, day), so a new rule is a new class." },
+    { "name": "Decorator", "where": "WeekendSurcharge wraps any other Pricing.", "why": "Rules stack without a class per combination: a season rule can wrap the weekend rule, which wraps the flat rates." },
+    { "name": "Encapsulation of the invariant", "where": "Room owns its stays and is the only place that answers isFree.", "why": "The no-double-booking rule lives next to the data it protects. Hotel never reads a room's stays to decide." }
+  ],
+  "decisions": [
+    {
+      "question": "How is a stay stored?",
+      "choice": "A half-open range [from, to) of integer days",
+      "because": "The overlap test is one line with no special cases, and a guest can check in the day another leaves. No off-by-one on the last night.",
+      "instead": "A closed range [from, to] where the last day is a night. It needs from <= b.to checks and breaks same-day turnover."
+    },
+    {
+      "question": "Who decides whether a room is free?",
+      "choice": "Each Room, from its own list of stays",
+      "because": "The room knows its bookings, so there is one place to get the rule right. Hotel just asks every room of the type.",
+      "instead": "Hotel scanning one global list of bookings for every question."
+    },
+    {
+      "question": "How does Hotel choose among free rooms?",
+      "choice": "The first free room in a fixed room order",
+      "because": "Deterministic and easy to test. A smarter choice, such as best fit, can be a strategy later.",
+      "instead": "A random room, which makes results differ from run to run."
+    },
+    {
+      "question": "When is the price fixed?",
+      "choice": "At booking, stored on the Booking and refunded as stored",
+      "because": "A price change after the booking must not change what the guest agreed to pay or get back.",
+      "instead": "Recomputing the price on cancel with today's rule."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two guests book the last room at the same moment.",
+      "answer": "Search then book is check-then-act. Both searches see the room free, both add a stay. Put a lock around book and cancel (a sync.Mutex in Go), or lock per room so other rooms stay parallel. With a database, enforce it there: an exclusion constraint on (room, daterange), or a unique row per room per night."
+    },
+    {
+      "ask": "There are 10,000 rooms and search is slow.",
+      "answer": "Today search scans every room of a type and every stay in it. Keep rooms grouped by type, and keep each room's stays sorted by check-in so isFree is a binary search. For a year ahead, a per-type array of free counts per night answers 'is anything free' in one pass."
+    },
+    {
+      "ask": "Add a season price: summer is 20 percent dearer.",
+      "answer": "Write a SeasonSurcharge Pricing that wraps another one, the same way WeekendSurcharge does. Stack them. Hotel and Room do not change."
+    },
+    {
+      "ask": "Let the guest pick a specific room, or move to a bigger one.",
+      "answer": "Add a method that takes a room id and calls isFree on just that room. Moving is cancel plus book done under one lock, so a failure in the second half does not lose the first booking."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Hotel takes [rooms as [id, type], rates as [type, price], \"flat\" or \"weekend\", surcharge percent]. Then book(guest, type, from, to), search(type, from, to), quote(type, from, to), cancel(id), roomOf(id). Day 0 is a Monday.",
+    "presets": [
+      {
+        "label": "Back to back and an overlap",
+        "args": [["Hotel", "book", "book", "book", "search", "cancel"], [[[["101", "std"], ["102", "std"], ["201", "dlx"]], [["std", 100], ["dlx", 200]], "flat", 0], ["ana", "std", 0, 3], ["bo", "std", 3, 5], ["cy", "std", 2, 4], ["std", 3, 4], [1]]]
+      },
+      {
+        "label": "Weekend pricing",
+        "args": [["Hotel", "quote", "book", "cancel"], [[[["101", "std"], ["201", "dlx"]], [["std", 100], ["dlx", 200]], "weekend", 50], ["dlx", 4, 7], ["ana", "dlx", 4, 7], [1]]]
+      },
+      {
+        "label": "Fully booked, then a cancel",
+        "args": [["Hotel", "book", "book", "cancel", "book"], [[[["101", "std"]], [["std", 100]], "flat", 0], ["ana", "std", 0, 3], ["bo", "std", 1, 2], [1], ["bo", "std", 1, 2]]]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Rooms with calendars",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Build the hotel", "note": "The hotel owns the rooms in a fixed order and is handed its pricing rule. Each room starts with an empty calendar." },
+        { "n": 2, "title": "The overlap test", "note": "A room is free when no stay overlaps the request. Overlap means each range starts before the other ends." },
+        { "n": 3, "title": "Search the rooms", "note": "Ask every room of the type, in order. The first free one gets the booking. None free means the answer is no." },
+        { "n": 4, "title": "Price the stay", "note": "Pricing is asked once per night, from check-in up to but not including check-out. The nights are added up." },
+        { "n": 5, "title": "Record the stay", "note": "The room stores the stay and the hotel stores the booking, so the nights are blocked from now on." },
+        { "n": 6, "title": "Cancel", "note": "Remove the stay from its room. The nights are free again and the stored price is refunded." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "Use a < b and c < d, not <=. With <=, a guest checking in on the day another checks out would clash, and your hotel would lose a night of revenue between every pair of stays." },
+    { "lang": "General", "text": "Search then book is check-then-act. Two requests can both see a room free. Hold one lock across the search and the add, or let the database refuse the second insert." },
+    { "lang": "TypeScript", "text": "Date objects hide time zones and daylight-saving changes, so a night can be 23 or 25 hours. Keep integer days inside the design and convert at the edges." },
+    { "lang": "Go", "text": "Go's integer division truncates toward zero. Percent maths like rate*percent/100 is exact only for rates that divide evenly. Write down the rounding rule, here floor, and test it." },
+    { "lang": "Go", "text": "Ranging over a slice of structs gives copies. Keep rooms as []*Room so that adding a stay changes the real room, not a copy." }
+  ],
+  "recap": {
+    "pattern": "Half-open ranges, plus Strategy and Decorator for price",
+    "key": "A stay is [from, to). Two stays overlap only if each starts before the other ends. Price is a swappable, stackable rule.",
+    "moves": ["Model stays as half-open integer day ranges", "Let each Room own its stays and answer isFree", "Hotel picks the first free room, then prices and records the stay", "Put the price rule behind Pricing and wrap it for weekends"]
+  }
+}

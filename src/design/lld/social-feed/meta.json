@@ -1,0 +1,137 @@
+{
+  "slug": "social-feed",
+  "title": "Social Feed (Instagram)",
+  "group": "Big products",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the core of a social feed, a system like Instagram. Users follow each other, publish posts and like them. A user's feed is made of the posts of the people they follow, and it is read a page at a time. The ordering of the feed must be easy to change.",
+  "requirements": {
+    "functional": [
+      "Follow and unfollow another user. Following is one-way. You cannot follow yourself or follow twice.",
+      "Publish a post. The caller gives the timestamp as an integer and the post gets the next id.",
+      "Like a post once per user. A repeated like changes nothing.",
+      "Tell the author when someone else likes their post.",
+      "The feed has the posts of the people you follow, not your own, ranked by a rule you can swap: newest first or most liked.",
+      "Read the feed in pages with a cursor. Each page starts exactly where the last one ended."
+    ],
+    "outOfScope": ["Photos and video", "Comments and stories", "Private accounts and blocking", "Storing feeds ahead of time (see the News Feed page)"]
+  },
+  "idea": {
+    "sentence": "Give every post a score from a swappable strategy, rank by score then id so the order is total, and let the cursor be the score and id of the last post you returned.",
+    "jargon": [
+      { "term": "cursor (keyset) pagination", "plain": "The page token says where the last page ended, as a value in the ordering. The next page is whatever ranks after it. Unlike page numbers, new posts do not shift it." },
+      { "term": "total order", "plain": "A ranking where no two items tie. Here equal scores are broken by post id, so every post has one exact place." },
+      { "term": "Observer pattern", "plain": "An object announces an event to a list of listeners it does not know the details of. Here, a like is announced to the inbox." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "NewestFirst", "methods": ["score(p) = p.at"], "x": 0, "y": 0 },
+      { "name": "FeedStrategy", "kind": "interface", "methods": ["score(post): number"], "x": 1, "y": 0 },
+      { "name": "MostLiked", "methods": ["score(p) = likes count"], "x": 2, "y": 0 },
+      { "name": "LikeObserver", "kind": "interface", "methods": ["liked(post, by)"], "x": 0, "y": 1 },
+      { "name": "SocialFeed", "fields": ["following: Map<user, Set<user>>", "byAuthor, posts", "strategy: FeedStrategy", "observers: LikeObserver[]"], "methods": ["follow(me, other)", "post(user, at): id", "like(user, postId)", "feed(user, limit, cursor): Page"], "x": 1, "y": 1 },
+      { "name": "Page", "fields": ["ids: number[]", "next: cursor or empty"], "x": 2, "y": 1 },
+      { "name": "Inbox", "fields": ["messages: Map<author, string[]>"], "methods": ["liked(post, by)", "of(user)"], "x": 0, "y": 2 },
+      { "name": "Post", "fields": ["id, author", "at: timestamp", "likes: Set<user>"], "x": 1, "y": 2 }
+    ],
+    "relations": [
+      { "from": "NewestFirst", "to": "FeedStrategy", "kind": "implements" },
+      { "from": "MostLiked", "to": "FeedStrategy", "kind": "implements" },
+      { "from": "SocialFeed", "to": "FeedStrategy", "kind": "uses", "label": "asks" },
+      { "from": "SocialFeed", "to": "LikeObserver", "kind": "uses", "label": "notifies" },
+      { "from": "Inbox", "to": "LikeObserver", "kind": "implements" },
+      { "from": "SocialFeed", "to": "Post", "kind": "has", "label": "owns" },
+      { "from": "SocialFeed", "to": "Page", "kind": "creates" }
+    ]
+  },
+  "patterns": [
+    { "name": "Strategy", "where": "FeedStrategy with NewestFirst and MostLiked. One method returns a score for a post.", "why": "A new ordering is one small class. The feed code never changes, and the cursor still works because it stores a score." },
+    { "name": "Observer", "where": "LikeObserver, with Inbox as the first listener. like() announces each new like.", "why": "SocialFeed does not know how anyone is told. Push, email or a counter are more observers, not edits to like()." },
+    { "name": "Cursor pagination", "where": "feed() returns next as score:id of the last post and keeps what ranks after it.", "why": "A new post during reading does not shift the next page, which page numbers would." }
+  ],
+  "decisions": [
+    {
+      "question": "How does a strategy express its order?",
+      "choice": "A score per post, then the larger id first on ties",
+      "because": "One number plus the id is a total order, and the pair is exactly what a cursor can store. Adding a ranking means writing one score method.",
+      "instead": "A compare(a, b) function. It sorts fine, but there is no value to put in a cursor."
+    },
+    {
+      "question": "Page numbers or a cursor?",
+      "choice": "A cursor holding the score and id of the last post returned",
+      "because": "The next page is what ranks after that point, so a new post at the top does not push items into a repeat. It also costs the same on page 50 as on page 1.",
+      "instead": "Offset pagination (skip N). New posts shift every later page, so people see repeats."
+    },
+    {
+      "question": "Build the feed when read or when posted?",
+      "choice": "When read: gather the followees' posts per request",
+      "because": "It is the simplest correct version and needs no extra storage. The cost grows with how many people you follow.",
+      "instead": "Fan-out on write: copy each post into every follower's stored feed. Reads are fast, but a celebrity post means millions of writes."
+    },
+    {
+      "question": "Where does the like notification live?",
+      "choice": "In observers that like() calls after the like is recorded",
+      "because": "Recording a like and telling people are separate jobs. A broken observer must not change whether the like happened.",
+      "instead": "Building and sending the message inside like(), which grows with every channel."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two people like the same post at the same moment.",
+      "answer": "Adding to a Set and then notifying is check-then-act, so one like can be lost or counted twice. Guard each post with a mutex, or the whole service with one (sync.Mutex in Go). In a database, insert (post, user) under a unique key and count rows, so the database rejects the duplicate."
+    },
+    {
+      "ask": "Likes change while someone is paging. What do they see?",
+      "answer": "With most liked, a post whose score rises past the cursor is skipped, never repeated. The cursor holds the score it saw, so the order after it stays stable. To show every post exactly once, rank a snapshot taken on the first page and put its id in the cursor."
+    },
+    {
+      "ask": "Add a trending ranking that favours recent likes.",
+      "answer": "Write another FeedStrategy. Widen score to take the current time as an integer, score(post, now), and score by likes divided by age. A cursor made under one strategy or time is not valid under another, so put the strategy name in the cursor."
+    },
+    {
+      "ask": "Someone follows a million accounts, or has a million followers.",
+      "answer": "Gathering followees' posts on read then costs too much. Switch to fan-out on write for normal accounts, and merge celebrity posts in at read time. The strategy and cursor stay. Only how the candidate posts are gathered changes."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. The constructor takes the user names and the ranking (newest or liked). feed takes the user, a page size and a cursor (empty string for the first page). Example: [\"SocialFeed\",\"follow\",\"post\",\"feed\"], [[[\"ana\",\"bob\"],\"newest\"],[\"ana\",\"bob\"],[\"bob\",10],[\"ana\",5,\"\"]]",
+    "presets": [
+      { "label": "Newest first, two pages", "args": [["SocialFeed", "follow", "follow", "post", "post", "post", "like", "inbox", "feed", "feed"], [[["ana", "bob", "cy", "di"], "newest"], ["ana", "bob"], ["ana", "cy"], ["bob", 10], ["cy", 20], ["bob", 30], ["ana", 1], ["bob"], ["ana", 2, ""], ["ana", 2, "20:2"]]] },
+      { "label": "Most liked on the same posts", "args": [["SocialFeed", "follow", "follow", "post", "post", "post", "like", "like", "like", "feed"], [[["ana", "bob", "cy", "di"], "liked"], ["ana", "bob"], ["ana", "cy"], ["bob", 10], ["cy", 20], ["bob", 30], ["di", 1], ["cy", 1], ["di", 2], ["ana", 10, ""]]] },
+      { "label": "Unfollow empties the feed", "args": [["SocialFeed", "follow", "post", "feed", "unfollow", "feed"], [[["ana", "bob"], "newest"], ["ana", "bob"], ["bob", 10], ["ana", 5, ""], ["ana", "bob"], ["ana", 5, ""]]] }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Strategy and cursor",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Build the service", "note": "The service knows its users and is handed the ranking strategy and a list of like observers." },
+        { "n": 2, "title": "Follow", "note": "Following is a one-way edge in a map from user to the users they follow. Self, unknown users and repeats are refused." },
+        { "n": 3, "title": "Post", "note": "A post gets the next id and the timestamp the caller gave. The service never reads a clock." },
+        { "n": 4, "title": "Like and notify", "note": "A like is recorded once per user. Then each observer is told, and the inbox keeps a message for the author." },
+        { "n": 5, "title": "Gather and rank", "note": "Collect the posts of everyone you follow, ask the strategy for one score per post, and order by score then larger id." },
+        { "n": 6, "title": "Cut a page", "note": "Drop what ranks at or before the cursor, take limit posts, and return the score and id of the last one as the next cursor if more remain." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "A cursor on a value that can change, like a like count, can skip a post when its score moves past the cursor. It never shows a post twice. Know which of the two your cursor risks." },
+    { "lang": "General", "text": "Fetch one more than the page size to know if a next page exists. Otherwise a feed that exactly fills a page hands out a cursor that leads to an empty page." },
+    { "lang": "TypeScript", "text": "Array.prototype.sort with no comparator sorts as strings, so [10, 9, 1] becomes [1, 10, 9]. Always pass (a, b) => b.score - a.score || b.id - a.id." },
+    { "lang": "Go", "text": "Ranging over a map gives a random order each run. Keep follows in a slice for order, and rank by a total order (score, then id) so an unstable sort never matters." },
+    { "lang": "Go", "text": "A nil slice marshals to null in JSON, but an empty one to []. Start page ids as []int{} so an empty page serialises as a list." }
+  ],
+  "recap": {
+    "pattern": "Strategy for ranking, Observer for likes, cursor for pages",
+    "key": "Rank by a score from a strategy and break ties by id. The cursor is the score and id of the last post returned, so the next page is what ranks after it.",
+    "moves": ["Make ranking a strategy that returns one score per post", "Rank by score, then id, so the order is total", "Page with the last (score, id) as the cursor and fetch one extra", "Announce likes to observers instead of notifying inside like()"]
+  }
+}

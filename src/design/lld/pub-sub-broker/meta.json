@@ -1,0 +1,155 @@
+{
+  "slug": "pub-sub-broker",
+  "title": "Pub-Sub Message Broker",
+  "group": "Events and messaging",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a small in-memory message broker. Producers publish messages to named topics. Consumers read them in groups: every group sees every message, and each group remembers its own place. A group only moves forward when it says it is done, so a crash before that means the messages come again.",
+  "requirements": {
+    "functional": [
+      "A topic is an append-only log. Publishing returns the offset the message got: 0, 1, 2 and so on.",
+      "A consumer group polls a topic and gets up to max messages, starting at the group's own offset.",
+      "Two groups on the same topic each get every message, independently.",
+      "Polling does not move the offset. Only commit does, so an uncommitted poll is delivered again (at least once).",
+      "Commit takes the next offset to read. It is refused if it goes backwards or past the end of the log.",
+      "A group that has never polled starts at offset 0.",
+      "Publish, poll, commit and lag on an unknown topic are refused, not crashed on."
+    ],
+    "outOfScope": ["Partitions and key ordering", "Several members per group with rebalancing", "Persistence to disk", "Retention and log compaction"]
+  },
+  "idea": {
+    "sentence": "The messages live in one shared log that never changes, and each consumer group is just a number: how far into that log it has finished.",
+    "jargon": [
+      { "term": "consumer group", "plain": "A named set of consumers that share one place in a topic. Two groups never affect each other's place." },
+      { "term": "offset", "plain": "A message's position in the log, counted from 0. A group's offset is the position of the next message it has not finished." },
+      { "term": "at-least-once delivery", "plain": "A message is never lost, but may arrive more than once. The price is that consumers must cope with duplicates." },
+      { "term": "lag", "plain": "How far behind a group is: log size minus the group's offset." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "Broker", "fields": ["logs: Map<topic, Log>", "offsets: Offsets"], "methods": ["publish(topic, value): offset", "poll(group, topic, max): Message[]", "commit(group, topic, offset)", "lag(group, topic)"], "x": 1, "y": 0 },
+      { "name": "Offsets", "fields": ["next: Map<group/topic, number>"], "methods": ["get(group, topic)", "set(group, topic, offset)"], "x": 2, "y": 0 },
+      { "name": "Log", "kind": "interface", "methods": ["append(value): offset", "read(from, max): Message[]", "size(): number"], "x": 0, "y": 1 },
+      { "name": "MemoryLog", "fields": ["msgs: Message[]"], "x": 0, "y": 2 },
+      { "name": "Message", "fields": ["offset", "value"], "x": 2, "y": 1 }
+    ],
+    "relations": [
+      { "from": "Broker", "to": "Log", "kind": "uses", "label": "append, read" },
+      { "from": "Broker", "to": "Offsets", "kind": "has", "label": "owns" },
+      { "from": "MemoryLog", "to": "Log", "kind": "implements" },
+      { "from": "Log", "to": "Message", "kind": "uses", "label": "holds" }
+    ]
+  },
+  "patterns": [
+    { "name": "Publish-subscribe, pull style", "where": "Broker sits between producers who publish and groups who poll.", "why": "Producers know only a topic. Groups know only a topic and their own offset, so either side can come and go without the other changing." },
+    { "name": "Append-only log", "where": "Log and MemoryLog: messages are added at the end and never edited or removed by a read.", "why": "Because nothing is consumed, any number of groups can read the same data, and a group can replay by moving its offset." },
+    { "name": "Cursor per reader", "where": "Offsets keeps one number for each (group, topic).", "why": "Progress is state about the reader, not the data. Keeping it apart from the log is what lets each group move at its own speed." }
+  ],
+  "decisions": [
+    {
+      "question": "Where does a group's progress live?",
+      "choice": "In a separate Offsets table keyed by group and topic, not inside the log or the messages",
+      "because": "The log stays read-only for consumers, so one group cannot disturb another. Offsets can later be saved somewhere durable without touching the log.",
+      "instead": "Deleting a message once read, which is a queue: it works for one reader and breaks as soon as a second group needs the same message."
+    },
+    {
+      "question": "When does a group move forward?",
+      "choice": "Only on an explicit commit, never as a side effect of poll",
+      "because": "If poll moved the offset, a consumer that crashed after polling but before finishing would lose messages. With commit, the worst case is a repeat, so delivery is at least once.",
+      "instead": "Moving the offset on poll (at most once): faster and simpler, but a crash silently drops work."
+    },
+    {
+      "question": "How are the members of a group handled?",
+      "choice": "A group is one shared offset. Whichever member polls next takes the next batch after the committed offset, one active consumer at a time",
+      "because": "It keeps the model small and exact. Work is shared by taking turns, and a second poll before a commit sees the same batch, so members must commit before the next member polls.",
+      "instead": "Tracking in-flight batches per member, or splitting the topic into partitions so members read in parallel. That is the real design, and it is a follow-up here."
+    },
+    {
+      "question": "What may a commit be?",
+      "choice": "Any offset from the current one up to the log size, nothing else",
+      "because": "Going back would replay finished work by accident, and going past the end would make the group skip messages that arrive later. Committing less than a full batch is allowed, and the rest is redelivered.",
+      "instead": "Accepting any number, which lets one bad call permanently skip data."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two producers publish at the same time. What breaks?",
+      "answer": "Append reads the length, then writes. Two threads can read the same length and give two messages one offset. Put a lock around append so the offset and the write happen together. In Go use a sync.Mutex in MemoryLog. Readers can use an RWMutex so polls do not block each other."
+    },
+    {
+      "ask": "How do several consumers in one group read in parallel?",
+      "answer": "Split each topic into partitions, each its own log. Messages with the same key go to the same partition, which keeps their order. Assign each partition to one member of the group, and keep an offset per (group, topic, partition). The member count caps the parallelism at the partition count."
+    },
+    {
+      "ask": "A consumer crashes after finishing a message but before committing. What happens?",
+      "answer": "The message is delivered again, because the offset never moved. That is at-least-once. The consumer must make processing idempotent, for example by remembering the ids it already handled, or by doing the work and the commit in one transaction."
+    },
+    {
+      "ask": "The log grows forever. How do you bound it?",
+      "answer": "Retention: delete messages older than a time or past a size, from the front. Offsets stay stable because they are numbers, not array indexes, so keep a base offset and subtract it. A group whose offset falls below the base has lost data and must be reset to the base or the end."
+    },
+    {
+      "ask": "How would you make a poll wait for new messages?",
+      "answer": "Long polling: if the log has nothing past the group's offset, hold the call until a publish arrives or a timeout passes. In Go that is a channel or a sync.Cond signalled by append. The Broker interface stays the same, only the waiting is new."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Start with Broker taking [topic names]. Then publish(topic, value), poll(group, topic, max), commit(group, topic, offset) and lag(group, topic). Example: [\"Broker\",\"publish\",\"poll\"], [[[\"t\"]],[\"t\",\"hi\"],[\"g\",\"t\",5]]",
+    "presets": [
+      {
+        "label": "Two groups, one log",
+        "args": [
+          ["Broker", "publish", "publish", "publish", "poll", "commit", "poll", "poll", "lag"],
+          [[["orders"]], ["orders", "o1"], ["orders", "o2"], ["orders", "o3"], ["billing", "orders", 2], ["billing", "orders", 2], ["shipping", "orders", 5], ["billing", "orders", 5], ["billing", "orders"]]
+        ]
+      },
+      {
+        "label": "Crash before commit",
+        "args": [
+          ["Broker", "publish", "publish", "poll", "poll", "commit", "poll"],
+          [[["jobs"]], ["jobs", "j1"], ["jobs", "j2"], ["workers", "jobs", 1], ["workers", "jobs", 1], ["workers", "jobs", 1], ["workers", "jobs", 1]]
+        ]
+      },
+      {
+        "label": "Bad commits and unknown topic",
+        "args": [
+          ["Broker", "publish", "publish", "commit", "commit", "commit", "poll"],
+          [[["t"]], ["t", "a"], ["t", "b"], ["g", "t", 5], ["g", "t", 2], ["g", "t", 1], ["g", "missing", 3]]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Log with offsets",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Append to the log", "note": "Publish adds the message at the end of the topic's log and returns its offset. Nothing else changes." },
+        { "n": 2, "title": "Find the group's place", "note": "Poll asks Offsets for this group's committed offset on this topic. A new group gets 0." },
+        { "n": 3, "title": "Read without removing", "note": "The log returns up to max messages from that offset. The offset does not move, so the same call gives the same answer." },
+        { "n": 4, "title": "Commit moves the pointer", "note": "Commit checks the offset is not behind the current one and not past the end, then stores it. Only now does progress become durable." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "An offset in commit means the next message to read, not the last one handled. Finishing offsets 0 and 1 means commit(2). Off-by-one here either replays a message forever or skips one." },
+    { "lang": "General", "text": "At-least-once means duplicates are normal. Redelivery is the design, not a bug, so the consumer has to be safe to run twice on the same message." },
+    { "lang": "TypeScript", "text": "Array.slice(from, from + max) quietly clamps to the array and returns [] when from is past the end. That is handy, but a negative max would count from the back, so clamp it with Math.max(0, max)." },
+    { "lang": "TypeScript", "text": "A Map key built from two strings, such as `${group}/${topic}`, breaks if a name contains the separator. Fine for a sketch; use nested maps or a tuple key in real code." },
+    { "lang": "Go", "text": "A sub-slice msgs[from:end] shares memory with the log. If the caller appends to it, it can overwrite the log's next message. Read copies the range before returning it." },
+    { "lang": "Go", "text": "A struct such as groupTopic{group, topic} works as a map key because it is comparable, which avoids the string-joining trick. Slices cannot be keys." },
+    { "lang": "Go", "text": "A nil slice and an empty slice are different when compared or encoded. Read returns []Message{} so an empty poll is an empty list, not nil." }
+  ],
+  "recap": {
+    "pattern": "Append-only log plus one offset per group",
+    "key": "Messages are never removed by reading. Each group keeps its own number: how far it has finished. Only commit moves that number.",
+    "moves": ["Store each topic as an append-only log", "Keep one offset per (group, topic), separate from the log", "Poll reads from the offset and does not move it", "Commit takes the next offset, and refuses going back or past the end"]
+  }
+}

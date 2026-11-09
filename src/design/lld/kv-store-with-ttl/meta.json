@@ -1,0 +1,161 @@
+{
+  "slug": "kv-store-with-ttl",
+  "title": "Key-Value Store with TTL",
+  "group": "Storage-like",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design an in-memory key-value store. Callers put a value under a key, optionally with a time to live in seconds, then get it back or delete it. After its time is up a key must look gone. The store can also be capped at a number of entries, and then it must decide which entry to throw out. Time is given to every call as an integer second, so the store never reads a clock.",
+  "requirements": {
+    "functional": [
+      "put(key, value, now, ttl?) stores a value. With no ttl the key never expires.",
+      "get(key, now) returns the value, or a miss when the key is absent or expired.",
+      "An entry is alive while now is below its expiry, so at exactly the expiry second it is already gone.",
+      "Putting an existing key replaces the value and restarts its TTL. A read never extends the TTL.",
+      "A ttl of 0 or less means already expired: nothing is stored, and any old value for the key is removed.",
+      "delete(key) removes a key. sweep(now) removes every expired key and returns their names, sorted.",
+      "An optional size cap evicts the least recently used key when a new key arrives and the store is full. Expired keys are dropped first."
+    ],
+    "outOfScope": ["Threads and locking (see the follow-ups)", "Persisting to disk", "Values other than strings"]
+  },
+  "idea": {
+    "sentence": "Expire lazily on read so get is always right, sweep only to reclaim memory, and put the choice of victim behind an EvictionPolicy so the store never knows what LRU is.",
+    "jargon": [
+      { "term": "lazy expiry", "plain": "Do not watch the clock. Check an entry's expiry only when someone asks for it, and delete it then if it is dead." },
+      { "term": "sweep", "plain": "A pass over all entries that deletes the expired ones. It frees memory that nobody reads again." },
+      { "term": "LRU", "plain": "Least recently used. When space runs out, remove the entry that was touched longest ago." },
+      { "term": "Strategy pattern", "plain": "Put one rule behind an interface so it can be swapped. Here the rule is who to evict." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "TtlStore", "fields": ["entries: Map<key, Entry>", "cap: number", "policy: EvictionPolicy"], "methods": ["put(key, value, now, ttl?): evicted[]", "get(key, now): string | null", "delete(key): boolean", "sweep(now): expired[]"], "x": 0, "y": 0 },
+      { "name": "Entry", "fields": ["value: string", "expiresAt: number"], "x": 1, "y": 0 },
+      { "name": "EvictionPolicy", "kind": "interface", "methods": ["touch(key)", "remove(key)", "victim(): key | undefined"], "x": 0, "y": 1 },
+      { "name": "LruPolicy", "fields": ["keys: Set<key>  (oldest first)"], "x": 0, "y": 2 }
+    ],
+    "relations": [
+      { "from": "TtlStore", "to": "Entry", "kind": "has", "label": "owns" },
+      { "from": "TtlStore", "to": "EvictionPolicy", "kind": "uses", "label": "asks" },
+      { "from": "LruPolicy", "to": "EvictionPolicy", "kind": "implements" }
+    ]
+  },
+  "patterns": [
+    { "name": "Strategy", "where": "EvictionPolicy, with LruPolicy as the implementation.", "why": "LRU, FIFO and LFU differ only in how they rank keys. The store tells the policy what happened and asks for a victim, so a new rule is a new class." },
+    { "name": "Lazy evaluation", "where": "get compares now with expiresAt and removes a dead entry on the spot.", "why": "Correctness needs no background work. A key that is never read again costs memory until sweep runs, which is the price of this choice." },
+    { "name": "Dependency injection", "where": "The cap and the policy come in through the constructor, and time comes in as an argument.", "why": "Tests pass any second they like and any policy, with no clock to fake and no hidden globals." }
+  ],
+  "decisions": [
+    {
+      "question": "Who notices that an entry expired?",
+      "choice": "The read itself, plus an explicit sweep the caller schedules",
+      "because": "get always compares now with the expiry, so it is right even if no sweep ever runs. Sweep only reclaims memory. The caller picks how often, and it stays easy to test.",
+      "instead": "A timer per key, or a background thread that deletes at expiry. It needs a clock, locks and cancellation, and is still wrong between two ticks."
+    },
+    {
+      "question": "How is time represented?",
+      "choice": "An integer second passed into put, get and sweep",
+      "because": "Every result depends only on the arguments, so the same case passes in TypeScript and Go. Expiry is exact: alive while now < expiresAt.",
+      "instead": "Calling Date.now or time.Now inside the store, which makes tests flaky and boundaries untestable."
+    },
+    {
+      "question": "Who decides what to evict?",
+      "choice": "An EvictionPolicy interface with touch, remove and victim",
+      "because": "The store owns the data and the policy owns the ranking. LRU needs a recency list that the data map does not have, and keeping it elsewhere keeps the store small.",
+      "instead": "Recency fields on Entry and a scan for the minimum, which ties the store to one rule and costs a full pass per eviction."
+    },
+    {
+      "question": "What goes first when the store is full?",
+      "choice": "Expired entries, then the policy's victim",
+      "because": "A dead entry is useless, so evicting a live one while a dead one sits there loses data for nothing. The sweep inside put is cheap next to being wrong.",
+      "instead": "Asking the policy straight away, which can throw out a recently used live key while expired keys stay."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two goroutines call put and get at once. What breaks?",
+      "answer": "The map and the policy's list are written together, so concurrent use is a data race and in Go can crash the program. Guard the whole store with one sync.Mutex. A plain RWMutex does not help get, because get also touches the policy and may delete. Shard the store by key hash to cut contention."
+    },
+    {
+      "ask": "Sweep scans everything. How would you make it cheap?",
+      "answer": "Keep a min-heap of (expiresAt, key). Sweep pops while the top is expired and skips heap items whose entry was overwritten, by comparing the stored expiry. Cost is O(k log n) for k expired keys. The price is an extra structure to update on every put."
+    },
+    {
+      "ask": "How do you make LRU O(1)?",
+      "answer": "A map from key to a node in a doubly linked list. Touch moves the node to the tail, victim reads the head, remove unlinks the node. This code uses an ordered Set in TypeScript and a slice in Go, which is simple but O(n) in Go. Swap the class and nothing else changes."
+    },
+    {
+      "ask": "Add LFU, or FIFO.",
+      "answer": "Write another class with touch, remove and victim. FIFO ignores touch after the first one. LFU keeps a count per key and picks the smallest, with a tie rule such as oldest first. The store is untouched."
+    },
+    {
+      "ask": "A cache stampede: many readers miss one expired hot key together.",
+      "answer": "Coalesce the misses. The first caller loads the value while the others wait for its result, for example with singleflight in Go. Add jitter to TTLs so many keys do not expire in the same second."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Start with TtlStore taking [capacity] (0 means no limit). Then put(key, value, now, ttl or null), get(key, now), delete(key), sweep(now) and size. Example: [\"TtlStore\",\"put\",\"get\"], [[0],[\"a\",\"x\",0,5],[\"a\",5]]",
+    "presets": [
+      {
+        "label": "Cap 2, expiry and eviction",
+        "args": [
+          ["TtlStore", "put", "put", "get", "put", "put", "get", "get", "put", "sweep"],
+          [[2], ["a", "va", 0, 5], ["b", "vb", 1, null], ["a", 4], ["c", "vc", 5, null], ["d", "vd", 6, 3], ["c", 7], ["d", 9], ["e", "ve", 9, 2], [12]]
+        ]
+      },
+      {
+        "label": "At the expiry second",
+        "args": [
+          ["TtlStore", "put", "get", "get", "size"],
+          [[0], ["a", "va", 10, 5], ["a", 14], ["a", 15], []]
+        ]
+      },
+      {
+        "label": "Overwrite restarts the clock",
+        "args": [
+          ["TtlStore", "put", "put", "get", "get"],
+          [[0], ["k", "v1", 0, 5], ["k", "v2", 4, 5], ["k", 7], ["k", 9]]
+        ]
+      },
+      {
+        "label": "Sweep keeps live keys",
+        "args": [
+          ["TtlStore", "put", "put", "put", "size", "sweep", "size"],
+          [[0], ["a", "va", 0, 3], ["b", "vb", 0, 3], ["c", "vc", 0, null], [], [3], []]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Lazy expiry and LRU",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Write an entry", "note": "Work out expiresAt as now plus ttl, or never. A put always replaces the old entry, so the clock restarts. A ttl of 0 stores nothing." },
+        { "n": 2, "title": "Read a live entry", "note": "The entry is alive while now is below its expiry. The policy is told the key was used, and the expiry is left alone." },
+        { "n": 3, "title": "Remove an entry", "note": "A read that finds a dead entry, and an explicit delete, share one removal path. The policy is told too." },
+        { "n": 4, "title": "Make room", "note": "A new key arrives at a full store. Dead entries are swept first, then the policy names victims until there is space." },
+        { "n": 5, "title": "Sweep", "note": "One pass over every entry removes the expired ones and returns their keys, sorted. Live entries are untouched." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "Off by one at the boundary. Alive means now < expiresAt, so a get at exactly the expiry second is a miss. Pick one rule, write it down, and test the exact second." },
+    { "lang": "General", "text": "A read must not extend the TTL, but it must count as use for LRU. Those are two separate effects, and mixing them up is the common bug." },
+    { "lang": "General", "text": "Dead entries still count towards the cap until they are removed. Evicting a live key while a dead one is present is a bug, which is why put sweeps first." },
+    { "lang": "TypeScript", "text": "A Set keeps insertion order, and delete then add moves a key to the end. That is all LRU needs here. A Map would work the same way." },
+    { "lang": "TypeScript", "text": "Infinity compares fine with >= and < for \"never expires\". Do not store 0 or -1 for never, because 0 reads as already expired." },
+    { "lang": "Go", "text": "Ranging over a map gives random order. Sweep collects keys and calls sort.Strings before returning, or the answer changes from run to run." },
+    { "lang": "Go", "text": "To tell \"no ttl\" from \"ttl 0\" the parameter is a *int, with nil for never. A plain int cannot say both. Get returns (string, bool) so an empty value is not confused with a miss." }
+  ],
+  "recap": {
+    "pattern": "Lazy expiry plus a Strategy for eviction",
+    "key": "A key is alive while now < expiresAt, checked on every read. Sweep only frees memory. The policy picks victims and the store never knows how.",
+    "moves": ["Store value and expiresAt, with Infinity for never", "Check expiry on read and delete the dead entry then", "Put dead entries out first, then ask the policy", "Hide LRU behind touch, remove and victim"]
+  }
+}

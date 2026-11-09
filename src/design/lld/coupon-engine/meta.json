@@ -1,0 +1,190 @@
+{
+  "slug": "coupon-engine",
+  "title": "Coupon and Discount Engine",
+  "group": "Money and rules",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the pricing step of a shop's checkout. A cart holds items. A shopper enters coupon codes, and each coupon has rules for when it works (minimum cart value, not expired, usage limit, a category) and a rule for how much it takes off (a percentage, a flat amount, buy X get Y free). The shop also chooses how coupons combine: only the best one, or stack them in a fixed order up to a cap. All money is integer cents.",
+  "requirements": {
+    "functional": [
+      "Add items to a cart. The same sku merges into one line, and a zero quantity is refused.",
+      "A coupon is eligible only if all its specs hold: minimum cart value, last valid day (inclusive), usage limit, category present.",
+      "A coupon's discount is a percentage (of the cart or of one category), a flat amount, or buy X get Y free for a sku.",
+      "Percentages round half up to whole cents. The price never goes below zero.",
+      "Policy one: only the single biggest saving applies, and a tie goes to the lower priority number.",
+      "Policy two: all eligible coupons apply in priority order, each on what is still payable, up to a cap as a percent of the subtotal.",
+      "Report why a coupon was rejected (the first failing spec, an unknown code, or a repeated code).",
+      "Checkout counts a use only for coupons that really took something off."
+    ],
+    "outOfScope": ["Tax and shipping", "Per-user limits and fraud checks", "Coupons that depend on the shopper's history"]
+  },
+  "idea": {
+    "sentence": "Split a coupon into two small parts that never know each other, a list of yes/no eligibility specs and one discount strategy, then let a separate stacking policy decide how coupons combine.",
+    "jargon": [
+      { "term": "Specification pattern", "plain": "Each business rule is a small object with one yes/no question. You combine rules by listing them, and a new rule is a new class." },
+      { "term": "Strategy pattern", "plain": "Put one way of calculating behind an interface so it can be swapped. Here each discount kind is a strategy." },
+      { "term": "stacking", "plain": "Applying more than one coupon to the same cart. The order and a cap decide the final price." },
+      { "term": "round half up", "plain": "Round to the nearest cent, and send exact halves upwards. In integers: (value * pct + 50) / 100 with integer division." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "Spec", "kind": "interface", "methods": ["name: string  (the reason)", "ok(cart, today): boolean", "MinCart, NotExpired, HasCategory, UnderLimit"], "x": 0, "y": 0 },
+      { "name": "Coupon", "fields": ["code", "priority", "specs: Spec[]", "strategy: DiscountStrategy"], "x": 1, "y": 0 },
+      { "name": "DiscountStrategy", "kind": "interface", "methods": ["amount(cart, payable): cents", "PercentOff, FlatOff, BuyXGetY"], "x": 2, "y": 0 },
+      { "name": "CouponEngine", "fields": ["catalog: Map<code, Coupon>", "policy: StackingPolicy", "usage: Usage"], "methods": ["quote(cart, codes, today): Quote", "checkout(cart, codes, today): Quote"], "x": 1, "y": 1 },
+      { "name": "Cart", "fields": ["items: Item[]"], "methods": ["add(sku, category, unit, qty)", "subtotal(), subtotalOf(category)"], "x": 0, "y": 2 },
+      { "name": "Usage", "fields": ["counts: Map<code, number>"], "methods": ["used(code)", "redeem(code)"], "x": 1, "y": 2 },
+      { "name": "StackingPolicy", "kind": "interface", "methods": ["choose(coupons, cart): Applied[]", "BestSingle, StackInOrder(cap)"], "x": 2, "y": 2 }
+    ],
+    "relations": [
+      { "from": "Coupon", "to": "Spec", "kind": "has", "label": "all must hold" },
+      { "from": "Coupon", "to": "DiscountStrategy", "kind": "has", "label": "one" },
+      { "from": "CouponEngine", "to": "Coupon", "kind": "has", "label": "catalog" },
+      { "from": "CouponEngine", "to": "Cart", "kind": "uses", "label": "prices" },
+      { "from": "CouponEngine", "to": "Usage", "kind": "has", "label": "redeems" },
+      { "from": "CouponEngine", "to": "StackingPolicy", "kind": "uses", "label": "asks" },
+      { "from": "StackingPolicy", "to": "DiscountStrategy", "kind": "uses", "label": "prices with" }
+    ]
+  },
+  "patterns": [
+    { "name": "Specification", "where": "Spec with MinCart, NotExpired, HasCategory and UnderLimit. A coupon holds a list of them.", "why": "Eligibility rules are many and change often. Each is one class with one question, and a coupon is just a list. The first one that fails gives the rejection reason." },
+    { "name": "Strategy", "where": "DiscountStrategy for how much to take off, and StackingPolicy for how coupons combine.", "why": "The math of a discount and the combining rule are independent. Any strategy works with any policy, and a new kind is a new class." },
+    { "name": "Dependency injection", "where": "The engine receives its coupons, policy and Usage. Today is an argument, not a clock.", "why": "Tests build any scenario, and expiry is exact to the day. Usage is shared with UnderLimit without a global." }
+  ],
+  "decisions": [
+    {
+      "question": "Where does the rule that a coupon works live?",
+      "choice": "A list of Spec objects on the coupon, checked in order",
+      "because": "Each rule is tiny and testable alone. The first failing spec names the rejection, which shoppers see. Adding a rule never edits the engine or other coupons.",
+      "instead": "One big isEligible function with a branch per coupon type, which grows with every new rule and mixes unrelated checks."
+    },
+    {
+      "question": "Who decides how coupons combine?",
+      "choice": "A StackingPolicy interface: BestSingle or StackInOrder with a cap",
+      "because": "Marketing changes this rule more than any other. Keeping it out of Coupon and the engine means a new policy touches nothing else.",
+      "instead": "A flag on each coupon saying whether it stacks, which makes the result depend on pairs of coupons and is hard to reason about."
+    },
+    {
+      "question": "What does a percentage apply to when stacking?",
+      "choice": "What is still payable, and a category percentage only to that category's lines",
+      "because": "Ten percent after a flat coupon is a smaller number than before it, so order is meaningful and priority has a job. The same input always gives the same price.",
+      "instead": "Always the original subtotal, which makes order irrelevant and lets two coupons together take more than the cart is worth."
+    },
+    {
+      "question": "How is money held and rounded?",
+      "choice": "Integer cents everywhere, percentages rounded half up, the cap rounded down",
+      "because": "Floats cannot hold 0.10 exactly, and TypeScript and Go would drift apart. Integer maths gives the same cent in both languages. Rounding the cap down means the shop never gives more than it promised.",
+      "instead": "Floating point dollars with toFixed or math.Round at the end, which hides errors until a total is one cent off."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two checkouts use the last coupon use at the same time.",
+      "answer": "Quote then redeem is a check then act, so both can pass the limit. Make redeem the single decision point: one atomic step that increments only if the count is under the limit and fails otherwise. In Go that is a mutex around the map or an atomic compare and swap. In a database it is an UPDATE with a WHERE used < max and a check of rows changed."
+    },
+    {
+      "ask": "Add an OR rule, such as 'apparel or shoes in the cart'.",
+      "answer": "Add AnyOf(specs) and AllOf(specs) classes that implement Spec themselves. They compose the same way, and Not(spec) too. Coupon still holds a list, and the name reported is the composite's own. This is the point of the pattern: a rule is a value you can combine."
+    },
+    {
+      "ask": "Find the best combination of coupons, not just the best single one.",
+      "answer": "A new StackingPolicy. For a few coupons, try every subset and every order and keep the cheapest total, which is exponential, so cap the coupon count. The engine and strategies are unchanged, which is why the policy is an interface."
+    },
+    {
+      "ask": "Add per-item discounts with a different price per line.",
+      "answer": "Let DiscountStrategy return amounts per line instead of one number, or add a LineDiscount strategy kind. Today a strategy only sees the cart and the running payable, so a coupon that lowers one line's price needs the per-line view."
+    },
+    {
+      "ask": "How would you test the rounding?",
+      "answer": "Table-driven cases at the boundaries: a value that ends in exactly half a cent, one just below, and one just above, for each percentage path. Assert the integer result, not a formatted string. These cases run unchanged in TypeScript and Go."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Start with CouponEngine taking [policy, coupons]. Policy is [\"best\"] or [\"stack\", capPercent]. A coupon is [code, priority, strategy, specs], with strategy [\"percent\", pct, category or \"\"], [\"flat\", cents] or [\"bogo\", sku, x, y], and specs from [\"min\", cents], [\"expires\", lastDay], [\"limit\", max], [\"category\", name]. Then add(sku, category, unitCents, qty), quote(codes, day) and checkout(codes, day).",
+    "presets": [
+      {
+        "label": "Stack, cap, then checkout",
+        "args": [
+          ["CouponEngine", "add", "add", "checkout", "checkout"],
+          [
+            [["stack", 30], [["SAVE20", 1, ["percent", 20, ""], [["expires", 30]]], ["FLAT2000", 2, ["flat", 2000], [["min", 5000], ["limit", 1]]], ["OLD5", 3, ["percent", 5, ""], [["expires", 10]]]]],
+            ["shoes", "footwear", 6000, 1],
+            ["socks", "footwear", 500, 2],
+            [["SAVE20", "FLAT2000", "OLD5"], 12],
+            [["FLAT2000"], 12]
+          ]
+        ]
+      },
+      {
+        "label": "Best single, same cart",
+        "args": [
+          ["CouponEngine", "add", "add", "quote"],
+          [
+            [["best"], [["SAVE20", 1, ["percent", 20, ""], [["expires", 30]]], ["FLAT2000", 2, ["flat", 2000], [["min", 5000], ["limit", 1]]], ["OLD5", 3, ["percent", 5, ""], [["expires", 10]]]]],
+            ["shoes", "footwear", 6000, 1],
+            ["socks", "footwear", 500, 2],
+            [["SAVE20", "FLAT2000", "OLD5"], 12]
+          ]
+        ]
+      },
+      {
+        "label": "Free items, then a percentage",
+        "args": [
+          ["CouponEngine", "add", "quote"],
+          [
+            [["stack", 100], [["B2G1", 1, ["bogo", "tee", 2, 1], []], ["P10", 2, ["percent", 10, ""], []]]],
+            ["tee", "apparel", 1000, 3],
+            [["P10", "B2G1"], 1]
+          ]
+        ]
+      },
+      {
+        "label": "Category only coupon",
+        "args": [
+          ["CouponEngine", "add", "add", "quote"],
+          [
+            [["best"], [["APP20", 1, ["percent", 20, "apparel"], [["category", "apparel"]]], ["TOY15", 2, ["percent", 15, "toys"], [["category", "toys"]]]]],
+            ["shirt", "apparel", 3000, 1],
+            ["book", "books", 1000, 2],
+            [["APP20", "TOY15"], 1]
+          ]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Specs and strategies",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Build the cart", "note": "Add a line to the cart. A sku that is already there merges into its line. A zero quantity or negative price is refused." },
+        { "n": 2, "title": "Check eligibility", "note": "For each code the engine asks the coupon's specs in order. The first spec that says no is the rejection reason." },
+        { "n": 3, "title": "Price each coupon", "note": "The policy asks each eligible coupon's strategy how much it takes off. Stacking asks on what is still payable." },
+        { "n": 4, "title": "Policy picks", "note": "BestSingle keeps the biggest saving. StackInOrder applies coupons by priority, each on the running price." },
+        { "n": 5, "title": "Cap and clamp", "note": "No coupon may take more than is left to pay, and all together may not pass the cap. The extra is cut off." },
+        { "n": 6, "title": "Redeem", "note": "Checkout counts one use for each coupon that really took something off. Others keep their uses." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "Percent of a percent is not additive. Ten percent then ten percent is 19 percent of the original when each works on what is left. Say which base each coupon uses, and test an order swap." },
+    { "lang": "General", "text": "Rounding rule belongs in one place. Here a percentage is floor((base * pct + 50) / 100) and the cap is floor(subtotal * cap / 100). With only non-negative values integer division matches floor." },
+    { "lang": "General", "text": "A coupon that yields zero must not be counted as applied, or it burns a use of its limit for nothing. The policy drops zero amounts, and checkout only redeems what is in the applied list." },
+    { "lang": "TypeScript", "text": "Math.round rounds halves towards positive infinity and works on floats, so 0.1 * 3 style errors creep in. Stay in integers and use Math.floor on an integer expression." },
+    { "lang": "TypeScript", "text": "Array.sort changes the array in place. The policies copy first with [...coupons].sort(...), or the caller's eligible list is reordered behind its back." },
+    { "lang": "Go", "text": "Integer division truncates toward zero, which equals floor only for non-negative numbers. That holds here because amounts and percentages are never negative. Reject negative prices at the cart." },
+    { "lang": "Go", "text": "A nil slice and an empty slice are different values, and a nil Rejected list encodes as null. Start the lists with []string{} so callers always get a list." }
+  ],
+  "recap": {
+    "pattern": "Specification for who, Strategy for how much",
+    "key": "A coupon is a list of yes/no specs plus one discount strategy. A stacking policy decides which coupons apply. Everything is integer cents.",
+    "moves": ["Check specs in order and keep the first failure as the reason", "Price each eligible coupon with its strategy", "Let the policy pick one or stack by priority up to a cap", "Redeem only the coupons that took something off"]
+  }
+}

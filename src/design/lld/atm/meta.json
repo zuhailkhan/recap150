@@ -1,0 +1,382 @@
+{
+  "slug": "atm",
+  "title": "ATM",
+  "group": "State machines",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the software inside a cash machine. A customer puts in a card, types a PIN, then checks a balance or withdraws cash, then takes the card back. The machine behaves differently before and after the PIN is right. It locks a card after too many wrong PINs, enforces a withdrawal limit, and pays out in the fewest notes it can.",
+  "requirements": {
+    "functional": [
+      "Insert a card. Unknown or locked cards are not taken in.",
+      "Enter a PIN. After N wrong tries in a row the card is locked and kept by the machine. A right PIN resets the count.",
+      "Check the balance, only when signed in.",
+      "Withdraw a whole number of currency units, only when signed in. Refuse if it passes the limit or the balance.",
+      "Pay out with the largest notes first (100, 50, 20, 10), limited by what the machine holds.",
+      "Refuse an amount the notes cannot make. Refused withdrawals change nothing, not the cash and not the balance.",
+      "Eject the card to end the session."
+    ],
+    "outOfScope": [
+      "Deposits, transfers and receipts",
+      "A daily reset of the limit (time is not modelled)",
+      "Hardware faults, timeouts and card capture mechanics"
+    ]
+  },
+  "idea": {
+    "sentence": "Use the State pattern for what each button does before and after sign-in, and a chain of responsibility for cash: each note handler takes what it can and passes the rest on.",
+    "jargon": [
+      {
+        "term": "State pattern",
+        "plain": "The machine forwards every call to an object for its current state. Changing state means swapping which object it forwards to. Vending Machine uses the same idea."
+      },
+      {
+        "term": "chain of responsibility",
+        "plain": "A line of handlers. Each one does its part of a request and passes what is left to the next. The caller only knows the first handler."
+      },
+      {
+        "term": "greedy",
+        "plain": "Always take the biggest piece that fits, never look back. Fast and simple. Not always able to find an answer that exists."
+      }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      {
+        "name": "ATM",
+        "fields": [
+          "card: string",
+          "state: State",
+          "bank: Bank",
+          "dispenser: Dispenser"
+        ],
+        "methods": [
+          "insertCard, enterPin, withdraw -> state",
+          "checkBalance, eject -> state",
+          "setState(s)"
+        ],
+        "x": 2,
+        "y": 0
+      },
+      {
+        "name": "Bank",
+        "fields": [
+          "accounts: Map<card, Account>"
+        ],
+        "methods": [
+          "usable(card)",
+          "verify(card, pin): Verdict",
+          "check(card, amt): ok | limit | funds",
+          "debit(card, amt)"
+        ],
+        "x": 0,
+        "y": 0
+      },
+      {
+        "name": "Dispenser",
+        "fields": [
+          "handlers: NoteHandler[]"
+        ],
+        "methods": [
+          "dispense(amount): Note[] | null"
+        ],
+        "x": 4,
+        "y": 0
+      },
+      {
+        "name": "NoteHandler",
+        "fields": [
+          "denom, stock",
+          "next: NoteHandler | null"
+        ],
+        "methods": [
+          "plan(amount, out): boolean"
+        ],
+        "x": 4,
+        "y": 1
+      },
+      {
+        "name": "State",
+        "kind": "interface",
+        "methods": [
+          "insertCard(card): boolean",
+          "enterPin(pin): Verdict",
+          "withdraw(amt): Note[] | Refusal",
+          "balance(): number",
+          "eject(): boolean"
+        ],
+        "x": 2,
+        "y": 1
+      },
+      {
+        "name": "Idle",
+        "methods": [
+          "insertCard: take card in",
+          "all others: refused"
+        ],
+        "x": 1,
+        "y": 2
+      },
+      {
+        "name": "CardInserted",
+        "methods": [
+          "enterPin: ask the bank",
+          "eject: give card back"
+        ],
+        "x": 2,
+        "y": 2
+      },
+      {
+        "name": "Authenticated",
+        "methods": [
+          "withdraw: bank, then chain",
+          "balance, eject"
+        ],
+        "x": 3,
+        "y": 2
+      }
+    ],
+    "relations": [
+      {
+        "from": "ATM",
+        "to": "State",
+        "kind": "uses",
+        "label": "forwards to"
+      },
+      {
+        "from": "ATM",
+        "to": "Bank",
+        "kind": "has"
+      },
+      {
+        "from": "ATM",
+        "to": "Dispenser",
+        "kind": "has"
+      },
+      {
+        "from": "Dispenser",
+        "to": "NoteHandler",
+        "kind": "has",
+        "label": "chain"
+      },
+      {
+        "from": "Idle",
+        "to": "State",
+        "kind": "implements"
+      },
+      {
+        "from": "CardInserted",
+        "to": "State",
+        "kind": "implements"
+      },
+      {
+        "from": "Authenticated",
+        "to": "State",
+        "kind": "implements"
+      }
+    ]
+  },
+  "patterns": [
+    {
+      "name": "State",
+      "where": "State with Idle, CardInserted and Authenticated. ATM forwards all five operations to the current one.",
+      "why": "Five operations times three states is fifteen answers. Each class holds its own five, so no method on the ATM is a tangle of if statements on the state."
+    },
+    {
+      "name": "Chain of responsibility",
+      "where": "NoteHandler links, one per denomination, built by Dispenser. Each takes what fits and passes the rest on.",
+      "why": "Adding a note (a 5, say) is one more link in the list. No branching changes, and the dispenser never mentions a denomination."
+    },
+    {
+      "name": "Plan, then commit",
+      "where": "NoteHandler.plan only records what it would take. Dispenser.dispense changes the stock after the whole plan succeeds.",
+      "why": "A refused withdrawal then leaves the cash untouched without any undo code."
+    }
+  ],
+  "decisions": [
+    {
+      "question": "Where does the PIN failure count live?",
+      "choice": "In the bank's account record",
+      "because": "A thief who pulls the card out and puts it back must not get a fresh set of tries. The count has to outlive the session, so the session object cannot own it.",
+      "instead": "A counter on the ATM or in CardInserted, which resets every time the card goes in."
+    },
+    {
+      "question": "How does the dispenser make an amount?",
+      "choice": "Greedy over a chain, highest note first",
+      "because": "It is easy to see and extend, and it is optimal for standard note sets. It can refuse an amount that a search could make from limited stock, and that is an honest, documented limit.",
+      "instead": "Dynamic programming or backtracking over the stock, which finds more answers but hides the chain idea."
+    },
+    {
+      "question": "When are notes taken out of the stock?",
+      "choice": "After the whole plan works, in a separate step",
+      "because": "A chain that takes as it goes needs an undo when a later link fails. Planning on paper first means a failure has nothing to undo.",
+      "instead": "Decrement in each handler and put the notes back on failure."
+    },
+    {
+      "question": "Who checks the limit and balance, and when?",
+      "choice": "The bank checks first, the dispenser second, and the debit comes last",
+      "because": "Cheap account rules run before touching cash, and the account is only debited once the notes are really paid out.",
+      "instead": "Debit first and refund if the cash cannot be made."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two requests hit the same account at once, from two machines.",
+      "answer": "Each does check, then dispense, then debit, so both can pass the check and overdraw. The check and the debit must be one atomic step in the bank: one mutex per account (sync.Mutex in Go), or a database transaction with a conditional update. The machine's own cash needs its own lock around dispense."
+    },
+    {
+      "ask": "The machine has 60 in 20s and no 10s, and 50 in 50s. Customer asks for 60.",
+      "answer": "Greedy takes a 50, has 10 left, and fails, though three 20s would work. Fix it with a search: try each count of the largest note down to zero and recurse, or run a small DP over the stock. Keep the chain for the common case and fall back to the search when greedy fails."
+    },
+    {
+      "ask": "Add a Maintenance or Out-of-service state.",
+      "answer": "One new class that refuses every operation, plus one setState call from whatever detects the fault. No existing state changes. That is what the pattern buys."
+    },
+    {
+      "ask": "Add a 5 note, or a coin tray.",
+      "answer": "Add a link to the chain list at the right position. Nothing else changes. That holds only while the order is kept highest first, so sort when you build the chain if the input order is not trusted."
+    },
+    {
+      "ask": "Make the limit daily.",
+      "answer": "Store the day number with the total withdrawn on the account, and reset the total when the day differs. Pass the current day in as an integer so tests stay deterministic."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: operation names, then each one's arguments. The constructor takes [accounts as [card, pin, balance], notes as [denomination, count] highest first, max PIN failures, withdrawal limit]. Example: [\"ATM\",\"insertCard\",\"enterPin\",\"withdraw\"], [[[[\"A1\",\"1234\",1000]],[[100,5],[50,5]],3,500],[\"A1\"],[\"1234\"],[150]]",
+    "presets": [
+      {
+        "label": "Sign in and withdraw 270",
+        "args": [
+          ["ATM", "insertCard", "enterPin", "withdraw", "eject"],
+          [
+            [[["A1", "1234", 1000]], [[100, 5], [50, 5], [20, 5], [10, 5]], 3, 500],
+            ["A1"],
+            ["1234"],
+            [270],
+            []
+          ]
+        ]
+      },
+      {
+        "label": "Three wrong PINs",
+        "args": [
+          ["ATM", "insertCard", "enterPin", "enterPin", "enterPin"],
+          [
+            [[["A1", "1234", 1000]], [[100, 5], [50, 5]], 3, 500],
+            ["A1"],
+            ["1111"],
+            ["2222"],
+            ["3333"]
+          ]
+        ]
+      },
+      {
+        "label": "Greedy cannot make 60",
+        "args": [
+          ["ATM", "insertCard", "enterPin", "withdraw", "withdraw"],
+          [
+            [[["A1", "1234", 1000]], [[50, 1], [20, 3], [10, 0]], 3, 500],
+            ["A1"],
+            ["1234"],
+            [60],
+            [40]
+          ]
+        ]
+      },
+      {
+        "label": "Over the limit",
+        "args": [
+          ["ATM", "insertCard", "enterPin", "withdraw", "withdraw"],
+          [
+            [[["A1", "1234", 1000]], [[100, 5], [50, 5]], 3, 500],
+            ["A1"],
+            ["1234"],
+            [300],
+            [300]
+          ]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "chain",
+      "label": "State + chain",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        {
+          "n": 1,
+          "title": "Build the machine",
+          "note": "The ATM gets a bank and a dispenser. The dispenser builds one handler per denomination and links them. The ATM starts Idle."
+        },
+        {
+          "n": 2,
+          "title": "Forward to the state",
+          "note": "Every public method is one line: hand the call to the current state. No branching on state here."
+        },
+        {
+          "n": 3,
+          "title": "The state decides",
+          "note": "Each state answers in its own way. It may refuse, ask the bank (PIN, limit, balance), or move the machine on."
+        },
+        {
+          "n": 4,
+          "title": "The chain plans",
+          "note": "Each handler takes as many of its note as fit and are in stock, then passes the rest on. Planning only, no stock changes."
+        },
+        {
+          "n": 5,
+          "title": "Commit the notes",
+          "note": "Only when the plan is exact does the dispenser take the notes out of stock. The bank debits after that."
+        },
+        {
+          "n": 6,
+          "title": "Switch state",
+          "note": "The state names the next one. The ATM swaps the one object it forwards to."
+        }
+      ]
+    }
+  ],
+  "goArgs": [
+    "[]string",
+    "[][]any"
+  ],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    {
+      "lang": "General",
+      "text": "Greedy is not a search. With limited stock or odd note sets it can refuse an amount that can be made. Say so, and add a fallback search if the business needs it."
+    },
+    {
+      "lang": "General",
+      "text": "Never decrement stock while planning. A chain that takes as it walks must undo when a later link fails. Plan on paper, then commit once."
+    },
+    {
+      "lang": "General",
+      "text": "Keep the lockout on the account, not the session. Otherwise ejecting and re-inserting the card gives unlimited guesses."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "Note[] | Refusal is told apart with Array.isArray, because Refusal is a string and arrays are not. Do not test the result with a plain truthy check: an empty plan would look like a refusal."
+    },
+    {
+      "lang": "Go",
+      "text": "Return (notes, error) and use sentinel errors (ErrLimit and friends) so callers compare with errors.Is. Do not return an empty slice to mean failure, because a nil slice and an empty one are easy to confuse."
+    },
+    {
+      "lang": "Go",
+      "text": "Integer division truncates, so amount/denom is already the floor. In TypeScript you need Math.floor, because / gives a float."
+    }
+  ],
+  "recap": {
+    "pattern": "State for sign-in, chain of responsibility for cash",
+    "key": "The ATM forwards each call to its state. Withdrawing asks the bank, then a chain of note handlers plans greedily, and the stock only changes once the plan is exact.",
+    "moves": [
+      "List the states and operations, and decide what each state does on an invalid call",
+      "Put the lockout counter on the account so it outlives the session",
+      "Build the dispenser as linked handlers that plan first and commit after",
+      "Say what greedy cannot do, and where a fallback search would go"
+    ]
+  }
+}

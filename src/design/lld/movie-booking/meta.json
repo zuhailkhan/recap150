@@ -1,0 +1,141 @@
+{
+  "slug": "movie-booking",
+  "title": "Movie Booking (BookMyShow)",
+  "group": "Big products",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the booking core of a system like BookMyShow. A show is a movie on one screen with a seat map. People pick seats, pay, and get a booking. Many people look at the same seats at once, so a picked seat is held for a short time while they pay.",
+  "requirements": {
+    "functional": [
+      "A show has numbered seats of two categories, regular and premium, and each show sells its own seats.",
+      "Hold one or more seats for a user for a fixed time. The hold is all or nothing.",
+      "A seat that is held or booked cannot be held by anyone else.",
+      "Confirm turns your live hold into a booking and returns the total. A lapsed hold cannot be confirmed.",
+      "Seats whose hold has lapsed are free again without anyone cleaning them up.",
+      "Price comes from the seat category through a rule that can be swapped.",
+      "Release a hold, or cancel a booking, to free the seats and get a refund for a booking."
+    ],
+    "outOfScope": ["Taking payment", "Searching theatres by city and movie", "Seat maps with rows and aisles"]
+  },
+  "idea": {
+    "sentence": "Every seat is a small state machine (Available, Held, Booked), and one rule decides who wins: a seat is only ever moved by the call that saw it in the right state.",
+    "jargon": [
+      { "term": "hold (soft lock)", "plain": "A short reservation that blocks others but is not yet a sale. It expires by itself if the user never pays." },
+      { "term": "lazy expiry", "plain": "No timer runs. Every call first compares the held-until time with the current time and frees what has lapsed." },
+      { "term": "all or nothing", "plain": "Check every seat first, then change them all. If one seat fails, none is touched." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "ByCategory", "methods": ["price(c) = rate of c"], "x": 0, "y": 0 },
+      { "name": "Pricing", "kind": "interface", "methods": ["price(category): number"], "x": 1, "y": 0 },
+      { "name": "PeakSurcharge", "fields": ["inner: Pricing", "percent"], "methods": ["price(c) = inner + percent"], "x": 2, "y": 0 },
+      { "name": "Booking", "fields": ["id, showId, user", "seats, total"], "x": 0, "y": 1 },
+      { "name": "BookingService", "fields": ["shows: Map<id, Show>", "holds, bookings", "pricing: Pricing", "holdFor: minutes"], "methods": ["hold(show, user, seats, now): holdId", "confirm(holdId, user, now): Booking", "release(holdId, user)", "cancel(bookingId, user)"], "x": 1, "y": 1 },
+      { "name": "Hold", "fields": ["id, showId, user", "seats, total, until"], "x": 2, "y": 1 },
+      { "name": "Show", "fields": ["id, movie", "seats: Seat[]"], "methods": ["sweep(now)", "hold(ids, holdId, until)", "book(ids, holdId)", "release(ids, holdId)", "cancel(ids)"], "x": 1, "y": 2 },
+      { "name": "Seat", "fields": ["id, category", "state: SeatState", "holdId, until"], "methods": ["expire(now)", "hold(), book(), free()"], "x": 1, "y": 3 },
+      { "name": "SeatState", "kind": "enum", "methods": ["Available", "Held", "Booked"], "x": 0, "y": 3 }
+    ],
+    "relations": [
+      { "from": "ByCategory", "to": "Pricing", "kind": "implements" },
+      { "from": "PeakSurcharge", "to": "Pricing", "kind": "implements" },
+      { "from": "BookingService", "to": "Pricing", "kind": "uses", "label": "asks" },
+      { "from": "BookingService", "to": "Booking", "kind": "creates" },
+      { "from": "BookingService", "to": "Hold", "kind": "creates" },
+      { "from": "BookingService", "to": "Show", "kind": "has", "label": "owns" },
+      { "from": "Show", "to": "Seat", "kind": "has", "label": "owns" },
+      { "from": "Seat", "to": "SeatState", "kind": "uses" }
+    ]
+  },
+  "patterns": [
+    { "name": "State machine", "where": "Seat: Available, Held, Booked. Each move is a small method, and Show only calls it after checking the current state.", "why": "Three states with tiny behaviour do not need a class each. An enum plus guarded transitions keeps every rule visible in one place." },
+    { "name": "Strategy", "where": "Pricing, with ByCategory and PeakSurcharge. PeakSurcharge wraps another Pricing.", "why": "Price rules change often. A new rule is a new class, and BookingService does not change. Wrapping lets rules stack." },
+    { "name": "Lazy expiry", "where": "Show.sweep(now) runs before any call reads or changes seats.", "why": "No timer threads and no clock inside the code. Time is a number the caller passes in, so tests are exact." },
+    { "name": "Aggregate", "where": "Show owns its seats. Outside code never touches a Seat directly.", "why": "The rule that no seat is double held lives in one class, so there is one place to lock." }
+  ],
+  "decisions": [
+    {
+      "question": "How does a hold expire?",
+      "choice": "Lazily: each seat stores held-until, and every call sweeps first",
+      "because": "No timer to start, cancel or race with. A hold is live while now is below until, so the boundary is exact and easy to test.",
+      "instead": "One timer per hold that frees the seat later. Timers can fire late or during a confirm and need cancelling."
+    },
+    {
+      "question": "Where is double booking prevented?",
+      "choice": "In Show.hold: check all seats, then mark them Held, in one step",
+      "because": "The seat can only move out of Available once. Confirm also checks the hold id, so a user whose hold lapsed cannot book a seat someone else now holds.",
+      "instead": "Checking only at confirm time, after payment. The loser has paid for a seat they cannot have."
+    },
+    {
+      "question": "When is the price fixed?",
+      "choice": "At hold time. The total is stored on the hold",
+      "because": "What the user saw is what they pay. A rule change during the 10 minutes does not change their total.",
+      "instead": "Pricing at confirm. The total could differ from what the screen showed."
+    },
+    {
+      "question": "A State class per seat state?",
+      "choice": "No. An enum on Seat and a few guarded methods",
+      "because": "Unlike the vending machine, the states here share the same operations and differ by one check. Classes would add files, not clarity.",
+      "instead": "AvailableSeat, HeldSeat and BookedSeat classes behind an interface."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two users click the last seat in the same millisecond.",
+      "answer": "hold is check-then-act, so two threads can both see Available. Put one mutex per Show around hold, book, release, cancel and sweep (sync.Mutex in Go). Shows are independent, so locks do not collide. In a database, claim the seat with one conditional UPDATE where state is available or the hold has lapsed, and read the rows-affected count."
+    },
+    {
+      "ask": "Payment takes longer than the hold.",
+      "answer": "Do not extend silently. Either let the user extend once, or add a Paying state that the seat enters when payment starts and that has its own longer limit. If payment succeeds after the hold lapsed and the seat was taken, refund. Never double sell."
+    },
+    {
+      "ask": "Expired holds pile up in the holds map.",
+      "answer": "Seats are right because sweep fixes them, but the Hold records stay until confirm or release. Add a periodic janitor that drops holds whose until has passed, or key them by expiry time in an ordered structure and pop from the front."
+    },
+    {
+      "ask": "Limit each user to six seats and stop hoarding.",
+      "answer": "Count a user's live holds in BookingService.hold and refuse above the limit. Hoarding bots need rate limiting and a per-user hold cap, not a different state machine."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. The constructor takes the seat layouts of the shows (R regular, P premium), the hold length in minutes and the price rule (category or peak). Example: [\"BookingService\",\"hold\",\"confirm\"], [[[\"RRPP\"],10,\"category\"],[1,\"ana\",[1,3],0],[1,\"ana\",5]]",
+    "presets": [
+      { "label": "Contention and expiry", "args": [["BookingService", "hold", "hold", "confirm", "hold", "hold", "confirm", "release"], [[["RRPP"], 10, "category"], [1, "ana", [1, 2], 0], [1, "bob", [2, 3], 1], [1, "ana", 5], [1, "bob", [3, 4], 6], [1, "cy", [3], 20], [2, "bob", 21], [3, "cy"]]] },
+      { "label": "Too late by one tick", "args": [["BookingService", "hold", "state", "confirm"], [[["RRPP"], 10, "category"], [1, "ana", [1], 0], [1, 1, 9], [1, "ana", 10]]] },
+      { "label": "Peak price, then cancel", "args": [["BookingService", "hold", "confirm", "cancel"], [[["RRPP"], 10, "peak"], [1, "ana", [1, 3], 0], [1, "ana", 1], [1, "ana"]]] }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Hold and confirm",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Build the service", "note": "The service owns the shows and is handed its price rule and the hold length. Each show makes its own seats, all Available." },
+        { "n": 2, "title": "Sweep lapsed holds", "note": "Before any seat is read or changed, every Held seat whose until has passed goes back to Available. No timer is involved." },
+        { "n": 3, "title": "Hold: all or nothing", "note": "The show checks every requested seat is Available. If so, all move to Held with the hold id and an expiry. If not, nothing changes." },
+        { "n": 4, "title": "Price the hold", "note": "The service asks the Pricing strategy for each seat by category and stores the total on the hold, so it stays fixed." },
+        { "n": 5, "title": "Confirm: Held to Booked", "note": "Only the owner of a live hold can confirm. Each seat must still be held by this very hold id. Then they become Booked." },
+        { "n": 6, "title": "Give the seats back", "note": "Release moves Held seats to Available early. Cancel moves Booked seats to Available and refunds the stored total." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "Pick one meaning for the boundary and test it. Here a hold is live while now < until, so at exactly until it is gone. Using <= in one place and < in another books a seat twice or loses a sale." },
+    { "lang": "General", "text": "Check then act is a race. Two callers can both see Available and both hold. Check and mark must sit under one lock per show." },
+    { "lang": "General", "text": "Confirm must compare the hold id, not just the state. A seat that is Held by someone else looks the same as yours if you only check state." },
+    { "lang": "TypeScript", "text": "seats[id - 1] with id 0 gives seats[-1], which is undefined, not an error. The type says Seat, so check for it yourself, as pick() does, or it crashes later." },
+    { "lang": "Go", "text": "seats[id-1] with id 0 panics with index out of range. Check 1 <= id <= len(seats) first. Also, Hold and Booking are stored by value in a map, so changing a copy read from the map changes nothing." }
+  ],
+  "recap": {
+    "pattern": "State machine per seat, plus a hold with an expiry",
+    "key": "Seats move Available, Held, Booked. A hold stores until, and every call sweeps lapsed holds first, so time is just a number.",
+    "moves": ["Model the seat as a state machine and write down each legal move", "Hold all seats or none, in one step with the check", "Store the hold id and expiry on the seat, and sweep before every read", "Confirm only your own live hold, and only if the seats still carry its id"]
+  }
+}

@@ -1,0 +1,147 @@
+{
+  "slug": "elevator-system",
+  "title": "Elevator System",
+  "group": "State machines",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design the control software for a building with several elevators. People press a hall button with a direction (up or down) and, once inside, a floor button. A scheduler decides which elevator answers a hall call. Each elevator moves, opens its doors and closes them in a simple cycle. Time moves in ticks, so every run is exactly repeatable.",
+  "requirements": {
+    "functional": [
+      "A hall call has a floor and a direction. The scheduler picks the elevator that will answer it.",
+      "A car call is a floor button pressed inside one elevator. That elevator must stop there.",
+      "Each elevator is a state machine: Idle, MovingUp, MovingDown, DoorsOpen.",
+      "tick() moves every elevator one floor, or takes one door step. Elevators act in id order.",
+      "An elevator keeps its direction while there are stops ahead, and turns round only when there are none.",
+      "It stops for a stop that matches its direction, and at the last stop in its direction it answers calls both ways.",
+      "Two scheduling rules can be swapped: nearest idle elevator, and a direction-aware estimate."
+    ],
+    "outOfScope": ["Door sensors, weight and overload", "Express and zoned elevators", "Reassigning a call after it is given out", "Real travel time"]
+  },
+  "idea": {
+    "sentence": "Each elevator is a small state machine that sweeps in one direction, like a disk head, and a swappable scheduler only decides which elevator gets a call.",
+    "jargon": [
+      { "term": "SCAN (elevator algorithm)", "plain": "Keep moving the same way, serving stops on the way, and reverse only when nothing is left ahead. It stops far requests from waiting forever." },
+      { "term": "tick", "plain": "One step of simulated time. Instead of a real clock, the system advances only when tick() is called, so a run is deterministic." },
+      { "term": "hall call vs car call", "plain": "A hall call is a button outside, with a direction. A car call is a floor button inside one elevator." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "Elevator", "fields": ["floor, dir", "state: State", "car, up, down: Set<floor>"], "methods": ["add(floor, kind)", "step(): doorsOpened", "pending(): floor[]"], "x": 0, "y": 0 },
+      { "name": "Building", "fields": ["floors", "elevators: Elevator[]", "scheduler: Scheduler", "log, tickNo"], "methods": ["hall(floor, call): elevator", "press(elevator, floor)", "tick()"], "x": 1, "y": 0 },
+      { "name": "Scheduler", "kind": "interface", "methods": ["pick(elevators, floor, call): id"], "x": 2, "y": 0 },
+      { "name": "State", "kind": "enum", "fields": ["Idle", "MovingUp", "MovingDown", "DoorsOpen"], "x": 0, "y": 1 },
+      { "name": "NearestIdle", "methods": ["closest idle car"], "x": 2, "y": 1 },
+      { "name": "DirectionAware", "methods": ["cheapest estimated ticks"], "x": 3, "y": 1 }
+    ],
+    "relations": [
+      { "from": "Building", "to": "Elevator", "kind": "has", "label": "owns" },
+      { "from": "Building", "to": "Scheduler", "kind": "uses", "label": "asks" },
+      { "from": "Elevator", "to": "State", "kind": "has" },
+      { "from": "NearestIdle", "to": "Scheduler", "kind": "implements" },
+      { "from": "DirectionAware", "to": "Scheduler", "kind": "implements" }
+    ]
+  },
+  "patterns": [
+    { "name": "State", "where": "Elevator.step() switches on Idle, MovingUp, MovingDown and DoorsOpen.", "why": "Each state has one clear rule for the next tick. Compact here as a switch, because the states share almost all their data. Use one class per state if the behaviour per state grows." },
+    { "name": "Strategy", "where": "Scheduler, with NearestIdle and DirectionAware.", "why": "How to pick a car is the part everyone argues about. A new rule is a new class, and Building and Elevator stay as they are." },
+    { "name": "Deterministic simulation", "where": "tick() is the only way time moves. Ties go to the lowest id.", "why": "No clock, no randomness: a bug can be replayed exactly, and tests are plain lists of calls and ticks." }
+  ],
+  "decisions": [
+    {
+      "question": "How do we model hall calls?",
+      "choice": "Per elevator, in three sets: car, up and down",
+      "because": "An elevator going up must stop for an up call but pass a down call, until it reaches the last stop. Keeping the direction on the call makes that a set lookup.",
+      "instead": "One set of floors. The elevator then stops for the wrong direction, and riders board a car that is going away."
+    },
+    {
+      "question": "When is a hall call given to an elevator?",
+      "choice": "Once, at the moment of the call",
+      "because": "It is simple and a rider sees a stable answer. The cost is that a later, better elevator is not used.",
+      "instead": "Keep a shared queue and re-run the scheduler each tick. Better wait times, much harder to test and to explain."
+    },
+    {
+      "question": "How does an elevator choose its direction?",
+      "choice": "Keep going while there is work ahead, then turn, then idle. With no direction, go to the nearest side",
+      "because": "This is the SCAN rule. A far call is reached after one sweep, so nobody waits forever.",
+      "instead": "Always go to the nearest stop. It is quick on average but can starve a far floor."
+    },
+    {
+      "question": "Why is the cost not just distance?",
+      "choice": "Distance on its way, or detour to the end of its sweep, plus two ticks per queued stop",
+      "because": "A busy car that is passing the caller is often the best choice. A car that has just passed, or that has many stops, is not.",
+      "instead": "Nearest idle only. It sends a far car while a passing one would arrive sooner."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Riders press buttons while the building is ticking. What goes wrong?",
+      "answer": "hall() and press() change the stop sets while tick() reads them. In Go, give the Building to one goroutine that reads events (calls and ticks) from a channel, so only it touches the elevators. Or guard every public method with one sync.Mutex. Do not lock inside each elevator: the scheduler reads all of them together."
+    },
+    {
+      "ask": "A far floor never gets served in a rush hour. Fix it?",
+      "answer": "The SCAN rule already bounds the wait: the car reaches the far end in one sweep and comes back. Plain nearest-first would starve it. If a different scheduler could still leave a call unserved, add an age to each call and let the cost shrink as it ages."
+    },
+    {
+      "ask": "Add express elevators that only stop on some floors.",
+      "answer": "Give an Elevator an allowed set of floors and let the Scheduler skip cars that cannot serve the call. The state machine does not change. Car buttons for a floor the car skips are refused in press()."
+    },
+    {
+      "ask": "Reassign a call to a better elevator as things change.",
+      "answer": "Keep hall calls in a building-level list. Each tick, or when a car changes direction, run the scheduler again for the calls not yet reached and move them between cars. Test it with the same tick log: the order of door openings is the whole result."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Building takes [floors, start floor of each elevator, \"nearest\" or \"direction\"]. Then hall(floor, \"up\" or \"down\"), press(elevator, floor), tick(n), state, log.",
+    "presets": [
+      {
+        "label": "Direction aware: passing car",
+        "args": [["Building", "press", "tick", "hall", "tick", "tick"], [[8, [0, 7], "direction"], [0, 6], [2], [3, "up"], [1], [1]]]
+      },
+      {
+        "label": "Nearest idle: the far car",
+        "args": [["Building", "press", "tick", "hall", "tick"], [[8, [0, 7], "nearest"], [0, 6], [2], [3, "up"], [2]]]
+      },
+      {
+        "label": "SCAN: sweep up, then down",
+        "args": [["Building", "press", "press", "tick", "tick", "tick"], [[8, [3], "nearest"], [0, 5], [0, 1], [2], [1], [5]]]
+      },
+      {
+        "label": "Passes a call going away",
+        "args": [["Building", "press", "hall", "tick"], [[8, [0], "nearest"], [0, 6], [3, "down"], [10]]]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Tick-driven elevators",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Build the building", "note": "The building owns the elevators, all idle, and is handed the scheduling rule." },
+        { "n": 2, "title": "Hall call: ask the scheduler", "note": "A hall call has a floor and a direction. The scheduler looks at every elevator and names one. The building does not choose." },
+        { "n": 3, "title": "Remember the stop", "note": "The chosen elevator stores the floor as a car, up or down stop. A car button inside goes straight to that elevator." },
+        { "n": 4, "title": "Tick: every elevator steps", "note": "One tick moves each elevator one floor, or one door step, in id order. An idle elevator with a stop picks a direction and moves." },
+        { "n": 5, "title": "Arrive: stop or pass", "note": "On a new floor the elevator opens its doors for a car stop, for a call going its way, or when it is the last stop this way. Otherwise it keeps going." },
+        { "n": 6, "title": "Doors close: pick a direction", "note": "Keep the direction if there is work ahead. Otherwise turn round. With nothing left, go idle." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "Decide what happens when the doors are open and a button for this floor is pressed. Here the call is kept and the doors open again after they close, which is easy to test. Real systems extend the open time." },
+    { "lang": "General", "text": "Order matters when two cars could take a call. Break ties by id and process cars in id order, or two runs of the same input can give different answers." },
+    { "lang": "TypeScript", "text": "A Set keeps insertion order, not numeric order. Sort before asking for the nearest floor above or below, or the scheduler and the elevator can disagree." },
+    { "lang": "Go", "text": "Ranging over a map gives a random order each time. Collect the floors, then slices.Sort them. Without that, ties are broken differently from run to run." },
+    { "lang": "Go", "text": "Delete a key while ranging over a map is allowed, but adding while ranging may or may not be seen. Collect first, then change." }
+  ],
+  "recap": {
+    "pattern": "State machine per elevator, Strategy to pick one",
+    "key": "Elevators sweep one way like SCAN. A swappable scheduler chooses the car. A tick is the only clock.",
+    "moves": ["Make time a tick, so runs repeat exactly", "Give each elevator car, up and down stops and four states", "Keep direction while work is ahead, then turn, then idle", "Put the choice of car behind Scheduler: nearest idle, or direction aware"]
+  }
+}

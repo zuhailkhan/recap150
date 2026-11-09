@@ -23,4 +23,9 @@ defineProps<{ p: BucketsPanel }>()
 .key { font: 700 .88rem var(--font-mono); padding: 4px 10px; border-radius: 8px; background: var(--tile-bg); color: var(--tile-fg); border: 1.5px solid var(--tile-bd); flex: none; max-width: 45%; overflow-wrap: anywhere; }
 .items { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .empty { padding: 10px; border: 2px dashed var(--line); border-radius: 12px; text-align: center; }
+.key.tone-focus { background: var(--focus-bg); color: var(--focus-fg); border-color: var(--focus-bd); }
+.key.tone-keep { background: var(--keep-bg); color: var(--keep-fg); border-color: var(--keep-bd); }
+.key.tone-hit { background: var(--hit-bg); color: var(--hit-fg); border-color: var(--hit-bd); }
+.key.tone-miss { background: var(--miss-bg); color: var(--miss-fg); border-color: var(--miss-bd); }
+.key.tone-dim { background: var(--dim-bg); color: var(--dim-fg); border-color: var(--dim-bd); }
 </style>

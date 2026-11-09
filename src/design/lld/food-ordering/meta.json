@@ -1,0 +1,172 @@
+{
+  "slug": "food-ordering",
+  "title": "Food Ordering (Zomato)",
+  "group": "Big products",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the in-process core of a food-delivery service, a system like Zomato. A customer fills a cart from one restaurant, the bill is built by a chain of pricing rules, and the placed order is walked through its life by the restaurant and a delivery partner. Three parties touch every order, so each one owns only its own part: the restaurant owns stock, the customer owns the cart, the partner owns the delivery.",
+  "requirements": {
+    "functional": [
+      "Restaurants have a menu with a price in paise and a stock count for each dish.",
+      "A cart belongs to one restaurant at a time. An item from another restaurant is refused until the cart is empty.",
+      "The bill runs through ordered rules: item totals, then discount, then tax, then delivery fee.",
+      "Placing an order takes stock for every line, or fails and takes nothing. The bill is locked into the order.",
+      "An order goes Placed, Accepted, Preparing, PickedUp, Delivered, and can be cancelled only before Preparing.",
+      "Accepting assigns a free delivery partner through a strategy. With no free partner the accept is refused.",
+      "Cancelling refunds the total, returns the stock and frees the partner."
+    ],
+    "outOfScope": ["Real payments and refund rails", "Live partner tracking and ETAs", "Menus with options, add-ons and timings", "Ratings, coupons by code, and restaurant search"]
+  },
+  "idea": {
+    "sentence": "Price a bill by running a fixed list of small rules in order, and hold stock and partners behind all-or-nothing steps, so the three parties never leave the order half done.",
+    "jargon": [
+      { "term": "pipeline of rules", "plain": "A list of small steps run in a fixed order, each one reading what earlier steps wrote. Changing the order changes the answer, so the order is part of the design." },
+      { "term": "paise", "plain": "One hundredth of a rupee. Money is stored as a whole number of paise, so there is no floating point and no rounding drift." },
+      { "term": "all or nothing", "plain": "An operation that either does every part or none of it. Reserving stock for a whole cart is checked first and taken second, so a failure leaves no trace." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "OrderState", "kind": "enum", "fields": ["Placed", "Accepted", "Preparing", "PickedUp", "Delivered", "Cancelled"], "x": 0, "y": 0 },
+      { "name": "PriceRule", "kind": "interface", "methods": ["apply(bill, lines)", "ItemTotals, PercentDiscount,", "Tax, DeliveryFee implement it"], "x": 1, "y": 0 },
+      { "name": "Cart", "fields": ["restaurantId", "qty: Map<itemId, n>"], "methods": ["add(restaurant, item, n)", "remove(item), clear()"], "x": 2, "y": 0 },
+      { "name": "Order", "fields": ["lines, bill (locked)", "state: OrderState", "partnerId"], "methods": ["can(next), move(next)"], "x": 0, "y": 1 },
+      { "name": "FoodService", "fields": ["restaurants, carts", "orders, partners", "rules: PriceRule[]"], "methods": ["addToCart, bill", "placeOrder", "accept, deliver, cancel"], "x": 1, "y": 1 },
+      { "name": "Restaurant", "fields": ["menu: Map<itemId, MenuItem>", "at: Point"], "methods": ["reserve(lines): boolean", "release(lines)"], "x": 2, "y": 1 },
+      { "name": "NearestPartner", "x": 0, "y": 2 },
+      { "name": "AssignStrategy", "kind": "interface", "methods": ["pick(partners, restaurant): Partner | null"], "x": 1, "y": 2 },
+      { "name": "LeastDelivered", "x": 2, "y": 2 }
+    ],
+    "relations": [
+      { "from": "FoodService", "to": "Cart", "kind": "has", "label": "one per user" },
+      { "from": "FoodService", "to": "Restaurant", "kind": "has", "label": "owns" },
+      { "from": "FoodService", "to": "Order", "kind": "creates", "label": "on place" },
+      { "from": "FoodService", "to": "PriceRule", "kind": "uses", "label": "runs in order" },
+      { "from": "FoodService", "to": "AssignStrategy", "kind": "uses", "label": "asks who delivers" },
+      { "from": "Order", "to": "OrderState", "kind": "uses", "label": "is in one" },
+      { "from": "NearestPartner", "to": "AssignStrategy", "kind": "implements" },
+      { "from": "LeastDelivered", "to": "AssignStrategy", "kind": "implements" }
+    ]
+  },
+  "patterns": [
+    { "name": "Pipeline (chain of rules)", "where": "PriceRule and FoodService.price. Each rule fills in one field of the Bill, in a fixed order.", "why": "Discounts and fees change every season. A new rule is one class in the list, and a rule can be tested alone with a hand-made bill." },
+    { "name": "Strategy (partner assignment)", "where": "AssignStrategy, with NearestPartner and LeastDelivered. accept calls pick and nothing else.", "why": "Closest is fast, least-delivered is fair to partners. The service does not change when the policy does." },
+    { "name": "State machine", "where": "The NEXT table in Order. can and move gate every step of the lifecycle.", "why": "The rule that food in preparation cannot be cancelled lives in one table, not in every method." },
+    { "name": "Snapshot", "where": "placeOrder copies the prices into Line and the bill into Order.", "why": "A restaurant may change a price later. The customer still owes what they were shown, and a refund returns exactly that." }
+  ],
+  "decisions": [
+    {
+      "question": "When is stock taken?",
+      "choice": "At placeOrder, all lines at once. The cart reserves nothing.",
+      "because": "A full cart sitting for an hour should not hide dishes from other people. Checking every line before taking any means a failure leaves stock as it was. Cancel puts the same lines back.",
+      "instead": "Reserving on add-to-cart. Abandoned carts then lock stock, and the restaurant looks sold out while nobody is buying."
+    },
+    {
+      "question": "Why does the order of pricing rules matter?",
+      "choice": "Item totals, then discount, then tax on the discounted food, then delivery fee, untaxed.",
+      "because": "Tax after discount is what the customer actually pays for food. The delivery waiver reads the discounted total too. Each rule only reads fields written before it, so the order is visible in one list.",
+      "instead": "Taxing the full subtotal, which overcharges anyone with a discount, or hard-coding the maths in one long function nobody dares touch."
+    },
+    {
+      "question": "What if no partner is free when the restaurant accepts?",
+      "choice": "Refuse the accept. The order stays Placed and can be accepted again.",
+      "because": "It keeps the model small: an Accepted order always has a partner. The rest of the lifecycle never has to ask whether one exists.",
+      "instead": "Accepting without a partner and assigning later. Real systems do this with a queue, at the cost of an Accepted state that may have no partner."
+    },
+    {
+      "question": "How is the cart bound to a restaurant?",
+      "choice": "The Cart remembers one restaurant id while it holds items, and forgets it when empty.",
+      "because": "Prices, stock and the delivery origin all depend on one kitchen. Enforcing it in Cart.add means no caller can build a mixed basket.",
+      "instead": "One cart per restaurant per user. It works, but the customer then has several carts and several bills to reason about."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two customers order the last portion at the same moment.",
+      "answer": "Without a lock both can pass the stock check and both take it, driving stock negative. Make reserve one critical section per restaurant: a mutex around check-and-take, or a conditional update in the database such as 'decrement where stock >= qty'. Only one caller gets true."
+    },
+    {
+      "ask": "Add a promo code the customer types in.",
+      "answer": "Make the discount rule take a code and look it up: its minimum, percent and cap. The rule list stays the same shape. Validate the code when it is applied and again at placeOrder, because a code can expire between the two."
+    },
+    {
+      "ask": "Partners are scarce at dinner time. How do you handle a waiting order?",
+      "answer": "Let accept succeed with no partner and keep a waiting queue of such orders, oldest first. Whenever a partner is freed, run the same dispatch loop the cab-booking design uses. The Accepted state then means 'restaurant agreed', not 'partner is on the way'."
+    },
+    {
+      "ask": "The restaurant never responds. What then?",
+      "answer": "Store the time the order was placed and let a timer cancel Placed orders after a limit. The time is passed in as an integer so tests control it. Cancelling already restocks and refunds, so the timer only has to call cancel."
+    },
+    {
+      "ask": "Tax differs by city. Where does that go?",
+      "answer": "Build the rule list per restaurant or per city, with the Tax rule given its percent. FoodService does not change. If tax applies per item, the Tax rule reads the lines and sums per line, which is why every rule receives them."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Start with FoodService taking [restaurants, partners, \"nearest\" or \"least\"], where a restaurant is [id, x, y, [[dishId, name, paise, stock]]] and a partner is [id, x, y]. Then addToCart(user, restaurant, dish, qty), removeFromCart, bill(user), placeOrder(user, x, y), accept, startPreparing, pickUp, deliver, cancel, status(orderId) and stock(restaurant, dish).",
+    "presets": [
+      {
+        "label": "From cart to the door",
+        "args": [
+          ["FoodService", "addToCart", "addToCart", "bill", "placeOrder", "accept", "startPreparing", "pickUp", "deliver"],
+          [[[["r1", 0, 0, [["i1", "Dosa", 12000, 3], ["i2", "Idli", 8000, 5]]]], [["p1", 1, 0], ["p2", 0, 4]], "nearest"], ["ana", "r1", "i1", 2], ["ana", "r1", "i2", 1], ["ana"], ["ana", 3, 3], [1], [1], [1], [1]]
+        ]
+      },
+      {
+        "label": "One restaurant per cart",
+        "args": [
+          ["FoodService", "addToCart", "addToCart", "removeFromCart", "addToCart", "bill"],
+          [[[["r1", 0, 0, [["i1", "Dosa", 12000, 3]]], ["r2", 9, 9, [["j1", "Pizza", 30000, 4]]]], [["p1", 1, 0]], "nearest"], ["ana", "r1", "i1", 1], ["ana", "r2", "j1", 1], ["ana", "i1"], ["ana", "r2", "j1", 1], ["ana"]]
+        ]
+      },
+      {
+        "label": "Last portion, two buyers",
+        "args": [
+          ["FoodService", "addToCart", "addToCart", "placeOrder", "placeOrder", "stock"],
+          [[[["r1", 0, 0, [["i3", "Thali", 25000, 2]]]], [["p1", 1, 0]], "nearest"], ["ana", "r1", "i3", 2], ["bo", "r1", "i3", 1], ["ana", 3, 3], ["bo", 4, 4], ["r1", "i3"]]
+        ]
+      },
+      {
+        "label": "Cancel after accept",
+        "args": [
+          ["FoodService", "addToCart", "placeOrder", "accept", "cancel", "status"],
+          [[[["r1", 0, 0, [["i1", "Dosa", 12000, 3]]]], [["p1", 1, 0]], "nearest"], ["ana", "r1", "i1", 2], ["ana", 3, 3], [1], [1], [1]]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Rule pipeline, strategy",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Fill the cart", "note": "The Cart binds to the first restaurant. Adding from another one is refused until the cart is empty." },
+        { "n": 2, "title": "Price through the rules", "note": "The rules run in order: item totals, discount, tax on the discounted food, delivery fee. Then the total is added up." },
+        { "n": 3, "title": "Reserve stock, place order", "note": "The restaurant checks every line, then takes every line, or takes nothing. On success the bill is locked into a new Placed order." },
+        { "n": 4, "title": "Move the order, pick a partner", "note": "Order.move allows only listed steps. Accept also asks the AssignStrategy for a free partner and claims them." },
+        { "n": 5, "title": "Release what was held", "note": "Deliver frees the partner at the door. Cancel puts the stock back, frees the partner and returns the locked total." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "Round once, in a documented place. Tax here is (amount * percent + 50) / 100, which is half-up. Plain division rounds down, and a float would drift. Check a value that lands exactly on a half, such as 4010 at 5 percent." },
+    { "lang": "General", "text": "A check-then-take on shared stock is two steps. Single-threaded it is safe. With two requests at once it is a race, so the whole reserve needs one lock per restaurant." },
+    { "lang": "General", "text": "Copy the price into the order line. If the order read the live menu, a price change would alter orders already placed, and a refund would no longer match what was paid." },
+    { "lang": "TypeScript", "text": "Map iteration follows insertion order, so cart lines come out in the order they were added. That is what makes a bill's line order reproducible, but totals do not depend on it." },
+    { "lang": "TypeScript", "text": "Math.floor(x / 100) is safe for the non-negative amounts here. For a negative amount it rounds toward minus infinity, not toward zero, which is a different answer from Go." },
+    { "lang": "Go", "text": "A map has no order and a map of struct values hands out copies. Keep item ids in a slice for order and store pointers to MenuItem, so Reserve changes the real stock." },
+    { "lang": "Go", "text": "Integer division truncates toward zero. For the non-negative money here that equals floor, but a refund or a negative adjustment would differ from TypeScript, so keep every amount non-negative." },
+    { "lang": "Go", "text": "A struct such as PercentDiscount satisfies PriceRule with a value receiver, so it can sit in a []PriceRule literal. The rule that writes to Bill takes a pointer to it, otherwise it would edit a copy." }
+  ],
+  "recap": {
+    "pattern": "A pipeline of price rules, strategies for who delivers",
+    "key": "The cart is one kitchen. Rules price it in order. The restaurant reserves stock all or nothing. The order moves through a table, and the partner is assigned by a strategy.",
+    "moves": ["Bind the cart to one restaurant, in Cart.add", "Price with an ordered rule list: totals, discount, tax, delivery", "Reserve all lines or none, then lock the bill in the order", "Gate every step with a table, and release stock and partner on cancel"]
+  }
+}

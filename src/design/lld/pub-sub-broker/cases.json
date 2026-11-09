@@ -1,0 +1,16 @@
+[
+  {"name":"publish gives offsets 0, 1, 2","input":[["Broker","publish","publish","publish"],[[["t"]],["t","a"],["t","b"],["t","c"]]],"expected":[null,0,1,2]},
+  {"name":"two groups both see every message","input":[["Broker","publish","publish","poll","poll","commit","lag","lag"],[[["t"]],["t","m0"],["t","m1"],["g1","t",10],["g2","t",10],["g1","t",2],["g1","t"],["g2","t"]]],"expected":[null,0,1,["0:m0","1:m1"],["0:m0","1:m1"],2,0,2]},
+  {"name":"no commit means the same messages come again","input":[["Broker","publish","publish","poll","poll","commit","poll"],[[["t"]],["t","a"],["t","b"],["g","t",1],["g","t",1],["g","t",1],["g","t",1]]],"expected":[null,0,1,["0:a"],["0:a"],1,["1:b"]],"edge":true},
+  {"name":"committing past the end is refused","input":[["Broker","publish","commit","lag","poll"],[[["t"]],["t","a"],["g","t",2],["g","t"],["g","t",5]]],"expected":[null,0,-1,1,["0:a"]],"edge":true},
+  {"name":"unknown topic is refused everywhere","input":[["Broker","publish","poll","commit","lag"],[[["t"]],["nope","x"],["g","nope",5],["g","nope",0],["g","nope"]]],"expected":[null,-1,-1,-1,-1],"edge":true},
+  {"name":"a new group starts at the beginning","input":[["Broker","publish","publish","poll","commit","publish","poll","poll"],[[["t"]],["t","a"],["t","b"],["g1","t",5],["g1","t",2],["t","c"],["g2","t",5],["g1","t",5]]],"expected":[null,0,1,["0:a","1:b"],2,2,["0:a","1:b","2:c"],["2:c"]]},
+  {"name":"committing backwards is refused","input":[["Broker","publish","publish","publish","commit","commit","poll"],[[["t"]],["t","a"],["t","b"],["t","c"],["g","t",2],["g","t",1],["g","t",5]]],"expected":[null,0,1,2,2,-1,["2:c"]],"edge":true},
+  {"name":"max limits the batch","input":[["Broker","publish","publish","publish","poll","commit","poll","commit","poll"],[[["t"]],["t","a"],["t","b"],["t","c"],["g","t",2],["g","t",2],["g","t",2],["g","t",3],["g","t",2]]],"expected":[null,0,1,2,["0:a","1:b"],2,["2:c"],3,[]]},
+  {"name":"polling an empty topic gives nothing","input":[["Broker","poll","lag"],[[["t"]],["g","t",5],["g","t"]]],"expected":[null,[],0],"edge":true},
+  {"name":"a batch of zero returns nothing","input":[["Broker","publish","poll","lag"],[[["t"]],["t","a"],["g","t",0],["g","t"]]],"expected":[null,0,[],1],"edge":true},
+  {"name":"topics keep separate logs and offsets","input":[["Broker","publish","publish","poll","commit","lag","lag"],[[["a","b"]],["a","x"],["b","y"],["g","b",5],["g","a",1],["g","b"],["g","a"]]],"expected":[null,0,0,["0:y"],1,1,0]},
+  {"name":"committing the current offset changes nothing","input":[["Broker","commit","publish","poll"],[[["t"]],["g","t",0],["t","a"],["g","t",5]]],"expected":[null,0,0,["0:a"]]},
+  {"name":"partial commit redelivers the rest","input":[["Broker","publish","publish","publish","poll","commit","poll"],[[["t"]],["t","a"],["t","b"],["t","c"],["g","t",3],["g","t",1],["g","t",3]]],"expected":[null,0,1,2,["0:a","1:b","2:c"],1,["1:b","2:c"]]},
+  {"name":"groups commit independently","input":[["Broker","publish","publish","commit","poll","poll"],[[["t"]],["t","a"],["t","b"],["fast","t",2],["fast","t",5],["slow","t",5]]],"expected":[null,0,1,2,[],["0:a","1:b"]]}
+]

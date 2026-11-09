@@ -1,0 +1,150 @@
+{
+  "slug": "library-management",
+  "title": "Library Management",
+  "group": "Booking and reservation",
+  "difficulty": "Easy",
+  "status": "ready",
+  "brief": "Design the software for a small library. Books have several copies. Members borrow them for a fixed number of days, up to a limit, and pay a fine if they are late. When every copy is out, a member can reserve the book and wait in line. The next copy that comes back is kept for the first person in line.",
+  "requirements": {
+    "functional": [
+      "Borrow a book if a copy is free. A loan has a due day, a fixed number of days after the borrow day.",
+      "A member can hold at most a set number of books at once.",
+      "Return a book and get the fine for the days it is late. Returning on the due day costs nothing.",
+      "The fine rule is replaceable: a fixed amount per day, or the same with a cap.",
+      "Reserve a book that has no free copy. Reservations are served first come, first served.",
+      "A returned copy is held for the first reader in the queue. Nobody else can borrow it.",
+      "Refuse unknown members, unknown books, and a loan that was already returned."
+    ],
+    "outOfScope": ["Hold expiry when the reader never comes", "Renewals", "Searching the catalogue", "Paying the fine"]
+  },
+  "idea": {
+    "sentence": "A copy is never just free or taken: when a reader is waiting, a returned copy goes to that reader and skips the shelf, so the queue can never be jumped.",
+    "jargon": [
+      { "term": "FIFO queue", "plain": "First in, first out. The reader who waited longest is served first." },
+      { "term": "Strategy pattern", "plain": "Put a rule behind an interface so you can swap it without touching the code that uses it. Here the rule is the fine." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "FinePolicy", "kind": "interface", "methods": ["fine(daysLate): number"], "x": 1, "y": 0 },
+      { "name": "PerDayFine", "fields": ["rate"], "x": 0, "y": 0 },
+      { "name": "CappedFine", "fields": ["rate", "cap"], "x": 2, "y": 0 },
+      { "name": "Library", "fields": ["books: Map", "members: Map", "loans: Map", "reservations", "policy: FinePolicy", "limit, loanDays"], "methods": ["borrow(m, b, today): loan | code", "reserve(m, b): position | code", "returnBook(loan, today): fine"], "x": 1, "y": 1 },
+      { "name": "Reservations", "fields": ["queue: book -> members", "ready: book -> members"], "methods": ["join(b, m): position", "next(b): held?", "claim(b, m): held?"], "x": 0, "y": 1 },
+      { "name": "Loan", "fields": ["id, member, book", "due", "open"], "x": 2, "y": 1 },
+      { "name": "Member", "fields": ["id", "loans"], "x": 0, "y": 2 },
+      { "name": "Book", "fields": ["id", "free"], "x": 1, "y": 2 }
+    ],
+    "relations": [
+      { "from": "PerDayFine", "to": "FinePolicy", "kind": "implements" },
+      { "from": "CappedFine", "to": "FinePolicy", "kind": "implements" },
+      { "from": "Library", "to": "FinePolicy", "kind": "uses", "label": "asks" },
+      { "from": "Library", "to": "Reservations", "kind": "uses", "label": "asks" },
+      { "from": "Library", "to": "Loan", "kind": "creates" },
+      { "from": "Library", "to": "Book", "kind": "has", "label": "owns" },
+      { "from": "Library", "to": "Member", "kind": "has", "label": "owns" }
+    ]
+  },
+  "patterns": [
+    { "name": "Strategy", "where": "FinePolicy, with PerDayFine and CappedFine.", "why": "The fine is the rule most likely to change. A new rule is a new class, and Library stays as it is." },
+    { "name": "Dependency injection", "where": "Library receives its Reservations, its policy and its limits in the constructor.", "why": "Tests pass a fake policy or a limit of 1. Nothing is global." },
+    { "name": "Single responsibility", "where": "Reservations owns the queue and the held copies. Library owns books, members and loans.", "why": "The waiting-line rules sit in one small class that can be tested alone, instead of being spread over borrow and return." }
+  ],
+  "decisions": [
+    {
+      "question": "Where does a returned copy go when someone is waiting?",
+      "choice": "Straight to a held list for the head of the queue, not back on the shelf",
+      "because": "If it hit the shelf for a moment, any caller could borrow it first. Skipping the shelf makes jumping the queue impossible by construction.",
+      "instead": "Put it on the shelf and check the queue inside borrow. That needs a lock and still has a gap."
+    },
+    {
+      "question": "Do we model each physical copy as an object?",
+      "choice": "No. A Book keeps a count of free copies",
+      "because": "Nothing in the brief needs to know which copy a member has. A count is enough and cannot drift out of step.",
+      "instead": "A Copy class with its own id and status. Worth it later for barcodes and damage tracking."
+    },
+    {
+      "question": "Who computes the fine?",
+      "choice": "A FinePolicy that gets the number of days late",
+      "because": "The policy does not need dates or loans, so it is trivial to test and to swap.",
+      "instead": "A formula inside returnBook that grows an if for every new fine rule."
+    },
+    {
+      "question": "When is the borrow limit checked?",
+      "choice": "Before the held copy is claimed",
+      "because": "A member at the limit is refused and keeps the held copy. Claiming first would use up the hold and then refuse the loan.",
+      "instead": "Claim first and roll back on failure."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two members borrow the last copy at the same moment.",
+      "answer": "Check-then-act race: both see free = 1, both decrement. Guard borrow and returnBook with one lock (a sync.Mutex in Go), or make the decrement atomic and refuse when it would go below zero. With a database, use one conditional UPDATE: set free = free - 1 where free > 0, and read how many rows changed."
+    },
+    {
+      "ask": "The reader at the head of the queue never shows up.",
+      "answer": "Give each hold an expiry day. The hold goes into ready with a deadline. On every borrow and return, drop expired holds and call next again so the copy moves to the following reader, or back to the shelf. Time stays an injected integer, so it is easy to test."
+    },
+    {
+      "ask": "Add renewals.",
+      "answer": "A renew(loan, today) method that refuses if anyone is waiting for the book, otherwise moves the due day forward. The queue check is one call to Reservations. The fine policy is not involved."
+    },
+    {
+      "ask": "Different rules for students and staff.",
+      "answer": "Do not subclass Member. Give each member a plan, a small object with the limit and the loan days, and look it up when borrowing. The fine policy can also come from the plan."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Library takes [books as [id, copies], member ids, limit, loan days, \"perday\" or \"capped\", rate, cap]. Then borrow(member, book, day), reserve(member, book), returnBook(loan id, day), dueOf(loan), count(member), queue(book), held(book).",
+    "presets": [
+      {
+        "label": "Queue and a held copy",
+        "args": [["Library", "borrow", "reserve", "reserve", "returnBook", "borrow", "borrow"], [[[["B1", 1]], ["ana", "bo", "cy"], 2, 14, "perday", 2, 0], ["ana", "B1", 0], ["bo", "B1"], ["cy", "B1"], [1, 20], ["cy", "B1", 21], ["bo", "B1", 21]]]
+      },
+      {
+        "label": "Fine per day",
+        "args": [["Library", "borrow", "returnBook"], [[[["B1", 1]], ["ana"], 2, 14, "perday", 2, 0], ["ana", "B1", 0], [1, 60]]]
+      },
+      {
+        "label": "Fine with a cap",
+        "args": [["Library", "borrow", "returnBook"], [[[["B1", 1]], ["ana"], 2, 14, "capped", 2, 20], ["ana", "B1", 0], [1, 60]]]
+      },
+      {
+        "label": "Borrow limit",
+        "args": [["Library", "borrow", "borrow", "returnBook", "borrow"], [[[["B1", 1], ["B2", 1]], ["ana"], 1, 14, "perday", 2, 0], ["ana", "B1", 0], ["ana", "B2", 1], [1, 5], ["ana", "B2", 5]]]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Library with a queue",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Build the library", "note": "The library owns the books and the members, and is handed its fine rule, its limits and the reservation queue." },
+        { "n": 2, "title": "Check the limit", "note": "Unknown member or book is refused. A member at the limit is refused before any copy is touched." },
+        { "n": 3, "title": "Take a copy", "note": "A copy held for this member comes first. Otherwise the shelf. If neither, the borrow fails and nothing changes." },
+        { "n": 4, "title": "Join the queue", "note": "Only when no copy is free. The member goes to the back of the line, once." },
+        { "n": 5, "title": "Price the lateness", "note": "On return the library works out the days late and asks the fine policy. On time means zero days." },
+        { "n": 6, "title": "Pass the copy on", "note": "If someone is waiting, the copy is held for the head of the queue. Otherwise it goes back on the shelf." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "Borrow is check-then-act: read the free count, then decrement. Two callers can both pass the check. Hold one lock across the whole of borrow and returnBook." },
+    { "lang": "General", "text": "Count days late as max(0, today - due). Without the max, an early return gives a negative number and a negative fine." },
+    { "lang": "TypeScript", "text": "Array.includes and filter copy or scan by value, which is fine for a short queue. For a long one, keep a Set next to the array so the already-waiting check is O(1)." },
+    { "lang": "Go", "text": "Deleting from the middle of a slice with append(s[:i], s[i+1:]...) shifts the shared backing array. Another slice header that points at it sees the change. slices.Delete and slices.Clone make the intent clear." },
+    { "lang": "Go", "text": "Indexing a missing key in map[string]*Book gives nil, not an error. Always test for nil, or use the two-value form, before you touch the fields." }
+  ],
+  "recap": {
+    "pattern": "Strategy for the fine, a queue that owns returned copies",
+    "key": "A returned copy goes to the head of the queue, not the shelf. The fine is a swappable policy on the days late.",
+    "moves": ["Name the rule that changes: the fine. Put it behind an interface", "Keep a count of free copies per book, not an object per copy", "Check the limit first, then the held copy, then the shelf", "On return: fine, then hold for the queue head or shelve"]
+  }
+}

@@ -1,0 +1,155 @@
+{
+  "slug": "in-memory-file-system",
+  "title": "In-Memory File System",
+  "group": "Storage-like",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design a small file system that lives in memory. Paths look like /docs/notes/a.txt. Callers make directories, list what is inside, write and read text files, delete, and move. A directory can hold files and other directories to any depth, and the code that walks a path should not care which kind of node it meets.",
+  "requirements": {
+    "functional": [
+      "mkdir(path) creates the directory and every missing parent. It returns whether anything was created, and an existing directory is not an error.",
+      "ls(path) lists a directory's children, sorted by name. ls of a file returns just that file's name.",
+      "addContentToFile(path, text) appends to a file and creates it when missing. The parent directory must already exist.",
+      "readContent(path) returns a file's text. A missing path and a directory are errors.",
+      "delete(path) removes a file, or a directory with everything under it, and says how many nodes went. The root cannot be deleted.",
+      "move(from, to) renames or relocates a file or directory, with its contents. The target must not exist, and a directory cannot move into itself.",
+      "Paths must be absolute. A trailing or doubled slash is ignored, the root is \"/\", and \".\" or \"..\" are invalid."
+    ],
+    "outOfScope": ["Permissions and owners", "Relative paths and symbolic links", "File sizes, timestamps and disk limits"]
+  },
+  "idea": {
+    "sentence": "Make File and Directory share one Node interface and let each directory hand the rest of the path to its child, so walking a path is a recursion that never asks what kind of node it holds.",
+    "jargon": [
+      { "term": "Composite pattern", "plain": "Treat one object and a group of objects through the same interface. A directory is a group of nodes that is itself a node, so trees of any depth work with the same code." },
+      { "term": "path segment", "plain": "One name between slashes. /a/b/c has the segments a, b and c." },
+      { "term": "normalising a path", "plain": "Turning different spellings of the same place (a trailing slash, a doubled slash) into one canonical list of segments." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "FsNode", "kind": "interface", "methods": ["name: string", "count(): number", "find(parts): FsNode"], "x": 1, "y": 0 },
+      { "name": "FileNode", "fields": ["content: string"], "methods": ["count() = 1", "find([]) = itself, else error"], "x": 0, "y": 1 },
+      { "name": "DirNode", "fields": ["children: Map<name, FsNode>"], "methods": ["count() = 1 + children", "find(parts): hand the rest down", "mkdir(parts): create what is missing"], "x": 2, "y": 1 },
+      { "name": "FileSystem", "fields": ["root: DirNode"], "methods": ["mkdir, ls, addContentToFile", "readContent, delete, move"], "x": 2, "y": 2 },
+      { "name": "FsError", "fields": ["message"], "x": 0, "y": 2 }
+    ],
+    "relations": [
+      { "from": "FileNode", "to": "FsNode", "kind": "implements" },
+      { "from": "DirNode", "to": "FsNode", "kind": "implements", "label": "and holds many" },
+      { "from": "FileSystem", "to": "DirNode", "kind": "has", "label": "root" },
+      { "from": "FileSystem", "to": "FsError", "kind": "creates", "label": "throws" }
+    ]
+  },
+  "patterns": [
+    { "name": "Composite", "where": "FsNode with FileNode as the leaf and DirNode as the group. find, count and mkdir recurse through children.", "why": "A path walk and a subtree count need no if-file-else-directory at every level. The leaf answers the base case, so the recursion ends by itself." },
+    { "name": "Facade", "where": "FileSystem is the only class a caller uses. It parses paths and calls the tree.", "why": "Callers think in paths and strings, not nodes. The node classes can change without breaking anyone." },
+    { "name": "One shared parent lookup", "where": "parentOf(parts) finds the directory that holds the last segment, and write, delete and move all reuse it.", "why": "Three operations share one rule for 'the parent must exist and be a directory', so they fail the same way." }
+  ],
+  "decisions": [
+    {
+      "question": "How does a node find the next one down a path?",
+      "choice": "Each node has find(parts) and a directory passes the rest of the path to its child",
+      "because": "The base case lives in the leaf: a file with no parts left returns itself, and a file with parts left is an error. No type checks while walking, and a new node type just implements find.",
+      "instead": "A loop in FileSystem with instanceof at every step, which spreads the knowledge of what a node is across the facade."
+    },
+    {
+      "question": "Where is a path turned into segments?",
+      "choice": "One parse function at the front of every operation",
+      "because": "Trailing slashes, doubled slashes and the root are handled once. After that every operation sees a list of names, and the root is the empty list.",
+      "instead": "Splitting paths inside each method, where one method forgets the trailing slash and the same place gets two spellings."
+    },
+    {
+      "question": "How are failures reported?",
+      "choice": "A thrown FsError in TypeScript and an error value in Go, with the same messages",
+      "because": "A failed call has no useful result, so it must not look like success. The message names the first problem: not found, not a directory, is a directory, already exists, invalid path.",
+      "instead": "Returning an empty string or false for every problem, so the caller cannot tell a missing file from a directory."
+    },
+    {
+      "question": "What does move do to the contents?",
+      "choice": "Detach the node from the old parent and attach it to the new one",
+      "because": "Children hang off the node, so they come along for free and nothing is copied. The cost is constant. The node is renamed, so ls of a moved file shows the new name.",
+      "instead": "Copying every file to the new place and deleting the old tree, which takes time in proportion to the subtree and can fail halfway."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Several threads read and write at the same time.",
+      "answer": "Every directory's map is shared state. The simplest fix is one RWMutex on the file system: readers take the read lock, mkdir, write, delete and move take the write lock. Finer locking per directory needs a fixed lock order, parent before child, to avoid deadlock, and move touches two directories so it needs both."
+    },
+    {
+      "ask": "Add a glob such as ls /docs/*.txt, or a recursive find.",
+      "answer": "Add a visit(callback) method to FsNode. A file calls the callback once, a directory calls it for itself then for each child, in sorted order. Search, du and glob become a callback on top of one traversal, which is another reason to keep the Composite."
+    },
+    {
+      "ask": "Make delete and move safe if they fail halfway.",
+      "answer": "In memory each of them is a few map writes, so validate everything first (source exists, destination free, not into itself) and only then change the maps. That order is why move does its checks before the detach. A disk version needs a journal."
+    },
+    {
+      "ask": "Make a file big. Appending strings is slow.",
+      "answer": "Store content as a list of chunks, or a byte buffer that grows by doubling, and join only on read. FileNode hides it, so nothing outside changes. Add a size() to the Node interface and a directory sums its children, as count does."
+    },
+    {
+      "ask": "Add timestamps and a way to see a file versus a directory in ls.",
+      "answer": "Add modified: number to FsNode, set from an injected integer clock, and return it from a stat(path) call. For ls, return objects with a kind field, or mark directories with a trailing slash. Sorting stays by name."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Start with FileSystem taking []. Then mkdir(path), ls(path), addContentToFile(path, text), readContent(path), delete(path) and move(from, to). Paths start with /. A failed call gives \"err: ...\". Example: [\"FileSystem\",\"mkdir\",\"ls\"], [[],[\"/a/b\"],[\"/a\"]]",
+    "presets": [
+      {
+        "label": "Build, write, move, delete",
+        "args": [
+          ["FileSystem", "mkdir", "addContentToFile", "ls", "readContent", "move", "delete"],
+          [[], ["/docs/notes/"], ["/docs/a.txt", "hello"], ["/docs"], ["/docs/a.txt"], ["/docs/a.txt", "/docs/notes/b.txt"], ["/docs/notes"]]
+        ]
+      },
+      {
+        "label": "Things that go wrong",
+        "args": [
+          ["FileSystem", "addContentToFile", "mkdir", "readContent", "ls", "mkdir", "readContent"],
+          [[], ["/f", "x"], ["/f/g"], ["/nope"], ["/f"], ["a/b"], ["/"]]
+        ]
+      },
+      {
+        "label": "mkdir twice, then list",
+        "args": [
+          ["FileSystem", "mkdir", "mkdir", "mkdir", "addContentToFile", "ls"],
+          [[], ["/a/b"], ["/a/b"], ["/a/c"], ["/a/z.txt", "hi"], ["/a"]]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Composite tree",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Parse the path", "note": "Split on slashes and drop empty segments, so a trailing or doubled slash changes nothing. The root is the empty list. Relative paths and dots are refused." },
+        { "n": 2, "title": "Find the node", "note": "The root hands the rest of the path to the child it names. Each level does the same, and a file ends the walk. A missing name is an error." },
+        { "n": 3, "title": "Make directories", "note": "Each level creates the next directory if it is missing, then recurses. An existing directory is left alone, and a file in the way is an error." },
+        { "n": 4, "title": "Read or write a file", "note": "Only a FileNode holds text. Writing finds the parent, creates the file if needed and appends. Reading a directory is an error." },
+        { "n": 5, "title": "Detach and attach", "note": "Delete removes the child from its parent. Move does that, renames the node and adds it to the new parent. Subtrees are never copied." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "Check before you change. Move must verify the source exists, the destination is free and the move is not into itself before it touches any map. Otherwise a failure leaves a node in neither place." },
+    { "lang": "General", "text": "Moving a directory into itself (/a to /a/b) would cut the tree off from the root and make a cycle. Compare path prefixes and refuse." },
+    { "lang": "General", "text": "ls of a directory must be sorted by the caller-visible rule. A hash map gives no order, so sort the names. Digits sort as text: a1, a10, a2." },
+    { "lang": "TypeScript", "text": "Splitting \"/\" gives two empty strings, and \"/a/\" gives a trailing one. Filter out empty segments instead of slicing the first element, or the root and trailing slashes break." },
+    { "lang": "TypeScript", "text": "A Map iterates in insertion order, not sorted order. ls must call .sort() on the keys. The default sort compares UTF-16 code units, so uppercase comes before lowercase." },
+    { "lang": "Go", "text": "A nil FsNode inside an interface is not the same as a nil pointer. Return nil explicitly with an error, and never return a typed nil pointer as an FsNode, or a later nil check passes by mistake." },
+    { "lang": "Go", "text": "Ranging over a map gives random order. Collect the names into a slice and call slices.Sort before returning. A type switch or a type assertion with ok tells File from Dir where a caller needs to." }
+  ],
+  "recap": {
+    "pattern": "Composite: a directory is a node that holds nodes",
+    "key": "File and Directory share FsNode. A path is parsed once into segments, and each directory passes the rest of the path to its child.",
+    "moves": ["Parse once: drop empty segments, root is the empty list", "Recurse with find(parts): a file ends the walk", "Make mkdir create what is missing, parents first", "Move by detach and attach, after every check"]
+  }
+}

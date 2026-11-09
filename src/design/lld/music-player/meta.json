@@ -1,0 +1,137 @@
+{
+  "slug": "music-player",
+  "title": "Music Player (Spotify)",
+  "group": "Big products",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the playback core of a music player, a system like Spotify. There is a library of songs and named playlists. A play queue holds what plays next. The player can be Stopped, Playing or Paused, and next, previous, shuffle and repeat all behave according to the state and mode.",
+  "requirements": {
+    "functional": [
+      "A library has songs with ids and titles, and named playlists of song ids.",
+      "Load a playlist into the queue, or enqueue single songs. Loading stops playback.",
+      "Play, pause, stop, next and previous work according to the state: Stopped, Playing or Paused. Actions that make no sense are ignored.",
+      "Repeat has three modes. Off stops after the last song. One replays a song that finishes. All wraps around.",
+      "Shuffle keeps the song that is playing and reorders the rest. Turning it off goes back to the added order on the same song.",
+      "Shuffle must be reproducible: the random source is injected, so the same seed gives the same order."
+    ],
+    "outOfScope": ["Audio decoding and seek position", "Streaming, caching and downloads", "Recommendations and search"]
+  },
+  "idea": {
+    "sentence": "The player forwards each action to a state object, the queue is an iterator that asks a repeat strategy where to go, and shuffle reorders positions with an injected source.",
+    "jargon": [
+      { "term": "State pattern", "plain": "An object hands its behaviour to a separate object for each state. Changing state means swapping which object it forwards to." },
+      { "term": "Iterator pattern", "plain": "A cursor over a collection. Callers ask for next and previous and never touch the indexes or the order underneath." },
+      { "term": "seeded shuffle", "plain": "A shuffle driven by a pseudo-random generator that starts from a known number. Same seed, same order, so tests do not flake." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "Library", "fields": ["titles", "playlists: Map<name, ids>"], "methods": ["has(id)", "playlist(name): ids | null"], "x": 0, "y": 0 },
+      { "name": "Player", "fields": ["state: PlayerState", "queue: PlayQueue", "library: Library"], "methods": ["play(), pause(), stop()", "next(), prev(), ended()", "load(name), enqueue(id)", "setRepeat(mode), setShuffle(on)"], "x": 1, "y": 0 },
+      { "name": "PlayQueue", "fields": ["songs, order, pos", "repeat: RepeatMode", "shuffle: Shuffle (injected)"], "methods": ["current()", "next(ended), prev()", "setShuffle(on)"], "x": 2, "y": 0 },
+      { "name": "RepeatMode", "kind": "interface", "methods": ["next(pos, len, ended): pos | -1", "prev(pos, len): pos", "RepeatOff, RepeatOne, RepeatAll"], "x": 3, "y": 0 },
+      { "name": "PlayerState", "kind": "interface", "methods": ["play(), pause(), stop()", "next(), prev(), ended()"], "x": 1, "y": 1 },
+      { "name": "Stopped", "methods": ["play: go Playing", "everything else: ignored"], "x": 0, "y": 2 },
+      { "name": "Playing", "methods": ["pause: go Paused", "next, ended: advance or finish"], "x": 1, "y": 2 },
+      { "name": "Paused", "methods": ["play: go Playing", "next, prev: move and play"], "x": 2, "y": 2 }
+    ],
+    "relations": [
+      { "from": "Player", "to": "Library", "kind": "uses" },
+      { "from": "Player", "to": "PlayQueue", "kind": "has", "label": "owns" },
+      { "from": "PlayQueue", "to": "RepeatMode", "kind": "uses", "label": "asks" },
+      { "from": "Player", "to": "PlayerState", "kind": "uses", "label": "forwards to" },
+      { "from": "Stopped", "to": "PlayerState", "kind": "implements" },
+      { "from": "Playing", "to": "PlayerState", "kind": "implements" },
+      { "from": "Paused", "to": "PlayerState", "kind": "implements" }
+    ]
+  },
+  "patterns": [
+    { "name": "State", "where": "PlayerState with Stopped, Playing and Paused. Player forwards all six actions to the current one.", "why": "Each state has its own answers: Stopped ignores next, Paused starts playing on next. No if/else on state in Player." },
+    { "name": "Strategy", "where": "RepeatMode with RepeatOff, RepeatOne and RepeatAll. The queue asks it for the next position.", "why": "Wrap-around and replay rules live in three tiny classes. A new mode is a new class and the queue does not change." },
+    { "name": "Iterator", "where": "PlayQueue: current(), next(ended), prev(). Callers never see positions or the shuffled order.", "why": "Shuffle and repeat change how the cursor moves, not who uses it. States only say next." },
+    { "name": "Dependency injection", "where": "The Shuffle function is passed to the queue.", "why": "Production passes a random shuffle, tests pass a seeded one. The queue has no hidden randomness." }
+  ],
+  "decisions": [
+    {
+      "question": "What does shuffle reorder?",
+      "choice": "A list of positions into the added songs, with the playing position first",
+      "because": "The added order is never lost, so turning shuffle off is exact, and the same song queued twice is two different positions.",
+      "instead": "Shuffle the song list itself. The original order is gone and a duplicate song cannot be told apart."
+    },
+    {
+      "question": "How is shuffle made testable?",
+      "choice": "Inject a Shuffle function and use a seeded generator in tests",
+      "because": "A fixed seed gives a fixed order, so the same cases pass in TypeScript and Go. The generator is a few lines of integer math that behave the same in both.",
+      "instead": "Call Math.random or math/rand inside the queue. Tests could only check that it is a permutation."
+    },
+    {
+      "question": "Where does repeat live, and how is skip different from ended?",
+      "choice": "In a RepeatMode strategy that gets an ended flag",
+      "because": "Repeat one replays a song that finished but still lets you skip. One boolean says which case it is, and the states stay simple.",
+      "instead": "Repeat checks in Playing.next and Paused.next, which duplicates the rule and drifts."
+    },
+    {
+      "question": "A class per state or an enum?",
+      "choice": "A class per state behind PlayerState",
+      "because": "Three states times six actions is eighteen answers, and many differ. Each class holds its own six. Next while Paused starts playing, while Stopped it does nothing.",
+      "instead": "An enum with a switch in every method, which grows with every new state."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Your phone and your speaker both press next at the same moment.",
+      "answer": "Each call reads the position and then moves it, so both can read the same song and both skip once, or skip twice. Put one mutex around every public Player method (sync.Mutex in Go), or let one goroutine own the player and send it commands over a channel."
+    },
+    {
+      "ask": "Add play next, which inserts a song after the current one.",
+      "answer": "Insert into songs, then insert its position into order right after pos. With shuffle on, that puts it next in the shuffled order too. The states and strategies do not change."
+    },
+    {
+      "ask": "Songs have lengths and the player should advance by itself.",
+      "answer": "Give Song a duration and add tick(now) with time as an integer. Playing records when the song started and calls ended() when the time is up. Pausing stores the time played so far. The state classes already have the right place for it."
+    },
+    {
+      "ask": "With repeat all and shuffle, the same order repeats every lap.",
+      "answer": "When the queue wraps, call the shuffle again on the positions, keeping the last song of the old lap away from the front to avoid a repeat across the seam. This only touches PlayQueue.next."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. The constructor takes the song titles, the playlists as an object of name to song ids, and the shuffle seed. Other operations: load, enqueue, play, pause, stop, next, prev, ended, repeat (off, one, all), shuffle (1 or 0), state, current, queue. Example: [\"MusicPlayer\",\"load\",\"play\"], [[[\"A\",\"B\"],{\"all\":[1,2]},1],[\"all\"],[]]",
+    "presets": [
+      { "label": "Shuffle, pause, repeat all", "args": [["MusicPlayer", "load", "play", "shuffle", "next", "pause", "repeat", "next"], [[["Aria", "Blue", "Coda", "Drift"], { "all": [1, 2, 3, 4], "mix": [2, 4] }, 1], ["all"], [], [1], [], [], ["all"], []]] },
+      { "label": "Repeat one versus skip", "args": [["MusicPlayer", "load", "repeat", "play", "ended", "next", "ended"], [[["Aria", "Blue", "Coda", "Drift"], { "all": [1, 2, 3, 4], "mix": [2, 4] }, 1], ["all"], ["one"], [], [], [], []]] },
+      { "label": "Stopped ignores most actions", "args": [["MusicPlayer", "load", "pause", "next", "play", "stop"], [[["Aria", "Blue", "Coda", "Drift"], { "all": [1, 2, 3, 4], "mix": [2, 4] }, 1], ["mix"], [], [], [], []]] }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "State and strategy",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Build the player", "note": "The player owns an empty queue with repeat off and one object per state. It starts Stopped. Load and enqueue fill the queue." },
+        { "n": 2, "title": "Forward to the state", "note": "Every action is one line: hand it to the current state. No branching on state in the player." },
+        { "n": 3, "title": "The state decides", "note": "Each state accepts, ignores, or accepts and names the next state. The answer is the current song, or -1 if ignored." },
+        { "n": 4, "title": "Queue asks the strategy", "note": "next and prev move a cursor. The queue asks the RepeatMode where to go, and learns if the song ended or was skipped." },
+        { "n": 5, "title": "Shuffle the positions", "note": "The playing position stays first and the rest go through the injected Shuffle. Turning it off restores the added order." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "A skip and a song ending are not the same event. Repeat one must replay on the second and still move on for the first." },
+    { "lang": "General", "text": "Define what happens past the end. Here the player goes back to the first song and Stopped, so the next play starts from the top instead of doing nothing." },
+    { "lang": "General", "text": "A shuffle with no seed cannot be tested exactly. Inject the source and keep the generator's state inside it, so each call uses the next numbers." },
+    { "lang": "TypeScript", "text": "Math.imul and >>> 0 keep the generator in 32 bits. Plain s * 1664525 goes past 2^53 and silently loses digits, so the order would differ from Go." },
+    { "lang": "Go", "text": "uint32 arithmetic wraps by itself, which is what the generator needs. Using int would give different numbers on 64-bit machines. Also RepeatOne embeds RepeatOff, so its Prev is promoted, but its own Next must be written out." }
+  ],
+  "recap": {
+    "pattern": "State for the player, strategy for repeat",
+    "key": "The player forwards to a state. The queue is a cursor that asks a repeat strategy where to go. Shuffle reorders positions with an injected, seeded source.",
+    "moves": ["Write the table of actions by state and decide what each state ignores", "Put each state behind one interface and forward from the player", "Make the queue an iterator and give repeat to a strategy with an ended flag", "Shuffle positions with an injected source so tests are exact"]
+  }
+}

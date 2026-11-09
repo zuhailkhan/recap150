@@ -1,0 +1,16 @@
+[
+  {"name":"hold then confirm sells at category prices","input":[["BookingService","hold","confirm","available"],[[["RRPP"],10,"category"],[1,"ana",[1,3],0],[1,"ana",5],[1,6]]],"expected":[null,1,300,[2,4]]},
+  {"name":"a held seat cannot be taken by someone else","input":[["BookingService","hold","hold","available"],[[["RRPP"],10,"category"],[1,"ana",[1,2],0],[1,"bob",[2,3],1],[1,1]]],"expected":[null,1,-1,[3,4]],"edge":true},
+  {"name":"a hold lapses exactly at its expiry time","input":[["BookingService","hold","state","state","hold"],[[["RRPP"],10,"category"],[1,"ana",[1],0],[1,1,9],[1,1,10],[1,"bob",[1],10]]],"expected":[null,1,"held","available",2],"edge":true},
+  {"name":"a lapsed hold cannot be confirmed once the seat moved on","input":[["BookingService","hold","hold","confirm","confirm"],[[["RRPP"],10,"category"],[1,"ana",[1],0],[1,"bob",[1],12],[1,"ana",13],[2,"bob",14]]],"expected":[null,1,2,-1,100],"edge":true},
+  {"name":"confirm exactly at expiry is too late","input":[["BookingService","hold","confirm","available"],[[["RRPP"],10,"category"],[1,"ana",[1],0],[1,"ana",10],[1,10]]],"expected":[null,1,-1,[1,2,3,4]],"edge":true},
+  {"name":"confirm one tick before expiry works","input":[["BookingService","hold","confirm"],[[["RRPP"],10,"category"],[1,"ana",[2],0],[1,"ana",9]]],"expected":[null,1,100]},
+  {"name":"only the owner can confirm or release a hold","input":[["BookingService","hold","confirm","release","confirm"],[[["RRPP"],10,"category"],[1,"ana",[1],0],[1,"bob",1],[1,"bob"],[1,"ana",2]]],"expected":[null,1,-1,0,100]},
+  {"name":"release frees the seats at once","input":[["BookingService","hold","release","available","release"],[[["RRPP"],10,"category"],[1,"ana",[1,2],0],[1,"ana"],[1,1],[1,"ana"]]],"expected":[null,1,1,[1,2,3,4],0]},
+  {"name":"a booked seat never expires","input":[["BookingService","hold","confirm","hold","state"],[[["RRPP"],10,"category"],[1,"ana",[1],0],[1,"ana",1],[1,"bob",[1],50],[1,1,50]]],"expected":[null,1,100,-1,"booked"],"edge":true},
+  {"name":"a hold is all or nothing","input":[["BookingService","hold","hold","state","state"],[[["RRPP"],10,"category"],[1,"ana",[1],0],[1,"bob",[2,1,3],1],[1,2,1],[1,3,1]]],"expected":[null,1,-1,"available","available"]},
+  {"name":"peak pricing adds half","input":[["BookingService","hold","confirm"],[[["RRPP"],10,"peak"],[1,"ana",[1,3],0],[1,"ana",1]]],"expected":[null,1,450]},
+  {"name":"cancel refunds and frees the seats","input":[["BookingService","hold","confirm","cancel","cancel","available","cancel"],[[["RRPP"],10,"category"],[1,"ana",[3,4],0],[1,"ana",1],[1,"bob"],[1,"ana"],[1,2],[1,"ana"]]],"expected":[null,1,400,-1,400,[1,2,3,4],-1]},
+  {"name":"the same seat number in two shows is independent","input":[["BookingService","hold","hold","available","available"],[[["RR","RR"],10,"category"],[1,"ana",[1],0],[2,"bob",[1],0],[1,1],[2,1]]],"expected":[null,1,2,[2],[2]]},
+  {"name":"unknown show, unknown seat, duplicates and empty list are refused","input":[["BookingService","hold","hold","hold","hold","hold","available"],[[["RRPP"],10,"category"],[9,"ana",[1],0],[1,"ana",[5],0],[1,"ana",[1,1],0],[1,"ana",[],0],[1,"ana",[0],0],[1,0]]],"expected":[null,-1,-1,-1,-1,-1,[1,2,3,4]],"edge":true}
+]

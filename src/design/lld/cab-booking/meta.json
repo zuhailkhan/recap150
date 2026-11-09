@@ -1,0 +1,171 @@
+{
+  "slug": "cab-booking",
+  "title": "Cab Booking (Uber)",
+  "group": "Big products",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design the in-process core of a ride-hailing service, a system like Uber. Riders request a ride, the service picks a free driver, and the trip moves through a fixed life: requested, matched, in progress, completed or cancelled. What makes it hard is that two decisions change often (which driver, what price) and one rule must never bend (a trip may only make legal moves).",
+  "requirements": {
+    "functional": [
+      "Add drivers with a grid position. A driver can go online or offline, but not while on a trip.",
+      "A rider requests a ride from one grid point to another. The trip starts as Requested.",
+      "The nearest free driver is matched, by Manhattan distance. Ties go to the smaller driver id.",
+      "With no free driver, the trip waits. It is matched, oldest first, when a driver becomes free.",
+      "A trip moves only Requested to Matched to InProgress to Completed, and can be cancelled before it starts.",
+      "Ending a trip prices it as base plus per-unit distance, times an optional surge, in whole cents.",
+      "A driver who ends a trip is free again at the drop-off point."
+    ],
+    "outOfScope": ["Live GPS, maps and real road distance", "Driver acceptance, timeouts and rejection", "Payments, ratings and cancellation fees", "Many cities, and the location index behind real matching"]
+  },
+  "idea": {
+    "sentence": "Keep the two decisions that change, who drives and what it costs, behind small interfaces, and keep the rule that must not change, which moves a trip may make, in one table inside the Trip.",
+    "jargon": [
+      { "term": "Manhattan distance", "plain": "Distance along a street grid: the horizontal gap plus the vertical gap. No diagonals, no square roots, and it is a whole number." },
+      { "term": "State machine", "plain": "A thing that is always in exactly one named state, with a fixed list of allowed moves between them. Here the Trip is the machine." },
+      { "term": "Surge", "plain": "A price multiplier when demand is high. Here it is a percent: 100 means normal, 150 means one and a half times." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "TripState", "kind": "enum", "fields": ["Requested", "Matched", "InProgress", "Completed", "Cancelled"], "x": 0, "y": 0 },
+      { "name": "FareStrategy", "kind": "interface", "methods": ["fare(distance, surgePercent): cents"], "x": 1, "y": 0 },
+      { "name": "DistanceFare", "fields": ["base", "perUnit"], "x": 2, "y": 0 },
+      { "name": "Trip", "fields": ["id, rider, from, to", "surgePercent", "state: TripState", "driverId"], "methods": ["move(next): boolean"], "x": 0, "y": 1 },
+      { "name": "CabService", "fields": ["drivers: Map<id, Driver>", "trips: Map<id, Trip>"], "methods": ["addDriver, setAvailable", "requestRide, startTrip", "endTrip, cancel, status", "dispatch()  (private)"], "x": 1, "y": 1 },
+      { "name": "Driver", "fields": ["id, at: Point", "online, busy"], "methods": ["free: online and not busy"], "x": 2, "y": 1 },
+      { "name": "NearestDriver", "x": 0, "y": 2 },
+      { "name": "MatchingStrategy", "kind": "interface", "methods": ["pick(drivers, from): Driver | null"], "x": 1, "y": 2 },
+      { "name": "FirstFree", "x": 2, "y": 2 }
+    ],
+    "relations": [
+      { "from": "CabService", "to": "Trip", "kind": "creates", "label": "one per request" },
+      { "from": "CabService", "to": "Driver", "kind": "has", "label": "owns" },
+      { "from": "CabService", "to": "MatchingStrategy", "kind": "uses", "label": "asks who" },
+      { "from": "CabService", "to": "FareStrategy", "kind": "uses", "label": "asks how much" },
+      { "from": "Trip", "to": "TripState", "kind": "uses", "label": "is in one" },
+      { "from": "DistanceFare", "to": "FareStrategy", "kind": "implements" },
+      { "from": "NearestDriver", "to": "MatchingStrategy", "kind": "implements" },
+      { "from": "FirstFree", "to": "MatchingStrategy", "kind": "implements" }
+    ]
+  },
+  "patterns": [
+    { "name": "Strategy (matching)", "where": "MatchingStrategy, with NearestDriver and FirstFree. CabService.dispatch calls pick and nothing else.", "why": "Matching is the part a ride-hailing product keeps tuning. A new rule (rating, ETA, pooling) is one class, and dispatch is untouched." },
+    { "name": "Strategy (pricing)", "where": "FareStrategy, with DistanceFare. endTrip hands it a distance and a surge percent.", "why": "Price rules differ by city and change often. The service stays the same, and a flat-rate or night-rate class can be tested alone." },
+    { "name": "State machine", "where": "The NEXT table and Trip.move. Every transition, from every caller, goes through move.", "why": "Illegal moves such as ending a trip that never started are impossible by construction. The rule sits in one place, not in every method." }
+  ],
+  "decisions": [
+    {
+      "question": "Where do the legal trip moves live?",
+      "choice": "A transition table inside Trip. Trip.move refuses anything not listed.",
+      "because": "Start, end and cancel all need the same rule. In one table it is read in ten seconds and tested in one place. Callers cannot forget a check, because the Trip will not move.",
+      "instead": "An if on the state in each CabService method. It repeats, drifts apart, and the first forgotten check lets a completed trip be cancelled."
+    },
+    {
+      "question": "What if no driver is free?",
+      "choice": "Keep the trip as Requested and match it, oldest first, when a driver frees up.",
+      "because": "The rider's request is not lost, and the state Requested means something real. Every event that frees a driver (add, online, end, cancel) calls the same dispatch.",
+      "instead": "Failing the request at once. Simple, but the rider must retry by hand and the first retry wins, which is unfair."
+    },
+    {
+      "question": "How are ties and order made deterministic?",
+      "choice": "Smaller driver id wins a tie. Drivers are scanned in insertion order, trips oldest first.",
+      "because": "The same input must give the same output, in tests and in logs. Comparing ids makes the answer independent of scan order, so it holds in TypeScript and Go alike.",
+      "instead": "Taking the first minimum found. It silently depends on map or list order, which Go randomises for maps."
+    },
+    {
+      "question": "Where is surge decided?",
+      "choice": "Passed with the request and stored on the Trip, then applied by the FareStrategy at the end.",
+      "because": "The rider agrees to a price at request time, so a later spike must not change it. Keeping it on the Trip makes the fare reproducible from the trip alone.",
+      "instead": "Reading the current surge when the trip ends. The same ride then costs different amounts depending on when it finishes."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two riders request at the same time and one driver is free. What goes wrong?",
+      "answer": "Both can see the driver as free and both mark them busy, so one driver gets two trips. Make the check and the claim one step: a mutex around dispatch, or an atomic compare-and-set on the driver's busy flag. In a real system the driver lives in a shared store, so the claim is a conditional write that only one request wins."
+    },
+    {
+      "ask": "The scan over every driver is too slow. How does matching scale?",
+      "answer": "Index drivers by grid cell, so the search looks at the rider's cell, then rings of neighbours, and stops at the first ring with a free driver. MatchingStrategy.pick already takes the candidates as input, so only what is passed in changes. A separate page covers nearby search."
+    },
+    {
+      "ask": "Add driver acceptance: the driver may decline.",
+      "answer": "Add a state between Requested and Matched, for example Offered, with moves back to Requested on decline or timeout. Add it to the table and nothing else about the Trip changes. Keep a set of drivers who declined this trip so the strategy skips them."
+    },
+    {
+      "ask": "Add ride pooling, where one driver carries two riders.",
+      "answer": "Matching returns a driver who is busy but has a seat, so a driver holds a list of trips and 'free' becomes 'has capacity'. Only the strategy and the Driver change. Fares stay per trip, which is why the fare strategy takes one trip's distance."
+    },
+    {
+      "ask": "Surge should follow demand. Where does that go?",
+      "answer": "Compute a percent per area from the count of waiting trips against free drivers, in a separate small class, and pass it into requestRide. The Trip stores it, so the fare stays fixed for that rider. Pricing stays a pure function of distance and percent."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Start with CabService taking [\"nearest\" or \"first\", base fare, cents per unit]. Then addDriver(id, x, y), setAvailable(id, 0 or 1), requestRide(rider, fromX, fromY, toX, toY, surgePercent), startTrip(id), endTrip(id), cancel(id) and status(id). Example: [\"CabService\",\"addDriver\",\"requestRide\"], [[\"nearest\",50,20],[\"d1\",0,0],[\"ana\",1,1,4,4,100]]",
+    "presets": [
+      {
+        "label": "Nearest driver, surge ride",
+        "args": [
+          ["CabService", "addDriver", "addDriver", "requestRide", "startTrip", "endTrip", "cancel"],
+          [["nearest", 50, 20], ["d1", 0, 0], ["d2", 5, 5], ["ana", 4, 4, 6, 4, 150], [1], [1], [1]]
+        ]
+      },
+      {
+        "label": "Illegal moves are refused",
+        "args": [
+          ["CabService", "addDriver", "requestRide", "endTrip", "startTrip", "cancel", "endTrip", "endTrip"],
+          [["nearest", 50, 20], ["d1", 1, 1], ["ana", 0, 0, 3, 2, 100], [1], [1], [1], [1], [1]]
+        ]
+      },
+      {
+        "label": "Waiting rider gets the driver",
+        "args": [
+          ["CabService", "addDriver", "requestRide", "requestRide", "startTrip", "endTrip", "status"],
+          [["nearest", 50, 20], ["d1", 0, 0], ["ana", 0, 0, 0, 3, 100], ["bo", 1, 1, 2, 2, 100], [1], [1], [2]]
+        ]
+      },
+      {
+        "label": "First-free ignores distance",
+        "args": [
+          ["CabService", "addDriver", "addDriver", "requestRide", "status"],
+          [["first", 50, 20], ["d1", 0, 0], ["d2", 5, 5], ["ana", 4, 4, 6, 4, 100], [1]]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Strategies, state table",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Request a ride", "note": "A request creates a Trip in the Requested state, with its surge percent locked in. It always succeeds. Waiting is a state, not a failure." },
+        { "n": 2, "title": "Ask the matching strategy", "note": "Dispatch hands the free drivers and the pickup to MatchingStrategy.pick. No driver means the trip stays Requested and the scan stops." },
+        { "n": 3, "title": "Move through the table", "note": "Matched, InProgress, Completed and Cancelled all go through Trip.move, which refuses any move the table does not list." },
+        { "n": 4, "title": "Price the trip", "note": "On a legal end, FareStrategy turns the trip distance and surge into whole cents. The formula lives outside the service." },
+        { "n": 5, "title": "Free the driver", "note": "The driver is free again, at the drop-off point after a ride or where they stood after a cancel, and waiting trips are dispatched." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "Never rely on the order a map is scanned. Nearest is decided by distance, then by id, so the result is the same however drivers are stored. Insertion order is only the documented scan order." },
+    { "lang": "General", "text": "Integer division rounds down for positive numbers in both languages, but only because the multiply comes first. Compute (base + per * d) * surge / 100, never surge / 100 first, which would lose the fraction." },
+    { "lang": "General", "text": "Every event that frees a driver must call dispatch: add, go online, end and cancel. Forget one and a waiting rider is stranded until some other event happens." },
+    { "lang": "TypeScript", "text": "A string union such as TripState has no runtime value, so the NEXT table is a Record keyed by it. The compiler then forces an entry for every state. A new state fails to compile until its moves are listed." },
+    { "lang": "TypeScript", "text": "Map keeps insertion order and values() reflects it, so iterating trips gives request order. Mutating a trip's fields while iterating is safe. Adding or deleting entries mid-loop is the thing to avoid." },
+    { "lang": "Go", "text": "A map iterates in random order. Keep drivers and trips in slices for order, and a map only for lookup by id. Trip id n is trips[n-1], which also gives request order for free." },
+    { "lang": "Go", "text": "Looking up a missing key in the next map returns a nil slice, and slices.Contains on nil is false, so Completed and Cancelled need no entry. In TypeScript the same gap would be an undefined error." },
+    { "lang": "Go", "text": "Methods that change a Driver or Trip need pointer receivers and a slice of pointers. A slice of struct values hands out copies, so setting Busy would change a copy and the next match would see the old value." }
+  ],
+  "recap": {
+    "pattern": "Strategy for who and how much, a table for what is legal",
+    "key": "CabService only coordinates. MatchingStrategy picks the driver, FareStrategy prices the trip, and Trip.move checks every state change against one table.",
+    "moves": ["Hold a trip in one state and allow only listed moves", "Match through a MatchingStrategy: nearest, ties by id", "Keep a waiting trip Requested and dispatch when a driver frees", "Price at the end with a FareStrategy, in whole cents"]
+  }
+}

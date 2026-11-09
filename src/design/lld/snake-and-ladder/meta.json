@@ -1,0 +1,128 @@
+{
+  "slug": "snake-and-ladder",
+  "title": "Snake and Ladder",
+  "group": "Games",
+  "difficulty": "Easy",
+  "status": "ready",
+  "brief": "Design the classic board game. Players start off the board and take turns rolling a die. A ladder lifts a token up, a snake drops it down, and the first player to land exactly on the last square wins. Tests must be able to say exactly which numbers come up.",
+  "requirements": {
+    "functional": [
+      "A board of N squares with snakes and ladders, each a head square and a tail square.",
+      "Two or more players start off the board (position 0) and move in a fixed turn order.",
+      "A turn rolls the dice and moves the token by that many squares.",
+      "Landing on a snake head or ladder bottom moves the token to the tail, once.",
+      "A roll that would go past the last square is ignored: the token stays and the turn passes.",
+      "Landing exactly on the last square wins, and a finished game takes no more turns.",
+      "The dice is a swappable object, so a test can script the rolls."
+    ],
+    "outOfScope": ["Extra turn on a six", "Rendering a real board", "Players joining or leaving mid-game"]
+  },
+  "idea": {
+    "sentence": "The board is just a lookup table from head to tail, and the only random thing in the game, the dice, sits behind an interface you can script.",
+    "jargon": [
+      { "term": "dependency injection", "plain": "The game receives its dice from outside instead of creating it, so a test can hand in a fake one." },
+      { "term": "test double", "plain": "A stand-in object used in a test. Here a ScriptedDice returns numbers from a list you wrote." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "Dice", "kind": "interface", "methods": ["roll(): number"], "x": 0, "y": 0 },
+      { "name": "Board", "fields": ["size", "jumps: Map<head, tail>"], "methods": ["settle(square): square"], "x": 2, "y": 0 },
+      { "name": "Game", "fields": ["board", "players: Player[]", "dice: Dice", "turn", "winner"], "methods": ["play(): position | null"], "x": 1, "y": 1 },
+      { "name": "ScriptedDice", "fields": ["rolls: number[]"], "methods": ["roll()"], "x": 0, "y": 2 },
+      { "name": "Player", "fields": ["name", "pos"], "x": 2, "y": 2 }
+    ],
+    "relations": [
+      { "from": "ScriptedDice", "to": "Dice", "kind": "implements" },
+      { "from": "Game", "to": "Dice", "kind": "uses", "label": "rolls" },
+      { "from": "Game", "to": "Board", "kind": "has", "label": "settle" },
+      { "from": "Game", "to": "Player", "kind": "has", "label": "turn order" }
+    ]
+  },
+  "patterns": [
+    { "name": "Dependency injection", "where": "Game receives a Dice in its constructor.", "why": "No hidden Math.random. A test passes ScriptedDice and every game is replayable, so a win or an overshoot can be asserted exactly." },
+    { "name": "Data over code", "where": "Board keeps every snake and ladder as one map entry.", "why": "A snake and a ladder are the same thing, a jump. One lookup replaces two classes and a pile of if statements, and a new board is only new data." }
+  ],
+  "decisions": [
+    {
+      "question": "Snake and Ladder as two classes?",
+      "choice": "One jumps map, head to tail",
+      "because": "Both do the same thing: move the token. The direction (tail below or above head) is data, so the game needs no type check.",
+      "instead": "A Snake class and a Ladder class behind a Jump interface, with nothing different between them."
+    },
+    {
+      "question": "What if the roll goes past the last square?",
+      "choice": "Ignore the move. The token stays and the turn passes. Only an exact landing wins.",
+      "because": "It is the rule most families play and it gives every game a real ending to test. A different house rule is a different line in play(), not a different design.",
+      "instead": "Bounce back from the end, or win on any roll that reaches the end."
+    },
+    {
+      "question": "Can a jump lead to another jump?",
+      "choice": "No. The token jumps once and stays on the tail, even if the tail is another head.",
+      "because": "Chains make the result depend on the table, and a loop (a snake whose tail is a ladder that goes back to the snake) would never end. One jump per landing is simple and always terminates.",
+      "instead": "Follow jumps until a plain square, with cycle detection added to the board."
+    },
+    {
+      "question": "Where does the randomness live?",
+      "choice": "Behind a Dice interface, injected into Game",
+      "because": "Random code cannot be asserted. A scripted dice makes the whole game deterministic.",
+      "instead": "Calling Math.random() or rand.Intn inside play()."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Add an extra turn when a player rolls a six.",
+      "answer": "Change one line in play(): when the roll is 6 and the player did not win, do not advance the turn index. To keep the rule swappable, hand Game a small TurnRule interface that says whether this roll earns another turn. The board and the dice do not change."
+    },
+    {
+      "ask": "Use two dice, or a loaded dice for a test.",
+      "answer": "Write another Dice. TwoDice rolls twice and adds. Game only calls roll(), so nothing else changes. A loaded dice is just ScriptedDice with a short list."
+    },
+    {
+      "ask": "How do you stop a bad board, like a snake on the last square or a tail off the board?",
+      "answer": "Validate once, in a board constructor or factory: every head and tail must be between 1 and size, no head sits on the last square, and no head equals its own tail. Settle already ignores a head on the last square, but a clear error at setup is better than a silent rule."
+    },
+    {
+      "ask": "Players join from different phones at the same time.",
+      "answer": "play() reads the turn, rolls and writes the position, so two calls could both move the same player. Put the game behind one lock, or a single goroutine or event loop that owns it and takes moves from a queue. Also check that the caller is the player whose turn it is."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Game takes: size, [head, tail] pairs, number of players, scripted rolls. Example: [\"Game\",\"play\"], [[10,[[3,7]],2,[3,1]],[]]",
+    "presets": [
+      { "label": "A full game to the win", "args": [["Game", "play", "play", "play", "play", "play", "play", "play"], [[16, [[3, 11], [6, 13], [14, 5], [9, 2]], 2, [3, 2, 4, 6, 2, 1, 1]], [], [], [], [], [], [], []]] },
+      { "label": "A jump is not chained", "args": [["Game", "play", "play"], [[10, [[3, 7], [7, 2]], 1, [3, 3]], [], []]] },
+      { "label": "Overshoot keeps the token", "args": [["Game", "play", "play", "play", "play"], [[10, [], 2, [9, 2, 2, 1]], [], [], [], []]] }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Injected dice",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Build the game", "note": "The game owns the board and the players and is handed its dice. It never rolls anything itself." },
+        { "n": 2, "title": "Roll", "note": "The player whose turn it is asks the dice. The target square is the current square plus the roll." },
+        { "n": 3, "title": "Move and settle", "note": "If the target is on the board, ask the board to settle it: a snake or ladder moves the token once. If it is past the end, nothing moves." },
+        { "n": 4, "title": "Win or pass the turn", "note": "Standing on the last square wins and ends the game. Otherwise the turn passes to the next player." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "Decide and write down three rules: exact landing or not, what a jump landing on another jump does, and whether a six rolls again. Most Snake and Ladder bugs are one of these left unsaid." },
+    { "lang": "General", "text": "Start at 0, off the board. Then the first roll is the same code as every other roll, and a snake back to the start is just a jump to 0." },
+    { "lang": "TypeScript", "text": "Map.get returns undefined for a miss. Give a default with ?? (jumps.get(s) ?? s), and never test the result with a truthiness check such as ||, because a tail of 0 is falsy." },
+    { "lang": "Go", "text": "A map read of a missing key gives the zero value 0, which here is also a valid tail (the start). Use the two-value form (tail, ok := jumps[s]) to tell a miss from a jump to 0." },
+    { "lang": "Go", "text": "Keep players as []*Player. With []Player, for _, p := range players hands you a copy, and p.Pos = 5 changes the copy, not the player." }
+  ],
+  "recap": {
+    "pattern": "Dependency injection: script the randomness",
+    "key": "The board is a head-to-tail map and the dice is an interface, so the game is a short loop you can replay exactly.",
+    "moves": ["Write the rules down first: exact landing, one jump, no extra turn", "Model snakes and ladders as one map of jumps", "Put the dice behind an interface and inject it", "In play(): roll, settle if on the board, then win or pass the turn"]
+  }
+}

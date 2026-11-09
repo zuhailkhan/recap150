@@ -1,0 +1,390 @@
+{
+  "slug": "chess",
+  "title": "Chess",
+  "group": "Games",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design the rules engine for a two-player chess game. Moves arrive as text like e2e4. The engine must know how each piece moves, refuse moves that are blocked, out of turn or that leave your own king in check, and tell the players about check, checkmate and stalemate. This version leaves out castling, en passant and promotion, and says so.",
+  "requirements": {
+    "functional": [
+      "An 8 by 8 board, set up from the standard start or from any placement of pieces.",
+      "A move is text like e2e4: the square it leaves, then the square it lands on.",
+      "Every kind of piece moves by its own rule. Sliding pieces cannot jump over others, and no piece lands on a friend.",
+      "Reject a move that is out of turn, from an empty square, against the piece's rule, or that leaves your own king attacked.",
+      "After each move, report check, checkmate (in check with no legal move) or stalemate (not in check, no legal move).",
+      "A finished game takes no more moves.",
+      "List the legal moves for the side to move, or for one square."
+    ],
+    "outOfScope": [
+      "Castling and en passant",
+      "Pawn promotion: a pawn on the last rank just stays there",
+      "Draws by repetition, the 50 move rule or too few pieces",
+      "Clocks, resigning and draw offers"
+    ]
+  },
+  "idea": {
+    "sentence": "A piece's own rule answers only 'can I get there?'. The game adds the one question no piece can answer alone: after this move, is my king attacked?",
+    "jargon": [
+      {
+        "term": "Strategy pattern",
+        "plain": "Put an algorithm behind an interface and hand it to the object that needs it. Here each piece holds a MoveRule."
+      },
+      {
+        "term": "pseudo-legal move",
+        "plain": "A move that follows the piece's own rule but may still leave your king in check. Legal = pseudo-legal and the king is safe."
+      },
+      {
+        "term": "FEN",
+        "plain": "A compact text for a position. Only the piece part is used: ranks from 8 down to 1 split by '/', capitals white, digits are runs of empty squares."
+      },
+      {
+        "term": "pin",
+        "plain": "A piece that cannot move because it stands between an attacker and its own king."
+      }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      {
+        "name": "Game",
+        "fields": [
+          "board",
+          "turn",
+          "over"
+        ],
+        "methods": [
+          "move('e2e4'): result",
+          "legal(color, square?): string[]",
+          "inCheck(color)"
+        ],
+        "x": 0,
+        "y": 0
+      },
+      {
+        "name": "Board",
+        "fields": [
+          "cells: Piece | null [8][8]"
+        ],
+        "methods": [
+          "at(sq)",
+          "move(from, to): captured",
+          "undo(from, to, captured)",
+          "pieces(color)"
+        ],
+        "x": 1,
+        "y": 0
+      },
+      {
+        "name": "Piece",
+        "fields": [
+          "color",
+          "kind",
+          "rule: MoveRule"
+        ],
+        "x": 2,
+        "y": 0
+      },
+      {
+        "name": "MoveRule",
+        "kind": "interface",
+        "methods": [
+          "reaches(board, from, to): boolean"
+        ],
+        "x": 2,
+        "y": 1
+      },
+      {
+        "name": "Slide",
+        "fields": [
+          "dirs"
+        ],
+        "methods": [
+          "bishop, rook, queen"
+        ],
+        "x": 1,
+        "y": 2
+      },
+      {
+        "name": "Jump",
+        "fields": [
+          "offsets"
+        ],
+        "methods": [
+          "knight, king"
+        ],
+        "x": 2,
+        "y": 2
+      },
+      {
+        "name": "PawnRule",
+        "methods": [
+          "forward, capture diagonally"
+        ],
+        "x": 3,
+        "y": 2
+      }
+    ],
+    "relations": [
+      {
+        "from": "Game",
+        "to": "Board",
+        "kind": "has",
+        "label": "owns"
+      },
+      {
+        "from": "Board",
+        "to": "Piece",
+        "kind": "has",
+        "label": "64 squares"
+      },
+      {
+        "from": "Piece",
+        "to": "MoveRule",
+        "kind": "uses",
+        "label": "holds one"
+      },
+      {
+        "from": "Slide",
+        "to": "MoveRule",
+        "kind": "implements"
+      },
+      {
+        "from": "Jump",
+        "to": "MoveRule",
+        "kind": "implements"
+      },
+      {
+        "from": "PawnRule",
+        "to": "MoveRule",
+        "kind": "implements"
+      }
+    ]
+  },
+  "patterns": [
+    {
+      "name": "Strategy",
+      "where": "MoveRule with Slide, Jump and PawnRule. Each Piece holds the one for its kind.",
+      "why": "Movement is the part that differs by piece, so it sits behind an interface. The game asks piece.rule.reaches() and never branches on the kind. Six piece types need only three rule classes."
+    },
+    {
+      "name": "Flyweight",
+      "where": "RULES: one shared rule object per kind.",
+      "why": "Rules hold no state (only directions), so all 16 pieces of a side share them. Nothing to copy when a piece is created."
+    },
+    {
+      "name": "Try, test, undo",
+      "where": "Game.exposesKing plays the move on the real board, checks, and takes it back.",
+      "why": "Checking king safety needs the position after the move. Undoing is cheaper than copying the board for every candidate, and the same trick lets the game list all legal moves."
+    }
+  ],
+  "decisions": [
+    {
+      "question": "How does a piece know how it moves?",
+      "choice": "A Piece holds a MoveRule. Slide takes directions, Jump takes offsets, and PawnRule is its own.",
+      "because": "Rook, bishop and queen differ only by their direction list. King and knight differ only by their offsets. Data in one class replaces five subclasses with copied loops.",
+      "instead": "An abstract Piece with six subclasses. The classic answer, but rook, bishop and queen would repeat one slide loop."
+    },
+    {
+      "question": "Where does the check rule live?",
+      "choice": "In Game, not in the pieces",
+      "because": "A piece cannot see whether the king is attacked after it moves: that needs the whole board, both colours and the turn. Keeping MoveRule free of check makes each rule small and testable alone.",
+      "instead": "Every rule calls a king-safety test itself, so each of them needs to know about the other side."
+    },
+    {
+      "question": "How do we know a square is attacked?",
+      "choice": "Ask the enemy pieces' own rules: does any of them reach the king's square?",
+      "because": "No second set of attack code. It even works for pawns: a pawn's forward step needs an empty target, and a king's square is never empty, so only its diagonal capture counts.",
+      "instead": "A separate attacks() method on every piece, which can drift out of sync with the move rules."
+    },
+    {
+      "question": "How is a candidate move tested for safety?",
+      "choice": "Make it on the real board, test, then undo",
+      "because": "No copying and no allocation. Board.move returns what was captured so undo can put it back exactly.",
+      "instead": "Cloning the whole board for each of the dozens of candidate moves."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Add castling and en passant.",
+      "answer": "Both need history a MoveRule cannot see, so Game tracks it: which kings and rooks have moved, and the square a pawn just skipped. Castling is a two-square king move Game checks itself: unmoved pieces, empty path, king not in, through or into check (reuse inCheck). En passant adds a capture target, and the captured pawn sits elsewhere, so Board.move must return it for undo."
+    },
+    {
+      "ask": "Add pawn promotion.",
+      "answer": "Allow a fifth character in the move text, like e7e8q. When a pawn lands on the last rank, Game replaces it with a new Piece of the chosen kind, since the rules are shared and cheap. Reject the move without the character, and undo must restore the pawn. Legal-move lists then contain four moves for each promotion."
+    },
+    {
+      "ask": "Detect draws: repetition, 50 moves, too few pieces.",
+      "answer": "Keep a count of half-moves since the last capture or pawn move, and a map from position key to times seen. The key is the board text plus side to move plus castling and en passant rights. Insufficient material is a small check on the piece list: king against king, or one bishop or knight each side extra. All of it lives in Game, since a single piece cannot know."
+    },
+    {
+      "ask": "Two players on different phones, or a double submit.",
+      "answer": "One authority owns each game and applies moves one at a time, with a lock per game or a single worker that reads a queue. Make a move carry the move number it expects, so a stale or repeated submit is rejected instead of played twice. Chess is turn-based, so contention is low, but the check-then-play inside move() must not interleave."
+    },
+    {
+      "ask": "Build a computer player on top.",
+      "answer": "legal() gives the candidate moves. A search plays a move, recurses, then undoes it: the same try and undo that Game already uses, which is why undo returns the captured piece. Add a move list in Game so a player can also take back a move."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Game takes a position as FEN piece placement, a space, and w or b (or \"start\"). Capitals are white. Example: [\"Game\",\"move\"], [[\"start\"],[\"e2e4\"]]",
+    "presets": [
+      {
+        "label": "Block a check, then capture",
+        "args": [
+          [
+            "Game",
+            "move",
+            "move",
+            "move",
+            "move"
+          ],
+          [
+            [
+              "4r2k/8/8/8/8/8/3B4/4K3 w"
+            ],
+            [
+              "d2d3"
+            ],
+            [
+              "d2h6"
+            ],
+            [
+              "d2e3"
+            ],
+            [
+              "e8e3"
+            ]
+          ]
+        ]
+      },
+      {
+        "label": "Fool's mate",
+        "args": [
+          [
+            "Game",
+            "move",
+            "move",
+            "move",
+            "move"
+          ],
+          [
+            [
+              "start"
+            ],
+            [
+              "f2f3"
+            ],
+            [
+              "e7e5"
+            ],
+            [
+              "g2g4"
+            ],
+            [
+              "d8h4"
+            ]
+          ]
+        ]
+      },
+      {
+        "label": "Stalemate is not mate",
+        "args": [
+          [
+            "Game",
+            "move",
+            "move"
+          ],
+          [
+            [
+              "7k/8/5QK1/8/8/8/8/8 w"
+            ],
+            [
+              "f6f7"
+            ],
+            [
+              "h8g8"
+            ]
+          ]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Piece rules + game",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        {
+          "n": 1,
+          "title": "Build the game",
+          "note": "The game owns the board and whose turn it is. Each piece on the board was made holding the movement rule for its kind."
+        },
+        {
+          "n": 2,
+          "title": "Right piece, right turn",
+          "note": "The text must name a square with a piece on it, and that piece must belong to the side to move. Cheap tests first."
+        },
+        {
+          "n": 3,
+          "title": "Ask the piece's rule",
+          "note": "piece.rule.reaches() checks the shape of the move, that the path is clear, and that the target is empty or an enemy. The game never asks what kind the piece is."
+        },
+        {
+          "n": 4,
+          "title": "Try it, test king safety",
+          "note": "Play the move on the board, ask whether any enemy piece now reaches your king, and undo. An attacker means the move is rejected."
+        },
+        {
+          "n": 5,
+          "title": "Play it and read the result",
+          "note": "Play the move for real and pass the turn. If the other side has no legal move, it is checkmate when its king is attacked and stalemate when not. Attacked with a move left is check."
+        }
+      ]
+    }
+  ],
+  "goArgs": [
+    "[]string",
+    "[][]any"
+  ],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    {
+      "lang": "General",
+      "text": "Do not put king safety inside the piece rules. A move that follows the rule but exposes your king is pseudo-legal. Keep the two checks apart: rules stay small, and pins and discovered checks come out right for free."
+    },
+    {
+      "lang": "General",
+      "text": "A pawn attacks differently from how it moves. Reusing the move rule to find attackers works only because the king's square is occupied: the forward step needs an empty square and fails, the diagonal capture succeeds. An attack test on an empty square needs more care."
+    },
+    {
+      "lang": "General",
+      "text": "Checkmate and stalemate are the same test (no legal move) with different answers to 'is the king attacked'. Compute legal moves once and branch on the check flag."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "Array(8).fill([]) makes eight references to the same array, so writing one rank changes every rank. Build the grid with Array.from({ length: 8 }, () => ...)."
+    },
+    {
+      "lang": "Go",
+      "text": "[8][8]*Piece is an array, a value type. Passing a Board by value copies all 64 cells, so the copy has its own moves. Pass *Board everywhere."
+    },
+    {
+      "lang": "Go",
+      "text": "A map of rules is fine to look up, but never range over it for anything that must be deterministic: Go randomises map order. The legal-move list is sorted for the same reason."
+    }
+  ],
+  "recap": {
+    "pattern": "Strategy: the movement rule lives with the piece",
+    "key": "A piece's MoveRule says where it can reach. The game adds turn order and king safety by trying each move and undoing it.",
+    "moves": [
+      "State the scope: no castling, en passant or promotion",
+      "Put each movement rule behind MoveRule: Slide, Jump, PawnRule",
+      "In Game: turn, piece rule, then try the move and test king safety",
+      "No legal move left means checkmate or stalemate, by whether the king is attacked"
+    ]
+  }
+}

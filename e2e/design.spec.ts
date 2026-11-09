@@ -94,3 +94,27 @@ test('sidebar track switch lists each track', async ({ page }) => {
   await nav.getByRole('button', { name: 'DSA', exact: true }).click()
   await expect(nav.getByText('Arrays & Hashing')).toBeVisible()
 })
+
+for (const deck of ['lld', 'hld'] as const) {
+  test(`recap ${deck} deck: reveal and rate a card`, async ({ page }) => {
+    const errors = watchConsole(page)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto(`./#/recap/run?deck=${deck}&mode=daily`)
+    await page.getByRole('button', { name: 'Show answer' }).click()
+    if (deck === 'lld') await page.getByRole('button', { name: 'Reveal TypeScript' }).click()
+    await page.getByRole('button', { name: /^Good/ }).click()
+    await expect(page.getByText(/Card 2 of|Done for now/)).toBeVisible()
+    expect(errors, errors.join('\n')).toEqual([])
+  })
+}
+
+test('recap home switches decks', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('./#/recap')
+  await expect(page.getByText(/Data structures and algorithms\./)).toBeVisible()
+  const decks = page.getByRole('group', { name: 'Deck' })
+  await decks.getByRole('button', { name: 'LLD', exact: true }).click()
+  await expect(page.getByText(/Low-level design\./)).toBeVisible()
+  await decks.getByRole('button', { name: 'HLD', exact: true }).click()
+  await expect(page.getByText(/High-level design\./)).toBeVisible()
+})

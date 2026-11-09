@@ -1,0 +1,456 @@
+{
+  "slug": "splitwise",
+  "title": "Splitwise (Expense Sharing)",
+  "group": "Money and rules",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the core of an expense-sharing app for a group of friends. Someone pays a bill and says how it is shared: equally, by exact amounts or by percentages. The app keeps track of who owes whom, and can suggest the fewest payments that bring everyone back to zero. All money is whole cents.",
+  "requirements": {
+    "functional": [
+      "A group has a fixed list of members. An expense has a payer, a total in cents and a list of participants.",
+      "Split equally, by exact amounts, or by percentages, chosen per expense.",
+      "When cents do not divide evenly, the leftover cents go one each to the first participants, in the order they were listed.",
+      "Reject an unknown member, a repeated participant, a total not above 0, exact amounts that do not add up, or percentages that do not total 100.",
+      "Show each member's net balance (positive means owed money) and the open debts between pairs, with opposite debts cancelled.",
+      "Suggest a settle-up plan: repeatedly the biggest debtor pays the biggest creditor, ties going to the earlier member.",
+      "Record a payment between two members, which reduces (or flips) the debt between them."
+    ],
+    "outOfScope": [
+      "Several groups and user accounts",
+      "Currencies and exchange rates",
+      "Editing or deleting an expense",
+      "Notifications and receipts"
+    ]
+  },
+  "idea": {
+    "sentence": "Turn every expense into small debts between people, keep only the net result, and let a swappable strategy decide how one bill is divided.",
+    "jargon": [
+      {
+        "term": "Strategy pattern",
+        "plain": "Put one way of doing a job behind an interface so you can swap or add ways without changing the caller. Each way of dividing a bill is a strategy."
+      },
+      {
+        "term": "net balance",
+        "plain": "What a person is owed minus what they owe, over everyone. Over the whole group the net balances add up to 0, because every debt is someone else's credit."
+      },
+      {
+        "term": "greedy algorithm",
+        "plain": "Repeatedly take the best-looking choice right now and never undo it. Here that means matching the biggest creditor with the biggest debtor."
+      },
+      {
+        "term": "integer cents",
+        "plain": "Money held as a whole number of the smallest unit. It avoids the rounding drift of floating point, so totals are exact."
+      }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      {
+        "name": "SplitStrategy",
+        "kind": "interface",
+        "methods": [
+          "split(amount, parts): cents[]  (throws if invalid)"
+        ],
+        "x": 1,
+        "y": 1
+      },
+      {
+        "name": "Group",
+        "fields": [
+          "members: string[]",
+          "ledger: Ledger"
+        ],
+        "methods": [
+          "addExpense(payer, amount, parts, strategy)",
+          "pay(from, to, cents)",
+          "balances(), debts()",
+          "settle(): Payment[]"
+        ],
+        "x": 1,
+        "y": 0
+      },
+      {
+        "name": "Ledger",
+        "fields": [
+          "owes: number[][]  (row owes column)"
+        ],
+        "methods": [
+          "transfer(debtor, creditor, cents)",
+          "nets(): number[]",
+          "debts(): Payment[]"
+        ],
+        "x": 2,
+        "y": 0
+      },
+      {
+        "name": "EqualSplit",
+        "x": 0,
+        "y": 2
+      },
+      {
+        "name": "ExactSplit",
+        "x": 1,
+        "y": 2
+      },
+      {
+        "name": "PercentSplit",
+        "x": 2,
+        "y": 2
+      },
+      {
+        "name": "Share",
+        "fields": [
+          "user",
+          "value"
+        ],
+        "x": 0,
+        "y": 1
+      },
+      {
+        "name": "Payment",
+        "fields": [
+          "from",
+          "to",
+          "cents"
+        ],
+        "x": 2,
+        "y": 1
+      }
+    ],
+    "relations": [
+      {
+        "from": "Group",
+        "to": "SplitStrategy",
+        "kind": "uses",
+        "label": "splits with"
+      },
+      {
+        "from": "Group",
+        "to": "Ledger",
+        "kind": "has",
+        "label": "owns"
+      },
+      {
+        "from": "EqualSplit",
+        "to": "SplitStrategy",
+        "kind": "implements"
+      },
+      {
+        "from": "ExactSplit",
+        "to": "SplitStrategy",
+        "kind": "implements"
+      },
+      {
+        "from": "PercentSplit",
+        "to": "SplitStrategy",
+        "kind": "implements"
+      },
+      {
+        "from": "Ledger",
+        "to": "Payment",
+        "kind": "creates",
+        "label": "debts()"
+      },
+      {
+        "from": "SplitStrategy",
+        "to": "Share",
+        "kind": "uses"
+      }
+    ]
+  },
+  "patterns": [
+    {
+      "name": "Strategy",
+      "where": "SplitStrategy with EqualSplit, ExactSplit and PercentSplit. Group receives one per expense.",
+      "why": "How a bill is divided changes often and each way has its own validation. Group stays the same when a new way is added, such as split by shares."
+    },
+    {
+      "name": "Ledger (double entry in spirit)",
+      "where": "Ledger keeps one signed amount per pair and nets opposite debts.",
+      "why": "Storing the net per pair keeps the data small and makes balances a simple sum. Every debt is also someone else's credit, so the nets always total 0, which is an easy invariant to test."
+    },
+    {
+      "name": "Greedy matching",
+      "where": "minimizePayments pairs the biggest creditor with the biggest debtor.",
+      "why": "Each payment clears at least one person, so there are at most one fewer payments than people with a balance. It is simple and exact in cents."
+    }
+  ],
+  "decisions": [
+    {
+      "question": "How is money represented?",
+      "choice": "Whole integer cents everywhere, with a stated rule for leftover cents",
+      "because": "100 split three ways is 33, 33, 33 and one cent left. Giving that cent to the first participants means every share is a whole number and the shares always add back to the total, so no cent appears or vanishes.",
+      "instead": "Floating point dollars, where 0.1 + 0.2 is not 0.3 and the debts slowly stop adding up."
+    },
+    {
+      "question": "What does the ledger store?",
+      "choice": "A netted amount per pair of members, plus a method that sums it into each person's net balance",
+      "because": "Opposite debts cancel the moment they are recorded, so the open debts shown to users are already simple. Net balances come from one pass over the matrix.",
+      "instead": "Keeping the list of every expense and recomputing on demand. It keeps history, but every question costs a full replay, and cancelling opposite debts must be done each time."
+    },
+    {
+      "question": "How are payments minimised?",
+      "choice": "Greedy: the biggest debtor pays the biggest creditor, for the smaller of the two amounts",
+      "because": "It is short, fast and never needs more than one fewer payment than people owing or owed. Ties go to the earlier member, so the same ledger always gives the same plan.",
+      "instead": "Searching for the true minimum. That splits people into groups that settle among themselves, which is a subset-sum style problem, too heavy for the small gain."
+    },
+    {
+      "question": "Does settle change anything?",
+      "choice": "No. Settle returns a plan, and pay records a real payment",
+      "because": "A plan is only a suggestion until money moves. Keeping them apart lets the user look at the plan, and lets people pay in a different order or amount.",
+      "instead": "Clearing all balances inside settle, which would claim money moved that never did."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Is greedy settle-up really the minimum number of payments?",
+      "answer": "Not always. It gives at most n-1 payments for n people with a balance, but the true minimum is fewer when some subset of people already sums to zero among themselves, because that subset needs only (size - 1) payments. Finding such subsets is NP-hard in general, so real apps use greedy and accept it."
+    },
+    {
+      "ask": "Add a fourth way to split: by shares, such as 2 shares for a couple and 1 for a single.",
+      "answer": "Write a ShareSplit that implements SplitStrategy. Floor each person's amount * shares / total shares, then use the same leftover-cents rule. Group, Ledger and settle do not change. Move the shared top-up function into a helper both percent and share splits use."
+    },
+    {
+      "ask": "Two people add expenses to the same group at the same time. What breaks?",
+      "answer": "transfer reads two cells and writes two cells, so two interleaved calls can lose an update. Put one mutex on the Group, or on the Ledger, around each operation. A per-group lock is enough because groups do not share data. For a database, wrap the expense in one transaction."
+    },
+    {
+      "ask": "How do you support several groups, and the same people in several of them?",
+      "answer": "Add a service that holds a map from group id to Group. Each Group has its own members and Ledger, so balances never mix. A cross-group total for a person is a sum over groups, computed on read."
+    },
+    {
+      "ask": "Users edit or delete an old expense.",
+      "answer": "Store each expense as a record with its shares. To edit, apply the exact opposite transfers of the old shares, then apply the new ones. Because transfer cancels opposite debts, reversing is just another transfer, and the nets stay at 0."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Start with Splitwise taking [members]. Then addExpense(payer, cents, \"equal\" | \"exact\" | \"percent\", participants), pay(from, to, cents), balances, debts and settle. Equal participants are names. Exact and percent are [name, value] pairs. Example: [\"Splitwise\",\"addExpense\",\"settle\"], [[[\"a\",\"b\"]],[\"a\",100,\"equal\",[\"a\",\"b\"]],[]]",
+    "presets": [
+      {
+        "label": "Dinner, then settle up",
+        "args": [
+          [
+            "Splitwise",
+            "addExpense",
+            "addExpense",
+            "balances",
+            "settle"
+          ],
+          [
+            [
+              [
+                "ana",
+                "bo",
+                "cy",
+                "di"
+              ]
+            ],
+            [
+              "ana",
+              1000,
+              "equal",
+              [
+                "ana",
+                "bo",
+                "cy",
+                "di"
+              ]
+            ],
+            [
+              "bo",
+              400,
+              "exact",
+              [
+                [
+                  "cy",
+                  400
+                ]
+              ]
+            ],
+            [],
+            []
+          ]
+        ]
+      },
+      {
+        "label": "Leftover cents",
+        "args": [
+          [
+            "Splitwise",
+            "addExpense",
+            "addExpense"
+          ],
+          [
+            [
+              [
+                "ana",
+                "bo",
+                "cy"
+              ]
+            ],
+            [
+              "bo",
+              100,
+              "equal",
+              [
+                "ana",
+                "bo",
+                "cy"
+              ]
+            ],
+            [
+              "cy",
+              1001,
+              "percent",
+              [
+                [
+                  "ana",
+                  50
+                ],
+                [
+                  "bo",
+                  30
+                ],
+                [
+                  "cy",
+                  20
+                ]
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "label": "Rejected and cancelled",
+        "args": [
+          [
+            "Splitwise",
+            "addExpense",
+            "addExpense",
+            "addExpense",
+            "debts"
+          ],
+          [
+            [
+              [
+                "ana",
+                "bo"
+              ]
+            ],
+            [
+              "ana",
+              1000,
+              "exact",
+              [
+                [
+                  "ana",
+                  200
+                ],
+                [
+                  "bo",
+                  500
+                ]
+              ]
+            ],
+            [
+              "ana",
+              300,
+              "equal",
+              [
+                "ana",
+                "bo"
+              ]
+            ],
+            [
+              "bo",
+              100,
+              "equal",
+              [
+                "ana",
+                "bo"
+              ]
+            ],
+            []
+          ]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Strategy and ledger",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        {
+          "n": 1,
+          "title": "Check the expense",
+          "note": "The group checks that the payer and every participant are members, nobody is listed twice, and the total is a positive whole number of cents."
+        },
+        {
+          "n": 2,
+          "title": "Strategy splits",
+          "note": "The chosen strategy turns the total into cents per participant. Leftover cents go one each to the first participants. Invalid input makes it throw and nothing is recorded."
+        },
+        {
+          "n": 3,
+          "title": "Ledger records debts",
+          "note": "Each participant, except the payer, owes the payer their share. The ledger cancels any debt in the opposite direction first."
+        },
+        {
+          "n": 4,
+          "title": "Greedy settle-up",
+          "note": "Take the biggest creditor and the biggest debtor, pay the smaller of their amounts, and repeat until all balances are 0."
+        }
+      ]
+    }
+  ],
+  "goArgs": [
+    "[]string",
+    "[][]any"
+  ],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    {
+      "lang": "General",
+      "text": "Integer division rounds down, which is why leftover cents exist at all. Never split with a float and round each share: the rounded shares can add up to a cent more or less than the total."
+    },
+    {
+      "lang": "General",
+      "text": "Ties must be broken the same way every time. Without a rule for equal balances, two correct runs can print two different plans. Here the first member in group order wins."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "Math.floor(amount * pct / 100) is exact for whole cents and whole percents, but Number is a float. For amounts beyond about 9 quadrillion cents it stops being exact. A real system would use BigInt or a decimal library."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "new Set(users).size !== users.length is the quick duplicate check. The strategy returns an array, not a Map, so shares stay in participant order, which the leftover-cents rule depends on."
+    },
+    {
+      "lang": "Go",
+      "text": "Integer division of ints truncates toward zero, the same as Math.floor for the positive amounts here. For negative amounts the two differ, so amounts must be validated above 0 first."
+    },
+    {
+      "lang": "Go",
+      "text": "A strategy that can fail returns an error, not a panic. Callers must check it, and the Group treats any error as a refusal and records nothing."
+    },
+    {
+      "lang": "Go",
+      "text": "topUp changes the slice it is given. That is fine here because Split just made it, but a strategy that returned a caller's slice and then topped it up would change the caller's data."
+    }
+  ],
+  "recap": {
+    "pattern": "Strategy split, netted ledger, greedy settle-up",
+    "key": "Divide each bill into whole cents with a swappable strategy, record who owes whom with opposite debts cancelled, and settle by matching the biggest debtor to the biggest creditor.",
+    "moves": [
+      "Hold money as integer cents, leftover cents to the first participants",
+      "Put each way of dividing a bill behind SplitStrategy",
+      "Net opposite debts in the Ledger so balances always total 0",
+      "Settle greedily: biggest debtor pays biggest creditor, ties to the earlier member"
+    ]
+  }
+}

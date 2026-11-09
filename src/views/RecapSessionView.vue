@@ -3,19 +3,25 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vu
 import { useRoute } from 'vue-router'
 import { GRADES, RECAP, type Grade } from '@/recap/config'
 import { buildCategory, buildDaily, buildWeak } from '@/recap/scheduler'
-import { candidates } from '@/recap/stats'
+import { candidatesFor, DECKS, isDeck, type Deck } from '@/recap/stats'
 import { currentStreak, progress, rateCard } from '@/recap/store'
 import { formatInterval, newCard, previewIntervals } from '@/recap/sm2'
 import { dayNumber } from '@/recap/sm2'
-import { loadVariants, readyBySlug, type LoadedVariant } from '@/data/problems'
+import { loadVariants, readyBySlug } from '@/data/problems'
+import { loadLldVariants, lldMetas, hldMetas } from '@/data/design'
+import type { HldMeta, LldMeta } from '@/core/designSchema'
 import MaskedCode from '@/components/MaskedCode.vue'
-import RecapCard from '@/components/RecapCard.vue'
+
+interface CodeSet { pseudo?: string; ts: string; go: string; stages: { n: number; title: string; note: string }[] }
+/** One shape for a card in any deck. */
+interface Card { title: string; group: string; difficulty: string; statement: string; idea: string; moves: string[]; note: string; list: { heading: string; items: string[] } | null }
 
 const route = useRoute()
+const deck = computed<Deck>(() => (isDeck(route.query.deck) ? route.query.deck : 'dsa'))
 const queue = ref<string[]>([])
 const pos = ref(0)
 const revealed = ref(false)
-const code = shallowRef<LoadedVariant | null>(null)
+const code = shallowRef<CodeSet | null>(null)
 const tally = ref<Record<Grade, number>>({ again: 0, hard: 0, good: 0, easy: 0 })
 const requeued = new Set<string>()
 const started = ref(false)
@@ -23,9 +29,10 @@ const started = ref(false)
 function build() {
   const mode = String(route.query.mode ?? 'daily')
   const today = dayNumber(Date.now())
-  if (mode === 'category') queue.value = buildCategory(candidates, progress.cards, today, String(route.query.cat ?? ''))
-  else if (mode === 'weak') queue.value = buildWeak(candidates, progress.cards)
-  else queue.value = buildDaily(candidates, progress.cards, today)
+  const cands = candidatesFor(deck.value)
+  if (mode === 'category') queue.value = buildCategory(cands, progress.cards, today, String(route.query.cat ?? ''))
+  else if (mode === 'weak') queue.value = buildWeak(cands, progress.cards)
+  else queue.value = buildDaily(cands, progress.cards, today)
   pos.value = 0
   revealed.value = false
   started.value = true
@@ -34,13 +41,31 @@ function build() {
 watch(() => progress.ready, (r) => { if (r && !started.value) build() }, { immediate: true })
 
 const id = computed(() => queue.value[pos.value])
-const meta = computed(() => (id.value ? readyBySlug.get(id.value) : undefined))
+const slugOf = (cardId: string) => cardId.replace(/^(lld|hld):/, '')
+
+const card = computed<Card | null>(() => {
+  if (!id.value) return null
+  const slug = slugOf(id.value)
+  if (deck.value === 'lld') {
+    const m = lldMetas.get(slug) as unknown as LldMeta | undefined
+    return m ? { title: m.title, group: m.group, difficulty: m.difficulty, statement: m.brief, idea: m.idea.sentence, moves: m.recap.moves, note: m.recap.pattern, list: { heading: 'Patterns', items: m.patterns.map((p) => `${p.name}: ${p.where}`) } } : null
+  }
+  if (deck.value === 'hld') {
+    const m = hldMetas.get(slug) as unknown as HldMeta | undefined
+    return m ? { title: m.title, group: m.group, difficulty: m.difficulty, statement: m.brief, idea: m.recap.key, moves: m.recap.moves, note: m.recap.numbers, list: { heading: 'The design grows in these steps', items: m.evolution.map((e) => e.title) } } : null
+  }
+  const m = readyBySlug.get(slug)
+  return m ? { title: m.title, group: m.category, difficulty: m.difficulty, statement: m.statement, idea: m.idea.sentence, moves: m.recap.moves, note: m.recap.complexity, list: null } : null
+})
 const done = computed(() => started.value && pos.value >= queue.value.length)
 const preview = computed(() => (id.value ? previewIntervals(progress.cards.get(id.value) ?? newCard(id.value), Date.now()) : null))
-const title = computed(() => ({ daily: 'Daily mix', category: String(route.query.cat ?? 'Category'), weak: 'Weak spots' })[String(route.query.mode ?? 'daily')] ?? 'Recap')
+const title = computed(() => `${DECKS.find((d) => d.id === deck.value)!.label}: ${({ daily: 'Daily mix', category: String(route.query.cat ?? 'Group'), weak: 'Weak spots' } as Record<string, string>)[String(route.query.mode ?? 'daily')] ?? 'Recap'}`)
 
 watch(revealed, async (r) => {
-  if (r && meta.value && !code.value) code.value = (await loadVariants(meta.value))[0]
+  if (!r || !id.value || code.value) return
+  const slug = slugOf(id.value)
+  if (deck.value === 'dsa') { const m = readyBySlug.get(slug); if (m) code.value = (await loadVariants(m))[0] }
+  else if (deck.value === 'lld') { const m = lldMetas.get(slug) as unknown as LldMeta | undefined; if (m) code.value = (await loadLldVariants(m))[0] }
 })
 watch(id, () => { code.value = null })
 
@@ -65,18 +90,19 @@ function onKey(e: KeyboardEvent) {
 onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 const labels: Record<Grade, string> = { again: 'Again', hard: 'Hard', good: 'Good', easy: 'Easy' }
+const prompt = computed(() => (deck.value === 'hld' ? 'Say the numbers that drive the design, then the order you would grow it in. Then reveal.' : deck.value === 'lld' ? 'Name the classes, the pattern and the first call. Then reveal.' : 'Say the key idea and the first move out loud. Then reveal.'))
 </script>
 
 <template>
   <div class="rs">
-    <p class="crumb small"><router-link to="/recap">Recap</router-link> / {{ title }}</p>
+    <p class="crumb small"><router-link :to="{ path: '/recap', query: { deck } }">Recap</router-link> / {{ title }}</p>
 
     <p v-if="!started" class="muted">Loading your progress…</p>
 
     <div v-else-if="!queue.length" class="empty">
       <h1>Nothing to review</h1>
-      <p class="muted">No cards match this list right now. Come back when something is due, or try another mode.</p>
-      <router-link class="btn primary" to="/recap">Back to recap</router-link>
+      <p class="muted">No cards match this list right now. Come back when something is due, or try another mode or deck.</p>
+      <router-link class="btn primary" :to="{ path: '/recap', query: { deck } }">Back to recap</router-link>
     </div>
 
     <div v-else-if="done" class="empty">
@@ -84,38 +110,43 @@ const labels: Record<Grade, string> = { again: 'Again', hard: 'Hard', good: 'Goo
       <p>You went through {{ tally.again + tally.hard + tally.good + tally.easy }} card{{ tally.again + tally.hard + tally.good + tally.easy === 1 ? '' : 's' }}.</p>
       <p class="tally"><span v-for="g in GRADES" :key="g" class="grade" :class="g"><b>{{ tally[g] }}</b> {{ labels[g].toLowerCase() }}</span></p>
       <p class="muted">Streak: {{ currentStreak() }} day{{ currentStreak() === 1 ? '' : 's' }}.</p>
-      <router-link class="btn primary" to="/recap">Back to recap</router-link>
+      <router-link class="btn primary" :to="{ path: '/recap', query: { deck } }">Back to recap</router-link>
     </div>
 
-    <article v-else-if="meta" class="c">
+    <article v-else-if="card" class="c">
       <div class="meta">
         <span class="count">Card <b>{{ pos + 1 }}</b> of {{ queue.length }}</span>
-        <span class="cat">{{ meta.category }}</span><span class="chip" :class="meta.difficulty">{{ meta.difficulty }}</span>
+        <span class="cat">{{ card.group }}</span><span class="chip" :class="card.difficulty">{{ card.difficulty }}</span>
       </div>
       <div class="bar" role="progressbar" :aria-valuenow="pos" aria-valuemin="0" :aria-valuemax="queue.length" aria-label="Session progress"><span :style="{ width: (pos / queue.length) * 100 + '%' }"></span></div>
-      <h1>{{ meta.title }}</h1>
-      <p class="statement">{{ meta.statement }}</p>
+      <h1>{{ card.title }}</h1>
+      <p class="statement">{{ card.statement }}</p>
 
       <template v-if="!revealed">
-        <p class="prompt">Say the key idea and the first move out loud. Then reveal.</p>
+        <p class="prompt">{{ prompt }}</p>
         <button class="btn primary big" type="button" @click="reveal">Show answer</button>
         <p class="muted small hint">or press <kbd>Space</kbd></p>
       </template>
 
       <template v-else>
-        <p class="idea">{{ meta.idea.sentence }}</p>
+        <p class="idea">{{ card.idea }}</p>
         <div class="two">
           <ol class="moves">
-            <li v-for="(m, i) in meta.recap.moves" :key="i"><span class="badge">{{ i + 1 }}</span>{{ m }}</li>
+            <li v-for="(m, i) in card.moves" :key="i"><span class="badge">{{ i + 1 }}</span>{{ m }}</li>
           </ol>
-          <p class="cx muted">{{ meta.recap.complexity }}</p>
+          <div>
+            <p v-if="card.note" class="cx muted">{{ card.note }}</p>
+            <template v-if="card.list"><h2 class="lh">{{ card.list.heading }}</h2><ul class="items"><li v-for="x in card.list.items" :key="x">{{ x }}</li></ul></template>
+          </div>
         </div>
-        <div v-if="code" class="blocks">
-          <MaskedCode lang="pseudo" label="Pseudocode" :code="code.pseudo" :stages="code.stages" />
-          <MaskedCode lang="ts" label="TypeScript" :code="code.ts" :stages="code.stages" />
-          <MaskedCode lang="go" label="Go" :code="code.go" :stages="code.stages" />
-        </div>
-        <p v-else class="muted">Loading code…</p>
+        <template v-if="deck !== 'hld'">
+          <div v-if="code" class="blocks">
+            <MaskedCode v-if="code.pseudo" lang="pseudo" label="Pseudocode" :code="code.pseudo" :stages="code.stages" />
+            <MaskedCode lang="ts" label="TypeScript" :code="code.ts" :stages="code.stages" />
+            <MaskedCode lang="go" label="Go" :code="code.go" :stages="code.stages" />
+          </div>
+          <p v-else class="muted">Loading code…</p>
+        </template>
 
         <div class="dock stage" role="group" aria-label="Rate your recall">
           <p class="q">How did that go?</p>
@@ -150,7 +181,9 @@ h1 { margin: 10px 0 0; font-size: clamp(2.2rem, 1.5rem + 3vw, 3.4rem); }
 .moves { list-style: none; margin: 0; padding: 0; }
 .moves li { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); line-height: 1.5; }
 .moves li:first-child { padding-top: 0; }
-.cx { margin: 0; font: 500 .9rem var(--font-mono); }
+.cx { margin: 0 0 10px; font: 500 .9rem var(--font-mono); }
+.lh { margin: 6px 0 6px; font: 650 .95rem var(--font-ui); letter-spacing: 0; color: var(--ink-2); }
+.items { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: .93rem; }
 .blocks { display: grid; gap: 14px; }
 .dock { position: sticky; bottom: 10px; z-index: 6; padding: 12px 14px 14px; margin-top: 8px; display: grid; gap: 8px; }
 .q { margin: 0; font-weight: 600; font-size: .95rem; color: var(--ink-2); }

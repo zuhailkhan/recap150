@@ -1,0 +1,19 @@
+[
+  {"name":"the starting position has 20 legal moves","input":[["Game","count"],[["start"],[]]],"expected":[null,20]},
+  {"name":"a pawn double step, then black has 20 replies","input":[["Game","move","board","count"],[["start"],["e2e4"],[],[]]],"expected":[null,"ok","rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR",20]},
+  {"name":"black cannot move first","input":[["Game","move"],[["start"],["e7e5"]]],"expected":[null,"rejected: not your turn"],"edge":true},
+  {"name":"rook and bishop are blocked, a queen cannot take its own pawn","input":[["Game","move","move","move"],[["start"],["a1a3"],["c1e3"],["d1d2"]]],"expected":[null,"rejected: illegal move","rejected: illegal move","rejected: illegal move"],"edge":true},
+  {"name":"a knight jumps over pieces","input":[["Game","move","board"],[["start"],["g1f3"],[]]],"expected":[null,"ok","rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R"]},
+  {"name":"pawns: no diagonal step, no triple step, no double step after the first","input":[["Game","move","move","move","move","move"],[["start"],["e2d3"],["e2e5"],["e2e3"],["e7e6"],["e3e5"]]],"expected":[null,"rejected: illegal move","rejected: illegal move","ok","ok","rejected: illegal move"],"edge":true},
+  {"name":"a pawn captures diagonally, a black pawn goes down the board","input":[["Game","move","move","move","board"],[["start"],["e2e4"],["d7d5"],["e4d5"],[]]],"expected":[null,"ok","ok","ok","rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR"]},
+  {"name":"a pawn blocked head on cannot move, the king has five squares","input":[["Game","move","count"],[["4k3/8/8/4p3/4P3/8/8/4K3 w"],["e4e5"],[]]],"expected":[null,"rejected: illegal move",5],"edge":true},
+  {"name":"fool's mate is checkmate and ends the game","input":[["Game","move","move","move","move","move","count"],[["start"],["f2f3"],["e7e5"],["g2g4"],["d8h4"],["e1f2"],[]]],"expected":[null,"ok","ok","ok","checkmate","rejected: game over",0],"edge":true},
+  {"name":"scholar's mate: the queen on f7 is protected by the bishop","input":[["Game","move","move","move","move","move","move","move"],[["start"],["e2e4"],["e7e5"],["f1c4"],["b8c6"],["d1h5"],["g8f6"],["h5f7"]]],"expected":[null,"ok","ok","ok","ok","ok","ok","checkmate"]},
+  {"name":"check is reported and the king must get out of it","input":[["Game","move","count","move","move"],[["4k3/8/8/8/8/8/R7/4K3 w"],["a2a8"],[],["e8d8"],["e8e7"]]],"expected":[null,"check",3,"rejected: king in check","ok"],"edge":true},
+  {"name":"a pinned bishop has no legal move","input":[["Game","moves","move"],[["4r2k/8/8/8/8/8/4B3/4K3 w"],["e2"],["e2d3"]]],"expected":[null,[],"rejected: king in check"],"edge":true},
+  {"name":"in check the only ways out are the king or a block","input":[["Game","count","moves"],[["4r2k/8/8/8/8/8/3B4/4K3 w"],[],["d2"]]],"expected":[null,4,["d2e3"]],"edge":true},
+  {"name":"stalemate is not checkmate","input":[["Game","move","count","move"],[["7k/8/5QK1/8/8/8/8/8 w"],["f6f7"],[],["h8g8"]]],"expected":[null,"stalemate",0,"rejected: game over"],"edge":true},
+  {"name":"a king cannot step next to the other king","input":[["Game","moves"],[["8/8/8/8/8/3k4/8/4K3 w"],["e1"]]],"expected":[null,["e1d1","e1f1","e1f2"]],"edge":true},
+  {"name":"a rook slides, captures the first enemy and stops at its own piece","input":[["Game","moves"],[["7k/8/8/8/p3R2P/8/8/4K3 w"],["e4"]]],"expected":[null,["e4a4","e4b4","e4c4","e4d4","e4e2","e4e3","e4e5","e4e6","e4e7","e4e8","e4f4","e4g4"]]},
+  {"name":"bad text, an empty square, and a piece that goes nowhere","input":[["Game","move","move","move","move"],[["start"],["e2e9"],["e2"],["e3e4"],["e2e2"]]],"expected":[null,"rejected: bad input","rejected: bad input","rejected: no piece","rejected: illegal move"],"edge":true}
+]

@@ -1,0 +1,16 @@
+[
+  {"name":"the first axis starts green","input":[["Junction","look"],[[3,1,2,1,2],[]]],"expected":[null,"NS:G EW:R"]},
+  {"name":"green lasts its ticks, then yellow, then the other axis","input":[["Junction","tick","tick","tick"],[[3,1,2,1,2],[2],[1],[1]]],"expected":[null,"NS:G EW:R","NS:Y EW:R","NS:R EW:G"]},
+  {"name":"a full cycle returns to the start","input":[["Junction","tick","tick"],[[3,1,2,1,2],[7],[3]]],"expected":[null,"NS:G EW:R","NS:Y EW:R"]},
+  {"name":"one tick at a time over a whole cycle","input":[["Junction","tick","tick","tick","tick","tick","tick","tick"],[[3,1,2,1,2],[1],[1],[1],[1],[1],[1],[1]]],"expected":[null,"NS:G EW:R","NS:G EW:R","NS:Y EW:R","NS:R EW:G","NS:R EW:G","NS:R EW:Y","NS:G EW:R"]},
+  {"name":"each axis has its own durations","input":[["Junction","tick","tick","tick"],[[2,1,4,2,1],[4],[5],[9]]],"expected":[null,"NS:R EW:G","NS:G EW:R","NS:G EW:R"]},
+  {"name":"a press during yellow waits for red, then a walk","input":[["Junction","tick","press","look","tick","press","tick","tick","tick","tick"],[[3,1,2,1,2],[3],[],[],[1],[],[1],[1],[1],[1]]],"expected":[null,"NS:Y EW:R",true,"NS:Y EW:R req","NS:R EW:R WALK",false,"NS:R EW:R WALK","NS:R EW:G","NS:R EW:G","NS:R EW:Y"]},
+  {"name":"a second press while one waits adds nothing","input":[["Junction","press","press"],[[3,1,2,1,2],[],[]]],"expected":[null,true,false],"edge":true},
+  {"name":"a press during the walk is not queued again","input":[["Junction","tick","press","tick","press","tick","tick"],[[3,1,2,1,2],[3],[],[1],[],[2],[7]]],"expected":[null,"NS:Y EW:R",true,"NS:R EW:R WALK",false,"NS:R EW:G","NS:R EW:G"],"edge":true},
+  {"name":"a press while the other axis is green","input":[["Junction","tick","press","tick","tick","tick","tick"],[[3,1,2,1,2],[5],[],[1],[1],[1],[1]]],"expected":[null,"NS:R EW:G",true,"NS:R EW:Y req","NS:R EW:R WALK","NS:R EW:R WALK","NS:G EW:R"]},
+  {"name":"a one tick walk","input":[["Junction","tick","press","tick","tick","tick","look"],[[2,1,2,1,1],[2],[],[1],[1],[1],[]]],"expected":[null,"NS:Y EW:R",true,"NS:R EW:R WALK","NS:R EW:G","NS:R EW:G","NS:R EW:G"]},
+  {"name":"a longer walk delays the next green","input":[["Junction","tick","press","tick","tick","tick","tick","tick"],[[2,1,4,2,3],[1],[],[2],[1],[3],[1],[1]]],"expected":[null,"NS:G EW:R",true,"NS:R EW:R WALK","NS:R EW:R WALK","NS:R EW:G","NS:R EW:G","NS:R EW:G"]},
+  {"name":"walk time 0 means no crossing is built","input":[["Junction","press","tick","tick"],[[2,1,2,1,0],[],[3],[1]]],"expected":[null,false,"NS:R EW:G","NS:R EW:G"],"edge":true},
+  {"name":"never two greens, with presses along the way","input":[["Junction","press","tick","press","tick","violations"],[[3,1,2,1,2],[],[30],[],[30],[]]],"expected":[null,true,"NS:G EW:R",true,"NS:G EW:R",0],"edge":true},
+  {"name":"never two greens over a long run with other durations","input":[["Junction","tick","press","tick","press","tick","violations"],[[5,2,3,1,4],[3],[],[17],[],[40],[]]],"expected":[null,"NS:G EW:R",true,"NS:Y EW:R",true,"NS:R EW:G",0]}
+]

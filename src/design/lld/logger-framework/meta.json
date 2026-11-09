@@ -1,0 +1,141 @@
+{
+  "slug": "logger-framework",
+  "title": "Logger Framework",
+  "group": "Events and messaging",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design a small logging library like the ones every service uses. Code calls the logger with a level and a message. The logger drops what is below its level, can run the message past some filters, and sends the rest to several destinations, each with its own format. One broken destination must never stop the others.",
+  "requirements": {
+    "functional": [
+      "Four levels: DEBUG, INFO, WARN, ERROR. The logger drops a record below its level.",
+      "The level can be changed while the program runs.",
+      "Send each record to several appenders: console, an in-memory list, a file-like sink.",
+      "Each appender has its own formatter, so one record can read differently in each place.",
+      "A chain of filters can reject a record before any appender sees it.",
+      "If an appender throws, the others still get the record and the failure is recorded.",
+      "Time comes from an injected clock, so output is exact in tests."
+    ],
+    "outOfScope": ["Real files and rotation by size or date", "Async or batched writing", "Named logger hierarchies"]
+  },
+  "idea": {
+    "sentence": "The logger only decides whether a record is worth keeping and who gets it. Formatting and writing live behind two small interfaces, so a new destination or a new layout is one new class.",
+    "jargon": [
+      { "term": "Observer pattern", "plain": "A subject keeps a list of listeners and tells each one about every event. The appenders are the listeners." },
+      { "term": "Chain of responsibility", "plain": "A request goes through handlers in order and any one of them can stop it. Here the handlers are filters." },
+      { "term": "Strategy pattern", "plain": "Put an algorithm behind an interface and pick it at setup. A Formatter is a strategy for turning a record into text." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "Filter", "kind": "interface", "methods": ["allow(record): boolean"], "x": 0, "y": 0 },
+      { "name": "Logger", "fields": ["level", "clock: () => number", "appenders: Appender[]", "filters: Filter[]", "failures: string[]"], "methods": ["log(level, msg): number", "addFilter(f)"], "x": 1, "y": 0 },
+      { "name": "LogRecord", "fields": ["level", "msg", "time"], "x": 2, "y": 0 },
+      { "name": "DropContaining", "fields": ["word"], "x": 0, "y": 1 },
+      { "name": "Appender", "kind": "interface", "methods": ["name", "write(record)", "Console, Memory, File"], "x": 1, "y": 1 },
+      { "name": "FileAppender", "fields": ["files: string[][]", "maxLines"], "x": 2, "y": 1 },
+      { "name": "Formatter", "kind": "interface", "methods": ["format(record): string", "ShortFormat, FullFormat"], "x": 1, "y": 2 }
+    ],
+    "relations": [
+      { "from": "Logger", "to": "Filter", "kind": "uses", "label": "chain" },
+      { "from": "Logger", "to": "Appender", "kind": "has", "label": "fan-out" },
+      { "from": "Logger", "to": "LogRecord", "kind": "creates" },
+      { "from": "Appender", "to": "Formatter", "kind": "uses", "label": "formats" },
+      { "from": "FileAppender", "to": "Appender", "kind": "implements" },
+      { "from": "DropContaining", "to": "Filter", "kind": "implements" }
+    ]
+  },
+  "patterns": [
+    { "name": "Observer", "where": "Logger keeps a list of Appenders and gives each one every record.", "why": "The logger does not know what a destination is. Adding a Slack or network appender touches no logger code, and one that throws is skipped, not fatal." },
+    { "name": "Strategy", "where": "Formatter, one per appender: ShortFormat, FullFormat.", "why": "Layout changes often and differs by destination. A console wants it short, a file wants the time." },
+    { "name": "Chain of responsibility", "where": "The filters list: each Filter can stop the record.", "why": "Rules such as \"never log passwords\" stack up without the logger knowing any of them. The first no ends the chain." },
+    { "name": "Dependency injection", "where": "The clock, the console output function and the appenders are passed in.", "why": "No Date.now() or global stdout inside the design, so a test controls time and reads exact lines." }
+  ],
+  "decisions": [
+    {
+      "question": "Who formats the record?",
+      "choice": "Each appender owns a Formatter",
+      "because": "Destinations disagree about layout. If the logger formatted once, every destination would get the same string.",
+      "instead": "One formatter on the logger, or formatting inside every appender class."
+    },
+    {
+      "question": "One failing appender: what does the logger do?",
+      "choice": "Catch it, record the appender's name, carry on",
+      "because": "A logger is there to help when things go wrong. It must not be the thing that breaks the call, and it must not starve the healthy destinations.",
+      "instead": "Let the exception out, which also skips every appender after the broken one."
+    },
+    {
+      "question": "Where is the level check?",
+      "choice": "First thing in log(), before the record or the clock is touched",
+      "because": "Most calls in a real service are DEBUG and get dropped. They should cost one comparison, not an allocation and a pass through the filters.",
+      "instead": "Checking the level in every appender, after the record is built and formatted."
+    },
+    {
+      "question": "Where does the time come from?",
+      "choice": "An injected clock function",
+      "because": "A real clock makes every test line different. A function that returns a number lets a test say exactly what time it is.",
+      "instead": "Calling Date.now() or time.Now() inside Logger."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two goroutines or two async tasks log at once.",
+      "answer": "Appenders that write to a shared slice or file need a lock, or the lines interleave and the slice can corrupt. In Go guard the sink with a sync.Mutex. In Node a single call is not interrupted, but an async appender needs a queue so lines keep order. Also guard the level and the filter list, which are read on every call, with an atomic value or an RWMutex."
+    },
+    {
+      "ask": "A slow appender, such as a network call, is hurting the app.",
+      "answer": "Wrap it in an AsyncAppender that puts the record on a bounded queue and writes from a worker. Decide what happens when the queue is full: drop the oldest, drop the newest, or block. Dropping DEBUG first is a common choice. The logger does not change, because the wrapper is still an Appender."
+    },
+    {
+      "ask": "Give each module its own logger and level.",
+      "answer": "Add a name and an optional parent to Logger. A level that is not set is read from the parent. A record is written by this logger's appenders and then handed to the parent, which is the classic chain. Named loggers come from a registry that returns the same object for the same name."
+    },
+    {
+      "ask": "Add structured logging with key-value fields.",
+      "answer": "Add a fields map to LogRecord and a JsonFormatter that writes it. Callers pass fields next to the message. Nothing else changes, which is the point of putting layout behind the Formatter interface."
+    },
+    {
+      "ask": "Cut the cost of a DEBUG call that is dropped.",
+      "answer": "The level check already runs before any work. Also let callers pass a function that builds the message, so the string is made only if the level passes. In Go, check logger.Enabled(level) before building an expensive argument."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Logger takes: level, then appender specs [kind, \"short\" or \"full\", optional max lines] with kind console, memory, file or broken. log takes: level, message, time. Example: [\"Logger\",\"log\"], [[\"INFO\",[[\"memory\",\"short\"]]],[\"INFO\",\"hi\",1]]",
+    "presets": [
+      { "label": "Level, filter, broken sink", "args": [["Logger", "addFilter", "log", "log", "log"], [["INFO", [["console", "full"], ["broken", "short"], ["memory", "short"]]], ["password"], ["DEBUG", "starting", 1], ["INFO", "password=hunter2", 2], ["ERROR", "disk full", 3]]] },
+      { "label": "Raise the level while running", "args": [["Logger", "log", "setLevel", "log", "lines"], [["INFO", [["memory", "short"]]], ["DEBUG", "trace a", 1], ["DEBUG"], ["DEBUG", "trace b", 2], ["memory"]]] },
+      { "label": "A file that starts a new file", "args": [["Logger", "log", "log", "log", "files"], [["INFO", [["file", "full", 2]]], ["INFO", "a", 1], ["WARN", "b", 2], ["ERROR", "c", 3], []]] }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Appenders + filters",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Build the logger", "note": "The logger owns a level, a clock, a filter chain and a list of appenders. Each appender brings its own formatter." },
+        { "n": 2, "title": "Check the level", "note": "A record below the logger's level is dropped first, before it is built. This is the cheap path most calls take." },
+        { "n": 3, "title": "Run the filter chain", "note": "Each filter sees the record in order. The first one that says no ends the chain and the record is dropped." },
+        { "n": 4, "title": "Fan out to appenders", "note": "Every appender gets the same record in registration order and formats it with its own formatter." },
+        { "n": 5, "title": "Isolate failures", "note": "If an appender throws, the logger records its name and continues, so one broken destination cannot starve the rest." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "A logging library must not throw into the caller or take the program down. Catch the appender failure, keep a count or a name, and decide on purpose where that record goes: here, a failures list." },
+    { "lang": "General", "text": "Never log the same event through two paths that both reach one appender, or lines double. With a parent chain, decide whether a child also passes records up, and write the rule down." },
+    { "lang": "TypeScript", "text": "Array.includes and indexOf on a literal union are fine, but a level typed as string accepts typos. Use ('DEBUG' | 'INFO' | ...) so log('WARNING', ...) fails to compile." },
+    { "lang": "TypeScript", "text": "A catch without a binding (catch {}) swallows every error, including your own bugs. Here the appender's name is recorded, so a failure is never silent." },
+    { "lang": "Go", "text": "A nil func field (Out) panics when called. The console appender checks for nil and falls back to fmt.Println, so the zero value is still usable." },
+    { "lang": "Go", "text": "Append to a field through a pointer receiver. With a value receiver on MemoryAppender, a.Lines = append(...) changes a copy and the appender looks empty." }
+  ],
+  "recap": {
+    "pattern": "Observer with failure isolation, plus a filter chain",
+    "key": "The logger checks the level, runs the filters, then hands one record to every appender, each with its own formatter.",
+    "moves": ["Cheapest check first: drop on level before any work", "Filters in a chain, first no wins", "Appenders behind an interface, formatters behind another", "Catch each appender's failure, record it, and keep going"]
+  }
+}

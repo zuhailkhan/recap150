@@ -1,0 +1,162 @@
+{
+  "slug": "online-shopping",
+  "title": "Online Shopping (Amazon)",
+  "group": "Big products",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the in-process core of an online store, a system like Amazon. Customers fill a cart, check out, and pay by card or wallet. The hard part is the gap between choosing and paying: stock must be held for a buyer who has not paid yet, so two people never buy the last unit, and the hold must be released if payment fails.",
+  "requirements": {
+    "functional": [
+      "A catalog of products with a price in cents, and stock for each.",
+      "A customer has a cart. Adding to a cart reserves nothing.",
+      "Checkout reserves every line at once, or none. The cart becomes a Pending order.",
+      "Payment goes through a PaymentStrategy, with a card and a wallet. The shop knows neither.",
+      "Payment success confirms the hold: the units are sold. Payment failure releases it and returns the items to the cart.",
+      "A Pending order can be cancelled, which releases the hold. A Paid order can be cancelled, which refunds and restocks.",
+      "Stock reserved by one buyer cannot be reserved or sold to another."
+    ],
+    "outOfScope": ["Shipping, addresses and tax", "Reservation time-outs (a follow-up shows how)", "Search, reviews and recommendations", "Real payment gateways and partial payments"]
+  },
+  "idea": {
+    "sentence": "Stock has three numbers, not one: on hand, reserved and free. Checkout moves units from free to reserved, and payment decides whether they become sold or free again.",
+    "jargon": [
+      { "term": "reservation (hold)", "plain": "A promise of stock to one buyer. The units stay on the shelf but cannot be promised to anyone else until the hold is confirmed or released." },
+      { "term": "two-phase flow", "plain": "Do the cheap, reversible step first (reserve), then the step that can fail (charge), and finish or undo the first step depending on the outcome." },
+      { "term": "oversell", "plain": "Selling more units than exist. It happens when two buyers each see the last unit as free and both take it." }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      { "name": "OrderState", "kind": "enum", "fields": ["Pending", "Paid", "PaymentFailed", "Cancelled"], "x": 0, "y": 0 },
+      { "name": "Cart", "fields": ["qty: Map<sku, n>"], "methods": ["add(sku, n), remove(sku)", "entries(), clear()"], "x": 1, "y": 0 },
+      { "name": "Order", "fields": ["lines (price copied)", "total, hold", "state: OrderState", "method"], "x": 0, "y": 1 },
+      { "name": "Shop", "fields": ["catalog, customers", "carts, orders"], "methods": ["addToCart, cartTotal", "checkout(user)", "pay(order, method)", "cancel(order)"], "x": 1, "y": 1 },
+      { "name": "Inventory", "fields": ["onHand, reserved per sku", "holds: Map<id, lines>"], "methods": ["reserve(lines): hold | 0", "confirm(hold), release(hold)", "restock(lines)"], "x": 2, "y": 1 },
+      { "name": "CardPayment", "fields": ["limit"], "x": 0, "y": 2 },
+      { "name": "PaymentStrategy", "kind": "interface", "methods": ["charge(cents): boolean", "refund(cents)"], "x": 1, "y": 2 },
+      { "name": "WalletPayment", "fields": ["balance"], "x": 2, "y": 2 }
+    ],
+    "relations": [
+      { "from": "Shop", "to": "Cart", "kind": "has", "label": "one per user" },
+      { "from": "Shop", "to": "Order", "kind": "creates", "label": "at checkout" },
+      { "from": "Shop", "to": "Inventory", "kind": "uses", "label": "holds stock" },
+      { "from": "Shop", "to": "PaymentStrategy", "kind": "uses", "label": "charge, refund" },
+      { "from": "Order", "to": "OrderState", "kind": "uses", "label": "is in one" },
+      { "from": "CardPayment", "to": "PaymentStrategy", "kind": "implements" },
+      { "from": "WalletPayment", "to": "PaymentStrategy", "kind": "implements" }
+    ]
+  },
+  "patterns": [
+    { "name": "Reserve, then confirm or release", "where": "Inventory.reserve at checkout, then confirm or release inside Shop.pay and Shop.cancel.", "why": "Reserving before charging means a slow or failing payment cannot cause an oversell. Releasing on failure means a failed payment cannot lock stock forever." },
+    { "name": "Strategy (payment)", "where": "PaymentStrategy, with CardPayment and WalletPayment. Shop.pay calls charge and nothing else.", "why": "Each method has its own rules and its own failure. A new method is a new class, and the shop's checkout flow is untouched." },
+    { "name": "Snapshot", "where": "Line copies the price at checkout. Order keeps the lines and the total.", "why": "A later catalog price change must not change what a placed order costs, or what is refunded." }
+  ],
+  "decisions": [
+    {
+      "question": "When is stock reserved?",
+      "choice": "At checkout, not at add-to-cart.",
+      "because": "Most carts are abandoned. Reserving on add would hide stock behind carts that never buy. Reserving at checkout holds units only for people about to pay, and makes the last-unit race fair.",
+      "instead": "Reserving on add-to-cart, which is safer against sold-out surprises but makes popular items look sold out when they are not."
+    },
+    {
+      "question": "Why not just subtract stock when the order is created?",
+      "choice": "Keep on-hand and reserved apart. Only a confirmed payment reduces on-hand.",
+      "because": "If payment fails you want to undo exactly what you did. Two numbers make confirm and release simple, symmetric moves, and a restock after a refund is just adding to on-hand.",
+      "instead": "One stock number that goes down at checkout and back up on failure. It works until a failure path is missed, and then stock leaks."
+    },
+    {
+      "question": "What happens to the cart when payment fails?",
+      "choice": "The items return to the cart and the order is marked PaymentFailed.",
+      "because": "The customer did not decide to drop the items, the payment failed. They can retry with another method by checking out again. The failed order stays as a record.",
+      "instead": "Keeping the order Pending and retrying in place, which holds stock for someone who may never pay."
+    },
+    {
+      "question": "Why does checkout return 0 when one line is short?",
+      "choice": "Reserve all lines or none. No partial orders.",
+      "because": "A half-filled order is hard to explain and hard to undo. Checking every line before taking any means a refusal leaves the Inventory exactly as it was.",
+      "instead": "Reserving what is available and reporting the rest, which needs partial-order rules the brief did not ask for."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Two buyers check out the last unit at the same moment.",
+      "answer": "If check and reserve are separate, both can pass the check and both reserve, leaving reserved above on-hand. Make reserve one critical section: a mutex around it, or a database update like 'reserved = reserved + n where on_hand - reserved >= n' and look at the affected row count. Exactly one wins."
+    },
+    {
+      "ask": "A buyer starts checkout and never pays. Stock stays held forever.",
+      "answer": "Give each hold an expiry time, passed in as an integer so tests control it. A sweep, or a check on every reserve, releases expired holds. A later pay on that order then finds it no longer Pending, and is refused."
+    },
+    {
+      "ask": "The payment provider times out. Did the money move?",
+      "answer": "Unknown. Do not release stock yet. Send the charge with an idempotency key, the order id, so a retry cannot charge twice, and ask the provider for the outcome. Keep the order Pending with its hold until you know."
+    },
+    {
+      "ask": "Add split payment: part wallet, part card.",
+      "answer": "Charge the wallet first for what it covers, then the card for the rest. If the second charge fails, refund the first. That is the same release-on-failure idea one level up, so keep the list of successful charges to undo them."
+    },
+    {
+      "ask": "Stock lives in many warehouses. What changes?",
+      "answer": "Inventory keeps a count per warehouse, and reserve picks which ones to take from, for example the nearest that can fill the line. The Shop and the payment flow do not change. Only Inventory.reserve and its holds do."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: the operation names, then each one's arguments. Start with Shop taking [products, customers], where a product is [sku, name, cents, stock] and a customer is [id, card limit in cents, wallet balance in cents]. Then addToCart(user, sku, qty), removeFromCart, cartTotal(user), checkout(user), pay(orderId, \"card\" or \"wallet\"), cancel(orderId), status(orderId), stock(sku) and wallet(user).",
+    "presets": [
+      {
+        "label": "Declined, retry, paid",
+        "args": [
+          ["Shop", "addToCart", "checkout", "pay", "checkout", "pay", "stock"],
+          [[[["p2", "Lamp", 4000, 2]], [["ana", 10000, 5000]]], ["ana", "p2", 2], ["ana"], [1, "wallet"], ["ana"], [2, "card"], ["p2"]]
+        ]
+      },
+      {
+        "label": "Last unit, two buyers",
+        "args": [
+          ["Shop", "addToCart", "checkout", "addToCart", "checkout", "cancel", "checkout"],
+          [[[["p2", "Lamp", 4000, 2]], [["ana", 10000, 5000], ["bo", 3000, 0]]], ["ana", "p2", 2], ["ana"], ["bo", "p2", 1], ["bo"], [1], ["bo"]]
+        ]
+      },
+      {
+        "label": "Wallet pays, then cancel",
+        "args": [
+          ["Shop", "addToCart", "checkout", "pay", "cancel", "wallet"],
+          [[[["p1", "Mug", 1500, 5]], [["ana", 10000, 5000]]], ["ana", "p1", 2], ["ana"], [1, "wallet"], [1], ["ana"]]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "standard",
+      "label": "Reserve, then pay",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        { "n": 1, "title": "Fill the cart", "note": "Adding to a cart only records a wish. It reserves nothing, so abandoned carts never hide stock from other buyers." },
+        { "n": 2, "title": "Reserve at checkout", "note": "Inventory.reserve checks every line, then holds every line, or holds nothing. The cart moves into a Pending order." },
+        { "n": 3, "title": "Charge the strategy", "note": "Shop.pay asks the chosen PaymentStrategy to charge the order total. It cannot tell a card from a wallet." },
+        { "n": 4, "title": "Confirm on success", "note": "An approved charge turns the hold into a sale: on-hand goes down, reserved goes down, the order is Paid." },
+        { "n": 5, "title": "Release on failure", "note": "A decline releases the hold and refills the cart. Cancelling a Pending order does the same. Cancelling a Paid order refunds and restocks." }
+      ]
+    }
+  ],
+  "goArgs": ["[]string", "[][]any"],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    { "lang": "General", "text": "Every path out of Pending must end the hold: pay success confirms it, pay failure releases it, cancel releases it. Miss one and reserved stock leaks and the product looks sold out forever." },
+    { "lang": "General", "text": "Check all lines before taking any. Reserving line by line and failing on the third leaves the first two held. The all-or-nothing check is what makes a refusal leave no trace." },
+    { "lang": "General", "text": "Keep money as whole cents. A float price like 19.99 cannot be added reliably, and totals drift. Compare and subtract integers only, and format at the edge." },
+    { "lang": "TypeScript", "text": "A hold stores the same Line array that the order holds. If code later mutates those lines, the release would use the changed values. Treat lines as read-only once reserved." },
+    { "lang": "TypeScript", "text": "A Record<string, PaymentStrategy> returns PaymentStrategy for any key at compile time, even a typo like \"crpto\". Check for undefined at runtime, as pay does, or the call throws." },
+    { "lang": "Go", "text": "A CardPayment can use a value receiver because it never changes. WalletPayment mutates its balance, so its methods need a pointer receiver, and the map must store the pointer. A copy would charge a balance nobody else sees." },
+    { "lang": "Go", "text": "Looking up a missing key in a map of interfaces gives a nil interface. Compare it to nil before calling it. Calling a method on a nil interface panics." },
+    { "lang": "Go", "text": "A map has no order and a map of struct values returns copies. Keep sku order in a slice, and store pointers (*level) so Reserve changes the real stock rather than a copy." }
+  ],
+  "recap": {
+    "pattern": "Reserve first, then charge, then confirm or release",
+    "key": "A cart reserves nothing. Checkout reserves all lines or none. A PaymentStrategy charges. Success confirms the hold, failure releases it.",
+    "moves": ["Track on-hand and reserved apart, so free = on-hand minus reserved", "Reserve every line or none at checkout, returning a hold id", "Charge through a PaymentStrategy interface: card and wallet", "End every hold: confirm on pay, release on failure or cancel"]
+  }
+}

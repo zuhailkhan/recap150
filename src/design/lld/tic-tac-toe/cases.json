@@ -1,0 +1,19 @@
+[
+  {"name":"X wins a row","input":[["Game","play","play","play","play","play","status","show"],[[3],[0,0],[1,0],[0,1],[1,1],[0,2],[],[]]],"expected":[null,"ok","ok","ok","ok","win","X wins","XXX/OO./..."]},
+  {"name":"O wins a column","input":[["Game","play","play","play","play","play","play","status"],[[3],[0,0],[0,1],[1,0],[1,1],[2,2],[2,1],[]]],"expected":[null,"ok","ok","ok","ok","ok","win","O wins"]},
+  {"name":"a win on the main diagonal","input":[["Game","play","play","play","play","play","status"],[[3],[0,0],[0,1],[1,1],[0,2],[2,2],[]]],"expected":[null,"ok","ok","ok","ok","win","X wins"]},
+  {"name":"a win on the other diagonal","input":[["Game","play","play","play","play","play","status"],[[3],[0,2],[0,0],[1,1],[0,1],[2,0],[]]],"expected":[null,"ok","ok","ok","ok","win","X wins"],"edge":true},
+  {"name":"a full board with no line is a draw","input":[["Game","play","play","play","play","play","play","play","play","play","status","show"],[[3],[0,0],[0,1],[0,2],[1,1],[1,0],[1,2],[2,1],[2,0],[2,2],[],[]]],"expected":[null,"ok","ok","ok","ok","ok","ok","ok","ok","draw","draw","XOX/XOO/OXX"]},
+  {"name":"a move onto a taken cell changes nothing","input":[["Game","play","play","status","play","status"],[[3],[1,1],[1,1],[],[0,0],[]]],"expected":[null,"ok","taken","O to move","ok","X to move"]},
+  {"name":"moves off the board are refused","input":[["Game","play","play","play","status"],[[3],[3,0],[0,-1],[1,1],[]]],"expected":[null,"out","out","ok","O to move"],"edge":true},
+  {"name":"no moves after the game is won","input":[["Game","play","play","play","play","play","play","status"],[[3],[0,0],[1,0],[0,1],[1,1],[0,2],[2,2],[]]],"expected":[null,"ok","ok","ok","ok","win","over","X wins"],"edge":true},
+  {"name":"undo takes the last move back","input":[["Game","play","play","undo","show","status","undo","undo","show"],[[3],[0,0],[1,1],[],[],[],[],[],[]]],"expected":[null,"ok","ok",true,"X../.../...","O to move",true,false,".../.../..."],"edge":true},
+  {"name":"undo of a winning move reopens the game","input":[["Game","play","play","play","play","play","undo","status","play","status"],[[3],[0,0],[1,0],[0,1],[1,1],[0,2],[],[],[2,2],[]]],"expected":[null,"ok","ok","ok","ok","win",true,"X to move","ok","O to move"],"edge":true},
+  {"name":"undo takes the move out of the counters","input":[["Game","play","play","play","undo","play","status","show"],[[3],[0,0],[1,0],[0,1],[],[0,2],[],[]]],"expected":[null,"ok","ok","ok",true,"ok","O to move","X.X/O../..."],"edge":true},
+  {"name":"a win on the last cell beats a draw","input":[["Game","play","play","play","play","play","play","play","play","play","status","play"],[[3],[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,1],[2,0],[2,2],[],[0,0]]],"expected":[null,"ok","ok","ok","ok","ok","ok","ok","ok","win","X wins","over"],"edge":true},
+  {"name":"a 4 by 4 board needs four in a line","input":[["Game","play","play","play","play","play","play","play","play","status","show"],[[4],[0,0],[1,0],[0,1],[1,1],[0,2],[1,2],[2,2],[1,3],[],[]]],"expected":[null,"ok","ok","ok","ok","ok","ok","ok","win","O wins","XXX./OOOO/..X./...."]},
+  {"name":"a 4 by 4 other diagonal","input":[["Game","play","play","play","play","play","play","play","status"],[[4],[0,3],[0,0],[1,2],[0,1],[2,1],[0,2],[3,0],[]]],"expected":[null,"ok","ok","ok","ok","ok","ok","win","X wins"]},
+  {"name":"a 1 by 1 board is won by the first move","input":[["Game","play","status","play"],[[1],[0,0],[],[0,0]]],"expected":[null,"win","X wins","over"],"edge":true},
+  {"name":"a 2 by 2 board is won on the third move","input":[["Game","play","play","play","status"],[[2],[0,0],[0,1],[1,0],[]]],"expected":[null,"ok","ok","win","X wins"]},
+  {"name":"turns alternate and status shows who moves","input":[["Game","status","play","status","play","status"],[[3],[],[0,0],[],[1,1],[]]],"expected":[null,"X to move","ok","O to move","ok","X to move"]}
+]

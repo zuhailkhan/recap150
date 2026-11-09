@@ -1,0 +1,296 @@
+{
+  "slug": "tic-tac-toe",
+  "title": "Tic-Tac-Toe",
+  "group": "Games",
+  "difficulty": "Easy",
+  "status": "ready",
+  "brief": "Design the engine for Tic-Tac-Toe on an n by n board. Two players take turns, X first. A move is refused if it is off the board, on a taken cell, or after the game has ended. A full row, column or diagonal of one mark wins, and a full board with no line is a draw. The last move can be undone.",
+  "requirements": {
+    "functional": [
+      "A board of size n by n, where n is a parameter and not fixed at 3.",
+      "Two players, X and O. X moves first and turns alternate.",
+      "Refuse a move that is off the board, on a taken cell, or made after the game is over. A refused move changes nothing.",
+      "Detect a win: n of the same mark in a row, a column or either diagonal.",
+      "Detect a draw: the board is full and nobody won.",
+      "Win and draw checks cost O(1) per move, however large n is.",
+      "Undo the last move, including a winning move, and give the turn back."
+    ],
+    "outOfScope": [
+      "Computer opponents and move search",
+      "k-in-a-row on a bigger board (Gomoku)",
+      "Redo, move timers and networking"
+    ]
+  },
+  "idea": {
+    "sentence": "Do not scan the board after a move. Keep one counter per row, column and diagonal, and a line is complete when its counter reaches n.",
+    "jargon": [
+      {
+        "term": "O(1) per move",
+        "plain": "The work for one move does not grow with the board. Here it is at most four counter updates and four comparisons."
+      },
+      {
+        "term": "signed counter",
+        "plain": "X adds 1 and O subtracts 1. A counter at +n means n Xs, at -n means n Os, and a mix cancels out and can never reach n."
+      },
+      {
+        "term": "history stack",
+        "plain": "A list where the newest item comes off first. Undo pops the last move and reverses it."
+      }
+    ]
+  },
+  "model": {
+    "label": "classes and how they relate",
+    "classes": [
+      {
+        "name": "Game",
+        "fields": [
+          "board: Board",
+          "tally: Tally",
+          "history: Move[]",
+          "turn: Mark",
+          "winner: Mark | null"
+        ],
+        "methods": [
+          "play(r, c): Outcome",
+          "undo(): boolean",
+          "status(): string"
+        ],
+        "x": 1,
+        "y": 0
+      },
+      {
+        "name": "Board",
+        "fields": [
+          "cells: Mark | null [n][n]"
+        ],
+        "methods": [
+          "has(r, c)",
+          "at(r, c)",
+          "set(r, c, mark)"
+        ],
+        "x": 0,
+        "y": 1
+      },
+      {
+        "name": "Tally",
+        "fields": [
+          "rows[n], cols[n]",
+          "diag, anti"
+        ],
+        "methods": [
+          "add(r, c, mark): lineComplete",
+          "remove(r, c, mark)"
+        ],
+        "x": 2,
+        "y": 1
+      },
+      {
+        "name": "Move",
+        "fields": [
+          "r, c",
+          "mark"
+        ],
+        "x": 1,
+        "y": 2
+      },
+      {
+        "name": "Outcome",
+        "kind": "enum",
+        "fields": [
+          "ok, win, draw",
+          "out, taken, over"
+        ],
+        "x": 3,
+        "y": 0
+      }
+    ],
+    "relations": [
+      {
+        "from": "Game",
+        "to": "Board",
+        "kind": "has"
+      },
+      {
+        "from": "Game",
+        "to": "Tally",
+        "kind": "has"
+      },
+      {
+        "from": "Game",
+        "to": "Move",
+        "kind": "creates",
+        "label": "history"
+      },
+      {
+        "from": "Game",
+        "to": "Outcome",
+        "kind": "uses",
+        "label": "returns"
+      }
+    ]
+  },
+  "patterns": [
+    {
+      "name": "Separation of data and rules",
+      "where": "Board stores cells. Tally answers whether a line is complete. Game owns turns, validation and the end of the game.",
+      "why": "The win rule can change (a different line length, a new board shape) by replacing Tally alone, with no change to Board or to turn handling."
+    },
+    {
+      "name": "Command history (undo stack)",
+      "where": "Game.history holds each Move. undo pops the last one and reverses its effect on the board and the counters.",
+      "why": "A move is a small record, so reversing it is exact and O(1). The counters make this easy because adding a mark and removing it are opposites."
+    }
+  ],
+  "decisions": [
+    {
+      "question": "How do you detect a win?",
+      "choice": "Counters per row, column and both diagonals, updated on every move",
+      "because": "Scanning the four lines through the move costs O(n), and scanning the whole board costs O(n squared). Counters cost O(1) time and 2n + 2 numbers of memory. For two players and full lines that is the best trade.",
+      "instead": "Scan the row, column and diagonals of the last move after every move. Simple and fine for n = 3, but the cost grows with n."
+    },
+    {
+      "question": "How do two players share one counter?",
+      "choice": "X adds 1 and O subtracts 1, and a win is a counter at +n or -n",
+      "because": "One array instead of two, and one comparison per line. A mixed line cancels toward 0 and cannot reach n.",
+      "instead": "Two counters per line, one per player. It works for any number of players but doubles the memory and the checks."
+    },
+    {
+      "question": "How is a draw detected?",
+      "choice": "Count the moves: n times n moves and no winner means a draw",
+      "because": "It is O(1) and the history length is already kept for undo. A win on the last cell is checked first, so it is a win and not a draw.",
+      "instead": "Scan for any empty cell, or for any line a player could still complete."
+    },
+    {
+      "question": "What does a refused move do?",
+      "choice": "Return an Outcome (out, taken or over) and change nothing",
+      "because": "A bad move is normal input from a person, not a programming error. A result value keeps the caller simple and the turn does not change.",
+      "instead": "Throw an exception, which makes every caller wrap each move in try and catch."
+    }
+  ],
+  "followups": [
+    {
+      "ask": "Add a computer player.",
+      "answer": "Add a Player interface with chooseMove(game): [r, c] and let a loop ask whoever's turn it is. A random player picks any empty cell. A perfect player uses minimax, and because undo is O(1) it can play a move, search deeper, then undo to try the next one. Game does not change."
+    },
+    {
+      "ask": "Change it to k in a row on a large board.",
+      "answer": "Counters per full line no longer fit, because a winning line is only k cells inside a longer row. After each move, scan outward from the new mark in the four directions (row, column, two diagonals) and count the run through it. That is O(k) per move, and it needs no counters."
+    },
+    {
+      "ask": "Three or more players.",
+      "answer": "The plus and minus trick stops working. Keep one counter per player per line, so rows becomes rows[player][n]. A win is any counter of the mover reaching n. Memory grows by the number of players."
+    },
+    {
+      "ask": "Two clients send moves at the same time.",
+      "answer": "Two plays can both pass the checks and both write. Put the board behind one mutex (sync.Mutex in Go) or send all moves to one goroutine that owns the game. For an online game also check that the move comes from the player whose turn it is."
+    },
+    {
+      "ask": "Add redo.",
+      "answer": "Keep a second stack. Undo pushes the popped move onto it and a new play clears it. Redo pops from it and replays the move through the normal path."
+    }
+  ],
+  "watch": {
+    "inputHint": "Two arguments: operation names, then each one's arguments. The constructor takes n. play takes a row and a column. Example: [\"Game\",\"play\",\"play\",\"undo\"], [[3],[0,0],[1,1],[]]",
+    "presets": [
+      {
+        "label": "X wins a row, then undo",
+        "args": [
+          ["Game", "play", "play", "play", "play", "play", "undo"],
+          [[3], [0, 0], [1, 0], [0, 1], [1, 1], [0, 2], []]
+        ]
+      },
+      {
+        "label": "Refused moves",
+        "args": [
+          ["Game", "play", "play", "play"],
+          [[3], [1, 1], [1, 1], [3, 3]]
+        ]
+      },
+      {
+        "label": "4 by 4, other diagonal",
+        "args": [
+          ["Game", "play", "play", "play", "play", "play", "play", "play"],
+          [[4], [0, 3], [0, 0], [1, 2], [0, 1], [2, 1], [0, 2], [3, 0]]
+        ]
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "counters",
+      "label": "Line counters",
+      "tsFn": "run",
+      "goFn": "runOps",
+      "stages": [
+        {
+          "n": 1,
+          "title": "Build the game",
+          "note": "An empty board and a tally of 2n + 2 counters, all zero. X moves first."
+        },
+        {
+          "n": 2,
+          "title": "Validate the move",
+          "note": "Off the board, taken, or game over: refuse and change nothing. All checks happen before any change."
+        },
+        {
+          "n": 3,
+          "title": "Place and count",
+          "note": "Write the mark and add plus or minus 1 to its row, its column and any diagonal it sits on. At most four counters."
+        },
+        {
+          "n": 4,
+          "title": "A counter reaches n",
+          "note": "If any of those counters is now +n or -n, that line is all one mark. The mover wins."
+        },
+        {
+          "n": 5,
+          "title": "Draw or pass the turn",
+          "note": "A full board with no winner is a draw. Otherwise the turn goes to the other player."
+        },
+        {
+          "n": 6,
+          "title": "Undo",
+          "note": "Pop the last move, clear its cell, reverse its counters and give the turn back."
+        }
+      ]
+    }
+  ],
+  "goArgs": [
+    "[]string",
+    "[][]any"
+  ],
+  "goRet": "[]any",
+  "compare": "exact",
+  "gotchas": [
+    {
+      "lang": "General",
+      "text": "Check the win before the draw. A move that fills the last cell and completes a line is a win. Testing the move count first would report a draw."
+    },
+    {
+      "lang": "General",
+      "text": "The centre of an odd board sits on both diagonals, so it must update both counters. An if / else if on the two diagonal tests would miss the anti-diagonal. Use two separate ifs."
+    },
+    {
+      "lang": "General",
+      "text": "Undo must reverse everything the move did: the cell, the counters, the winner and the turn. Forgetting the winner leaves a game that is over but empty."
+    },
+    {
+      "lang": "TypeScript",
+      "text": "An index like cells[r][c] with r out of range throws on the first dimension but returns undefined on the second. Validate with has(r, c) before indexing, and use Number.isInteger so 1.5 or NaN are rejected."
+    },
+    {
+      "lang": "Go",
+      "text": "Go slices panic on an index out of range, so the bounds check is not optional. Use a zero value (None = 0) for an empty cell so a new board from make needs no fill loop."
+    }
+  ],
+  "recap": {
+    "pattern": "Line counters instead of scanning",
+    "key": "Keep a signed counter per row, column and diagonal. A move changes at most four of them and a counter at plus or minus n means a win, so each move costs O(1).",
+    "moves": [
+      "Validate first: bounds, empty cell, game not over",
+      "Place the mark and add plus or minus 1 to its row, column and diagonals",
+      "Win if a touched counter hits n in size, draw if the board is full and nobody won",
+      "Undo pops the move and reverses the counters"
+    ]
+  }
+}

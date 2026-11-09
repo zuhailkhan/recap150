@@ -1,0 +1,15 @@
+[
+  {"name":"plain moves add up","input":[["Game","play","play","play","positions"],[[10,[],2,[4,3,2]],[],[],[],[]]],"expected":[null,4,3,6,[6,3]]},
+  {"name":"a ladder lifts the player","input":[["Game","play","play"],[[10,[[3,7]],2,[3,1]],[],[]]],"expected":[null,7,1]},
+  {"name":"a snake drops the player","input":[["Game","play","play"],[[10,[[5,1]],1,[2,3]],[],[]]],"expected":[null,2,1]},
+  {"name":"overshoot stays put, exact roll wins","input":[["Game","play","play","play","winner"],[[10,[],1,[6,6,4]],[],[],[],[]]],"expected":[null,6,6,10,0],"edge":true},
+  {"name":"no more turns after a win","input":[["Game","play","play","winner"],[[10,[],2,[10,5]],[],[],[]]],"expected":[null,10,-1,0],"edge":true},
+  {"name":"a jump is not chained","input":[["Game","play","play"],[[10,[[3,7],[7,2]],1,[3,3]],[],[]]],"expected":[null,7,10],"edge":true},
+  {"name":"landing on a head directly still jumps once","input":[["Game","play","play"],[[10,[[3,7],[7,2]],1,[4,3]],[],[]]],"expected":[null,4,2]},
+  {"name":"a ladder to the last square wins","input":[["Game","play","winner"],[[10,[[4,10]],1,[4]],[],[]]],"expected":[null,10,0],"edge":true},
+  {"name":"the turn still passes after an overshoot","input":[["Game","play","play","play","play","positions","winner"],[[10,[],2,[9,2,2,1]],[],[],[],[],[],[]]],"expected":[null,9,2,9,3,[9,3],-1]},
+  {"name":"second player can win","input":[["Game","play","play","winner","play"],[[6,[],2,[1,6]],[],[],[],[]]],"expected":[null,1,6,1,-1]},
+  {"name":"a snake back to the start square","input":[["Game","play","play","positions"],[[10,[[1,0]],1,[1,1]],[],[],[]]],"expected":[null,0,0,[0]],"edge":true},
+  {"name":"a snake on the last square is ignored","input":[["Game","play","winner"],[[10,[[10,3]],1,[10]],[],[]]],"expected":[null,10,0],"edge":true},
+  {"name":"three players take turns in order","input":[["Game","play","play","play","play","play","play","positions"],[[100,[],3,[1,2,3,4,5,6]],[],[],[],[],[],[],[]]],"expected":[null,1,2,3,5,7,9,[5,7,9]]}
+]
