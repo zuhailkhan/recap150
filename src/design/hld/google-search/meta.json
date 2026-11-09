@@ -1,0 +1,185 @@
+{
+  "slug": "google-search",
+  "title": "Google Search",
+  "group": "Productivity, maps and payments",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a web search engine like Google Search: type a few words and get the best pages in a fraction of a second, from an index far too big for one machine. This is a design from general, public ideas about search engines. Real internals are not public, and this page does not claim to describe them.",
+  "requirements": {
+    "functional": [
+      "Take a text query and return a ranked page of results with titles and snippets.",
+      "Find documents that contain all the query words, over a huge web index.",
+      "Correct spelling and understand simple synonyms.",
+      "Show new content such as breaking news within minutes.",
+      "Keep the index up to date as pages are crawled again."
+    ],
+    "nonFunctional": [
+      { "name": "Latency", "target": "Results come back in about 200 ms at the 99th percentile" },
+      { "name": "Availability", "target": "Search answers 99.99% of the time, even if parts of the index are down" },
+      { "name": "Freshness", "target": "Breaking news is searchable within minutes, other pages within days" },
+      { "name": "Relevance", "target": "The best matches are in the top 10 for most queries" }
+    ],
+    "outOfScope": ["Ads and auctions", "Personalisation", "Image, video and map search", "How the crawler works (see Web Crawler)"]
+  },
+  "estimate": {
+    "note": "Every number is an assumption you can change. The key idea: each query goes to every shard, so the work per query is multiplied by the shard count. Assume a machine can scan about 2 billion postings a second.",
+    "inputs": [
+      { "id": "docs", "label": "Documents indexed", "value": 50000000000, "min": 1000000000, "max": 1000000000000, "log": true },
+      { "id": "qps", "label": "Queries per second", "value": 100000, "min": 1000, "max": 1000000, "log": true },
+      { "id": "docsPerShard", "label": "Documents per shard", "value": 200000000, "min": 50000000, "max": 1000000000, "log": true },
+      { "id": "posting", "label": "Average posting list length", "value": 20000000, "min": 100000, "max": 1000000000, "log": true, "unit": "docs", "note": "Documents containing a query term, across the whole web." },
+      { "id": "terms", "label": "Words per query", "value": 3, "min": 1, "max": 8, "step": 1 },
+      { "id": "budgetMs", "label": "Total latency budget", "value": 200, "min": 100, "max": 1000, "step": 50, "unit": "ms" }
+    ],
+    "outputs": [
+      { "id": "shards", "label": "Shards needed", "expr": "ceil(docs / docsPerShard)", "unit": "shards", "note": "Split by document, so every shard sees every query." },
+      { "id": "fanout", "label": "Shard requests per second", "expr": "qps * shards", "unit": "per s", "note": "One query becomes this many shard lookups." },
+      { "id": "scan", "label": "Postings scanned per shard per query", "expr": "posting / shards * terms", "unit": "postings", "note": "An upper bound. Skip pointers and early stopping scan far fewer." },
+      { "id": "replicas", "label": "Replicas per shard", "expr": "ceil(qps * scan / 2e9)", "unit": "copies", "note": "Enough copies to carry the query rate." },
+      { "id": "machines", "label": "Index machines", "expr": "shards * replicas", "unit": "machines" },
+      { "id": "shardMs", "label": "Budget for the shard step", "expr": "budgetMs * 0.6", "unit": "ms", "note": "The rest goes to the frontend, merge, re-rank and network." },
+      { "id": "slowPct", "label": "Queries that hit a slow shard", "expr": "(1 - 0.99 ^ shards) * 100", "unit": "%", "note": "If each shard is slow 1% of the time. Why the tail matters." }
+    ]
+  },
+  "api": [
+    { "call": "GET /search?q=&page=", "does": "Returns ranked results: title, URL, snippet, and a spelling suggestion when one applies." },
+    { "call": "aggregator.query(terms, k)", "does": "Internal. Sends the terms to every shard and merges their local top k." },
+    { "call": "shard.search(terms, k, deadline)", "does": "Internal. Returns the best k local documents with first-pass scores before the deadline." },
+    { "call": "indexer.add(docId, tokens)", "does": "Internal. Adds a crawled page to the fast or the big index." },
+    { "call": "docs.snippet(docId, terms)", "does": "Internal. Returns the title and text around the matched words." }
+  ],
+  "data": [
+    { "entity": "Posting list", "fields": "term, [docId, positions, score signals] sorted by docId", "store": "Immutable index files on each shard.", "why": "Sorted lists merge by walking pointers. Files that never change are easy to cache and replicate." },
+    { "entity": "Document record", "fields": "docId, url, title, text, quality signals", "store": "Sharded key-value store.", "why": "Looked up by docId after ranking, only for the few results shown." },
+    { "entity": "Query result cache", "fields": "normalised query, top results, expiresAt", "store": "In-memory cache with short expiry.", "why": "The most common queries repeat all day. A hit skips the whole fan-out." },
+    { "entity": "Spelling and synonyms", "fields": "term, corrections, related terms", "store": "In-memory dictionary.", "why": "Built offline from the index and query logs. Looked up in microseconds." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Browser", "kind": "client", "x": 6, "y": 50, "since": 0 },
+    { "id": "frontend", "label": "Query frontend", "kind": "service", "x": 25, "y": 50, "sub": "one entry point", "since": 0 },
+    { "id": "qu", "label": "Query understanding", "kind": "service", "x": 25, "y": 12, "sub": "spelling, synonyms", "since": 4 },
+    { "id": "cache", "label": "Result cache", "kind": "cache", "x": 25, "y": 88, "sub": "hot queries", "since": 3 },
+    { "id": "agg", "label": "Aggregator", "kind": "service", "x": 44, "y": 50, "sub": "scatter, merge", "since": 1 },
+    { "id": "ranker", "label": "Re-ranker", "kind": "service", "x": 44, "y": 12, "sub": "slow model, top K", "since": 2 },
+    { "id": "docs", "label": "Document store", "kind": "db", "x": 63, "y": 12, "sub": "titles, snippets", "since": 2 },
+    { "id": "sharda", "label": "Index shard A", "kind": "db", "x": 63, "y": 35, "sub": "docs 1 to N/2", "since": 0 },
+    { "id": "shardb", "label": "Index shard B", "kind": "db", "x": 63, "y": 57, "sub": "docs N/2 to N", "since": 1 },
+    { "id": "fresh", "label": "Fresh index", "kind": "db", "x": 63, "y": 80, "sub": "small, minutes old", "since": 5 },
+    { "id": "indexer", "label": "Indexer", "kind": "worker", "x": 82, "y": 57, "sub": "tokenise, invert", "since": 0 },
+    { "id": "crawler", "label": "Web crawler", "kind": "worker", "x": 82, "y": 88, "sub": "see Web Crawler", "since": 0 }
+  ],
+  "edges": [
+    { "from": "client", "to": "frontend", "since": 0 },
+    { "from": "frontend", "to": "sharda", "label": "lookup", "since": 0, "until": 1 },
+    { "from": "crawler", "to": "indexer", "label": "pages", "since": 0 },
+    { "from": "indexer", "to": "sharda", "since": 0 },
+    { "from": "frontend", "to": "agg", "since": 1 },
+    { "from": "agg", "to": "sharda", "since": 1 },
+    { "from": "agg", "to": "shardb", "since": 1 },
+    { "from": "indexer", "to": "shardb", "since": 1 },
+    { "from": "agg", "to": "ranker", "label": "top K", "since": 2 },
+    { "from": "ranker", "to": "docs", "since": 2 },
+    { "from": "ranker", "to": "frontend", "label": "results", "since": 2 },
+    { "from": "frontend", "to": "cache", "label": "hit?", "dashed": true, "since": 3 },
+    { "from": "frontend", "to": "qu", "label": "rewrite", "since": 4 },
+    { "from": "agg", "to": "fresh", "label": "news", "since": 5 },
+    { "from": "indexer", "to": "fresh", "label": "fast path", "since": 5 }
+  ],
+  "evolution": [
+    { "title": "One machine, an inverted index", "problem": "Scanning every page for the query words would take hours. Start with the simplest thing that works: one box.", "change": "Offline, the crawler feeds an indexer that tokenises each page and builds an inverted index: for each word, a sorted posting list of the documents that contain it. A query reads the lists for its words and intersects them." },
+    { "title": "Shard by document", "problem": "Tens of billions of pages are far more than one machine can store, and one machine's CPU cannot serve the query rate.", "change": "Split documents across shards. Each shard holds a full index for its own documents, so every shard can answer every query. An aggregator sends the query to all shards at once (scatter) and merges the answers (gather).", "numbers": "shards = documents divided by documents per shard" },
+    { "title": "Two-pass ranking", "problem": "Millions of documents match a common query. Scoring each with an expensive model blows the time budget.", "change": "Each shard scores cheaply and returns its best few hundred. The aggregator merges them. A re-ranker applies the slow, rich model to only the top candidates, then the document store fills in snippets." },
+    { "title": "Cache hot queries", "problem": "A small set of popular queries is asked again and again, and each costs a fan-out to every shard.", "change": "Cache the final results of normalised queries for a short time. Shards also keep hot posting lists in memory.", "numbers": "shard requests per second = queries times shards" },
+    { "title": "Query understanding", "problem": "People mistype words and use different words for the same thing. Exact matching returns nothing, or misses good pages.", "change": "A query understanding block fixes spelling, adds synonyms and detects the language before the query reaches the index. It is one dictionary lookup and a few rules, not a new index." },
+    { "title": "A fresh tier", "problem": "Building the big index takes hours, but news pages must be searchable in minutes.", "change": "Keep a small fast-updating index for new and changing pages. The aggregator queries it alongside the big shards and merges, so recent items appear fast while the big index stays immutable and optimised." }
+  ],
+  "flows": [
+    {
+      "name": "Answer a query",
+      "steps": [
+        { "say": "The browser sends the query to the frontend.", "nodes": ["client", "frontend"], "edges": [["client", "frontend"]] },
+        { "say": "The frontend normalises the query and checks the result cache. A hit returns right here.", "nodes": ["frontend", "cache"], "edges": [["frontend", "cache"]] },
+        { "say": "On a miss, query understanding fixes spelling and adds synonyms.", "nodes": ["frontend", "qu"], "edges": [["frontend", "qu"]] },
+        { "say": "The aggregator receives the rewritten query and sets a deadline for the whole fan-out.", "nodes": ["frontend", "agg"], "edges": [["frontend", "agg"]] },
+        { "say": "It sends the query to every shard at the same moment. Each shard intersects the posting lists of its own documents.", "nodes": ["agg", "sharda", "shardb"], "edges": [["agg", "sharda"], ["agg", "shardb"]] },
+        { "say": "It also asks the small fresh index for recent matches.", "nodes": ["agg", "fresh"], "edges": [["agg", "fresh"]] },
+        { "say": "Each shard returns its local top results with a cheap score. The aggregator merges them into one global list and does not wait for stragglers past the deadline.", "nodes": ["agg"], "edges": [] },
+        { "say": "The re-ranker scores only the top few hundred with the expensive model.", "nodes": ["agg", "ranker"], "edges": [["agg", "ranker"]] },
+        { "say": "It fetches titles and snippets for the final ten.", "nodes": ["ranker", "docs"], "edges": [["ranker", "docs"]] },
+        { "say": "The page goes back to the frontend, is cached, and is shown to the user.", "nodes": ["ranker", "frontend"], "edges": [["ranker", "frontend"]] }
+      ]
+    },
+    {
+      "name": "Index a new page",
+      "steps": [
+        { "say": "The crawler downloads a page. How it decides what to fetch is the Web Crawler design.", "nodes": ["crawler"], "edges": [] },
+        { "say": "The indexer parses the page, strips markup and splits it into tokens: lowercased, stemmed words.", "nodes": ["crawler", "indexer"], "edges": [["crawler", "indexer"]] },
+        { "say": "For each token it records the document id and positions. Together these entries form posting lists.", "nodes": ["indexer"], "edges": [] },
+        { "say": "A page that is new or changing goes into the fresh index first, so it is searchable within minutes.", "nodes": ["indexer", "fresh"], "edges": [["indexer", "fresh"]] },
+        { "say": "In batches, the indexer builds new immutable index files and swaps them onto the shards that own those documents.", "nodes": ["indexer", "sharda", "shardb"], "edges": [["indexer", "sharda"], ["indexer", "shardb"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Shard by document or by term",
+      "question": "How do we split an index too big for one machine?",
+      "options": [
+        { "name": "By document", "pros": "Each shard is a complete small search engine. Adding documents touches one shard. A dead shard loses a slice of results, not whole words.", "cons": "Every query goes to every shard, so cost per query grows with the shard count." },
+        { "name": "By term", "pros": "A query goes only to the shards holding its words.", "cons": "Long posting lists must travel between machines to be intersected. Common words create hot shards." }
+      ],
+      "pick": "By document",
+      "because": "Intersecting lists locally avoids shipping huge lists over the network. The price is fan-out, which we control with replicas, caches, deadlines and a cap on how much each shard returns."
+    },
+    {
+      "title": "Cheap first, costly second",
+      "question": "How do we use a rich ranking model without scoring millions of matches?",
+      "options": [
+        { "name": "One scoring function everywhere", "pros": "Simple. Every document is scored the same way.", "cons": "Either the model is too weak to be good, or too slow to run on every match." },
+        { "name": "Pre-rank by a static quality score", "pros": "Sort posting lists by page quality so a shard can stop early.", "cons": "Quality ignores the query. A good page for this query can be missed." },
+        { "name": "Cheap score, then re-rank the top", "pros": "A fast score on every candidate, then the slow model on a few hundred. Models can change independently.", "cons": "If the cheap stage drops a good page, the expensive stage never sees it." }
+      ],
+      "pick": "Pipeline with early stopping",
+      "because": "Order lists by a static quality score so shards can stop early, score cheaply, and re-rank only the top K. Measure recall of the cheap stage, because it caps the final quality."
+    },
+    {
+      "title": "Tail latency across the fan-out",
+      "question": "A query waits for the slowest shard. How do we keep it fast when there are hundreds?",
+      "options": [
+        { "name": "Wait for every shard", "pros": "Complete results.", "cons": "If each shard is slow 1% of the time, most queries hit at least one slow shard." },
+        { "name": "Hard deadline, return what arrived", "pros": "Bounded latency. A missing slice only lowers recall a little.", "cons": "Results vary between runs, and a persistently slow shard hides documents." },
+        { "name": "Hedged requests to replicas", "pros": "After a short wait, send the same request to a second replica and take the first reply. Cuts the tail cheaply.", "cons": "Adds some extra load, and needs a replica copy of every shard." }
+      ],
+      "pick": "Deadline plus hedged requests",
+      "because": "Send the hedge after, say, the 95th percentile latency, so only a few percent of requests are doubled. Cancel the loser. Keep the deadline as the final safety net."
+    },
+    {
+      "title": "Fresh and big index together",
+      "question": "How do new pages become searchable fast without rebuilding a giant index?",
+      "options": [
+        { "name": "Rebuild everything often", "pros": "One simple index.", "cons": "Hours to build. Pages are stale in between." },
+        { "name": "Update the big index in place", "pros": "No second index.", "cons": "Writes fight reads, and compact immutable files are lost." },
+        { "name": "Two tiers merged at query time", "pros": "A small index absorbs new pages in minutes. The big one stays immutable and fast.", "cons": "Every query reads both. Fresh results need their own scoring care. Needs a periodic merge." }
+      ],
+      "pick": "Two tiers",
+      "because": "Immutable files are what make the big index fast and cacheable. A small mutable tier handles change, and a background job folds it into the big one."
+    }
+  ],
+  "failures": [
+    { "what": "One shard is slow or down", "impact": "The query waits on it, or results from its documents go missing.", "fix": "Replicas per shard, a deadline, hedged requests, and a degraded answer from the shards that replied." },
+    { "what": "A burst of one hot query", "impact": "Millions ask the same thing at once, such as a breaking event, and the fan-out multiplies it.", "fix": "Cache results for a few seconds, and coalesce identical in-flight queries into a single fan-out." },
+    { "what": "A bad index build goes live", "impact": "Results get worse or empty for the documents in a bad shard.", "fix": "Build into new files and check them against sample queries first. Swap gradually, and keep the old files to roll back." },
+    { "what": "The re-ranker is slow", "impact": "Every query waits on the expensive stage.", "fix": "Give it a time limit. If it runs out, fall back to the cheap ordering. Cap how many candidates go to it." },
+    { "what": "Fresh index grows too large", "impact": "The small tier gets slow and loses its speed advantage.", "fix": "Fold it into the big index on a schedule and expire old entries. Alert when its size passes a limit." }
+  ],
+  "scaling": [
+    { "limit": "Fan-out cost grows with the number of shards", "lever": "Bigger shards, replicas for the query rate, and tiers so most queries touch only a smaller index of the best pages." },
+    { "limit": "Users around the world", "lever": "Serve from regional clusters, each with replicas of the index, and send each query to the nearest one." },
+    { "limit": "Index size keeps growing", "lever": "Compress posting lists with delta encoding, keep a small tier of important pages, and drop low-value pages." }
+  ],
+  "recap": {
+    "key": "Invert the web into posting lists, split the index by document, scatter each query to all shards and merge, then spend the costly ranking only on the top few hundred.",
+    "numbers": "50B documents at 200M per shard is 250 shards. 100K queries per second means 25M shard requests per second, in a 200 ms budget.",
+    "moves": ["Inverted index: term to sorted posting list of documents", "Shard by document, scatter-gather through an aggregator", "Cheap first-pass score, then re-rank only the top K", "Cache hot queries, hedge slow shards, and add a fresh tier"]
+  }
+}

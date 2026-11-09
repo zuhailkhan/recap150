@@ -1,6 +1,16 @@
 # Recap150
 
-Visual explainers and spaced-repetition recap for the NeetCode 150 interview problems.
+Visual explainers and spaced-repetition recap for interview preparation, in three tracks:
+
+| Track | What it teaches | Count |
+|---|---|---|
+| **DSA** | The NeetCode 150, each with an idea, a step-by-step run of the real code, and pseudocode, TypeScript and Go | 150 |
+| **LLD** (low-level design) | Turning a brief into classes and patterns: Parking Lot, Chess, Cab Booking (Uber), Food Ordering (Zomato), Movie Booking (BookMyShow) and more. Real TypeScript and Go with tests, a class diagram, and a stepper that draws a sequence diagram from real calls | 24 |
+| **HLD** (high-level design) | Architecture from requirements and numbers: Uber, Zomato, Instagram, WhatsApp, Netflix, YouTube, Google Maps and more, plus the building blocks they share (cache, key-value store, rate limiter, crawler, nearby search). Live estimators, an architecture that grows one forced step at a time, request-flow steppers, trade-offs and failure modes. No code | 34 |
+
+Product pages are "a system like X", designed from public, general knowledge and standard architecture. They make no claims about how the real companies build their systems, and every number is a labelled assumption you can change with a slider.
+
+Each track has its own recap deck, so the 150 DSA cards are not diluted by design topics.
 
 - **One interactive explainer per problem.** A one-sentence idea with a tiny demo, a step-by-step run driven by the real TypeScript solution, a brute-force vs optimal comparison, code in pseudocode, TypeScript and Go (each hidden until you ask), edge cases, gotchas and a 30-second recap.
 - **Recap mode.** Daily mix, category drill and weak spots, with SM-2-style scheduling. Progress is stored in your browser (IndexedDB). No accounts, no backend, no network calls at runtime.
@@ -39,6 +49,11 @@ runs, in order:
    - Go tests are generated from the same `cases.json`; `gofmt`, `go vet` and `go test` must pass.
    - Rewrites `PROGRESS.md`.
 4. Playwright smoke test: opens every explainer at 360px and 1440px, steps to the end, reveals each code block, and fails on any console error or sideways page scroll.
+
+`verify:content` also checks the two design tracks:
+
+- **LLD** (`npm run verify:lld`): schema, shared numbered stages in TypeScript and Go, every scenario case in TypeScript, and generated Go tests with `gofmt`, `go vet` and `go test`.
+- **HLD** (`npm run verify:hld`): schema, every edge and flow referencing a real node, every evolution step adding something, estimator formulas finite at the defaults and at both slider extremes, and diagram layout (no overlapping nodes and no edge drawn through a node, at every step).
 
 A problem that is not finished has `"status": "draft"` and is excluded from recap.
 
@@ -105,3 +120,9 @@ src/problems    one folder per problem
 scripts         verify, screenshots, list import
 e2e, tests      Playwright and Vitest
 ```
+
+## Add or edit a system design topic
+
+LLD topics live in `src/design/lld/<slug>/` (classes, drivers, `cases.json`, Go) and HLD topics in `src/design/hld/<slug>/meta.json` (data only). The catalog of topics, groups and difficulty is `src/design/catalog.json`. The full contract, including rules for product topics, is in **[docs/AUTHORING_DESIGN.md](docs/AUTHORING_DESIGN.md)** and the plan is in [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md).
+
+Start from `src/design/lld/parking-lot` or `src/design/hld/url-shortener`, then run `npx tsx scripts/verify.ts --track=lld --only=<slug>` or `npx tsx scripts/verify-hld.ts --only=<slug>`. Open `/#/lab` in the dev server to see every diagram type.

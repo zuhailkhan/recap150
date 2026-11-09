@@ -1,0 +1,179 @@
+{
+  "slug": "spotify",
+  "title": "Spotify",
+  "group": "Media and streaming",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design a music streaming service like Spotify. Millions of people search a huge catalog, press play and expect sound within a fraction of a second. Audio files are small, the catalog is big, and every play must be counted so artists get paid. This is a general design from public knowledge, not how any company builds it.",
+  "requirements": {
+    "functional": [
+      "Browse and search tracks, albums and artists.",
+      "Play a track, with the next one starting without a gap.",
+      "Create and edit playlists, including shared ones.",
+      "Download tracks to listen offline.",
+      "Count every play for royalties.",
+      "Suggest music, such as a weekly personal mix."
+    ],
+    "nonFunctional": [
+      { "name": "Start time", "target": "Sound starts within 300 ms of pressing play at the 99th percentile" },
+      { "name": "Continuity", "target": "Playback never stalls on a normal connection" },
+      { "name": "Play counts", "target": "No play lost, none counted twice in royalty reports" },
+      { "name": "Availability", "target": "Playback works 99.95% of the time, even if search or recommendations are down" }
+    ],
+    "outOfScope": ["Podcasts and video", "Payments and subscriptions", "Artist upload and rights contracts"]
+  },
+  "estimate": {
+    "note": "Every figure is an assumption you can move. Audio is small, but many people listen at once, so egress bandwidth and the play event rate set the size.",
+    "inputs": [
+      { "id": "mau", "label": "Monthly active users", "value": 500000000, "min": 10000000, "max": 2000000000, "log": true },
+      { "id": "livePct", "label": "Share listening at peak", "value": 5, "min": 1, "max": 15, "step": 1, "unit": "%" },
+      { "id": "kbps", "label": "Average audio bitrate", "value": 160, "min": 24, "max": 320, "step": 8, "unit": "kbit/s" },
+      { "id": "trackMin", "label": "Average track length", "value": 3.5, "min": 2, "max": 6, "step": 0.5, "unit": "min" },
+      { "id": "hit", "label": "Edge cache hit ratio", "value": 95, "min": 50, "max": 99.5, "step": 0.5, "unit": "%" }
+    ],
+    "outputs": [
+      { "id": "live", "label": "Concurrent listeners", "expr": "mau * livePct / 100", "unit": "people" },
+      { "id": "egressTbps", "label": "Egress bandwidth at peak", "expr": "live * kbps / 1e9", "unit": "Tbit/s", "note": "All of it leaves through CDN edges." },
+      { "id": "originGbps", "label": "Origin bandwidth after the cache", "expr": "live * kbps * (1 - hit / 100) / 1e6", "unit": "Gbit/s", "note": "Only cache misses reach blob storage." },
+      { "id": "fileMb", "label": "One track file", "expr": "kbps * trackMin * 60 / 8 / 1000", "unit": "MB", "note": "Small, so a whole track is cheap to prefetch or download." },
+      { "id": "playsPerSec", "label": "Play events per second", "expr": "live / (trackMin * 60)", "unit": "per s", "note": "Each finished or skipped track is one event into the pipeline." },
+      { "id": "eventsPerDayB", "label": "Play events per day", "expr": "playsPerSec * 86400 / 1e9", "unit": "billion", "note": "Assumes the peak rate held all day, so an upper bound." }
+    ]
+  },
+  "api": [
+    { "call": "GET /tracks/{id}/play", "does": "Checks the plan and region, then returns signed chunk URLs on the CDN." },
+    { "call": "GET /search?q=&type=", "does": "Returns ranked tracks, albums and artists." },
+    { "call": "POST /playlists/{id}/ops  { baseVersion, ops }", "does": "Applies add, remove or move operations. A stale baseVersion is merged, not refused." },
+    { "call": "POST /downloads  { trackId, deviceId }", "does": "Issues an encrypted offline copy with a licence that expires unless renewed." },
+    { "call": "POST /events/play  { eventId, trackId, ms }", "does": "Reports a play. eventId lets the server drop retried duplicates." },
+    { "call": "GET /home", "does": "Returns shelves, including the weekly mix prepared offline." }
+  ],
+  "data": [
+    { "entity": "Track", "fields": "trackId, albumId, artistIds, title, duration, files per bitrate", "store": "Replicated catalog database, read mostly.", "why": "Written when labels deliver, read constantly. Cache it hard and replicate widely." },
+    { "entity": "Playlist", "fields": "playlistId, ownerId, version, [trackId, addedBy] x N", "store": "Key-value store keyed by playlistId.", "why": "Small, write heavy, one document per list. Versions allow collaborative edits." },
+    { "entity": "PlayEvent", "fields": "eventId, userId, trackId, startedAt, msPlayed", "store": "Append-only log, then aggregated tables.", "why": "Huge write volume and never updated. The log is the source of truth for royalties." },
+    { "entity": "Offline licence", "fields": "userId, deviceId, trackId, expiresAt", "store": "Key-value store.", "why": "Looked up when a device reconnects, to renew or revoke." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Player app", "kind": "client", "x": 8, "y": 50, "sub": "buffers and prefetches", "since": 0 },
+    { "id": "app", "label": "API service", "kind": "service", "x": 30, "y": 50, "sub": "play, home, licence", "since": 0 },
+    { "id": "catalog", "label": "Catalog store", "kind": "db", "x": 30, "y": 12, "sub": "track metadata", "since": 0 },
+    { "id": "blob", "label": "Audio blob store", "kind": "blob", "x": 56, "y": 88, "sub": "chunked audio files", "since": 0 },
+    { "id": "cdn", "label": "CDN edge", "kind": "cdn", "x": 30, "y": 88, "sub": "audio chunk cache", "since": 1 },
+    { "id": "playlists", "label": "Playlist store", "kind": "db", "x": 56, "y": 46, "sub": "versioned lists", "since": 2 },
+    { "id": "search", "label": "Search index", "kind": "service", "x": 56, "y": 28, "sub": "tracks, artists", "since": 3 },
+    { "id": "queue", "label": "Play event log", "kind": "queue", "x": 56, "y": 66, "sub": "partitioned stream", "since": 4 },
+    { "id": "agg", "label": "Aggregator", "kind": "worker", "x": 80, "y": 66, "sub": "dedupe and count", "since": 4 },
+    { "id": "ledger", "label": "Royalty ledger", "kind": "db", "x": 80, "y": 88, "sub": "plays per track", "since": 4 },
+    { "id": "recs", "label": "Mix builder", "kind": "worker", "x": 80, "y": 28, "sub": "offline batch job", "since": 5 }
+  ],
+  "edges": [
+    { "from": "client", "to": "app", "since": 0 },
+    { "from": "app", "to": "catalog", "since": 0 },
+    { "from": "app", "to": "blob", "label": "audio", "since": 0, "until": 1 },
+    { "from": "blob", "to": "client", "label": "audio", "since": 0, "until": 1 },
+    { "from": "blob", "to": "cdn", "label": "miss", "since": 1 },
+    { "from": "cdn", "to": "client", "label": "chunks", "since": 1 },
+    { "from": "app", "to": "playlists", "since": 2 },
+    { "from": "app", "to": "search", "since": 3 },
+    { "from": "catalog", "to": "search", "label": "index", "dashed": true, "since": 3 },
+    { "from": "app", "to": "queue", "label": "plays", "since": 4 },
+    { "from": "queue", "to": "agg", "since": 4 },
+    { "from": "agg", "to": "ledger", "since": 4 },
+    { "from": "queue", "to": "recs", "label": "history", "dashed": true, "since": 5 },
+    { "from": "recs", "to": "playlists", "label": "mixes", "since": 5 }
+  ],
+  "evolution": [
+    { "title": "Metadata plus files", "problem": "Start simple: a catalog of tracks and one place to keep the audio files.", "change": "An API service looks up a track in the catalog store and streams the file from blob storage (cheap, durable file storage). Files are cut into small chunks of a few seconds so playback can start before the whole file arrives." },
+    { "title": "Put a CDN in front of audio", "problem": "At peak the estimator shows several Tbit/s leaving the system. Blob storage cannot serve that, and far-away users get high start times.", "change": "A CDN (caches near users) serves the chunks. Popular tracks are hot, so the hit ratio is high. The app only hands out signed chunk URLs, and the player prefetches the next few chunks and the next track.", "numbers": "origin bandwidth is egress times the miss ratio" },
+    { "title": "Playlists as a small hot data set", "problem": "Playlists are tiny but written all the time, and shared ones are edited by several people at once. Last write wins would lose edits.", "change": "A playlist store keeps one versioned document per list. Edits are sent as operations against a version and merged on the server, so two people adding a track both succeed." },
+    { "title": "Search", "problem": "Finding a track among a huge catalog by title, artist or a typo with a database scan is slow and cannot rank.", "change": "A search index is built from the catalog (a copy, rebuilt as labels deliver new tracks). It handles typos and prefixes and ranks by popularity. Playback does not depend on it." },
+    { "title": "Count plays for royalties", "problem": "Artists are paid per play. Counting inside the request path is slow, and retries from flaky phones create duplicates.", "change": "The player sends play events with a unique eventId. They land on a partitioned log. An aggregator drops duplicates and totals plays per track in a royalty ledger. At-least-once delivery plus dedupe gives exactly-once counts.", "numbers": "play events per second in the estimator" },
+    { "title": "Weekly mixes, computed offline", "problem": "Recommending from the full listening history cannot run when a user opens the app.", "change": "A batch job reads play history on a schedule, computes each person's mix ahead of time and writes it as a playlist. Opening the app is then a plain playlist read." }
+  ],
+  "flows": [
+    {
+      "name": "Press play",
+      "steps": [
+        { "say": "The player asks the API service to play a track.", "nodes": ["client", "app"], "edges": [["client", "app"]] },
+        { "say": "The service reads the track and checks plan and region. It returns signed chunk URLs.", "nodes": ["app", "catalog"], "edges": [["app", "catalog"]] },
+        { "say": "The player asks the CDN for the first chunk. A popular track is already cached there.", "nodes": ["cdn", "client"], "edges": [["cdn", "client"]] },
+        { "say": "On a miss the edge fetches the chunk from blob storage once, then keeps it.", "nodes": ["blob", "cdn"], "edges": [["blob", "cdn"]] },
+        { "say": "The player buffers a few chunks ahead and prefetches the next track, so a weak network does not cause a pause.", "nodes": ["cdn", "client"], "edges": [["cdn", "client"]] },
+        { "say": "When the track ends or is skipped, the player reports a play event with a unique id.", "nodes": ["client", "app", "queue"], "edges": [["client", "app"], ["app", "queue"]] }
+      ]
+    },
+    {
+      "name": "Count a play, build a mix",
+      "steps": [
+        { "say": "A play event reaches the API service, which appends it to the log without waiting for any counting.", "nodes": ["app", "queue"], "edges": [["app", "queue"]] },
+        { "say": "The aggregator reads the log, skips event ids it already processed and adds up plays per track.", "nodes": ["queue", "agg"], "edges": [["queue", "agg"]] },
+        { "say": "Totals are written to the royalty ledger. Reports later read from here.", "nodes": ["agg", "ledger"], "edges": [["agg", "ledger"]] },
+        { "say": "Separately, the nightly mix builder reads the same history from the log.", "nodes": ["queue", "recs"], "edges": [["queue", "recs"]] },
+        { "say": "It writes each person's mix as a playlist, ready for the next time they open the app.", "nodes": ["recs", "playlists"], "edges": [["recs", "playlists"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Chunk size and prefetching",
+      "question": "How big should audio chunks be, and how far ahead should the player load?",
+      "options": [
+        { "name": "One whole file per track", "pros": "Simple. One request.", "cons": "Start waits on a big download. A skip wastes the rest. Poor cache reuse across bitrates." },
+        { "name": "Small chunks of a few seconds", "pros": "Fast start. A skip wastes little. Chunks are cached and reused.", "cons": "Many more requests and URLs to sign." },
+        { "name": "Small chunks plus aggressive prefetch", "pros": "Next track starts instantly and weak signal is hidden by the buffer.", "cons": "Wasted bytes when the user skips. Costs mobile data." }
+      ],
+      "pick": "Small chunks plus prefetch",
+      "because": "Start time is the headline feature. Prefetch only a short buffer on mobile data, a longer one on Wi-Fi, and always the first chunk of the likely next track."
+    },
+    {
+      "title": "Editing a shared playlist",
+      "question": "Two people add tracks to the same playlist at the same moment. What happens?",
+      "options": [
+        { "name": "Last write wins", "pros": "Trivial to build.", "cons": "One person's edit silently disappears." },
+        { "name": "Lock the playlist", "pros": "No conflicts.", "cons": "Offline edits and slow phones block everyone." },
+        { "name": "Versioned operations, merged on the server", "pros": "Add, remove and move are small operations that mostly commute. Offline edits replay later.", "cons": "Needs merge rules, for example for two moves of the same track." }
+      ],
+      "pick": "Versioned operations",
+      "because": "Playlists are small, so merging is cheap. The client sends its base version and operations. The server rebases them on top of newer edits."
+    },
+    {
+      "title": "Offline downloads and licences",
+      "question": "How do we let people listen without a network yet still respect the rights holders?",
+      "options": [
+        { "name": "Plain files on the device", "pros": "Simple and fast.", "cons": "Can be copied and kept forever after cancelling." },
+        { "name": "Encrypted files plus an expiring licence", "pros": "Files are useless without a device key. The licence expires, so cancelled users lose access.", "cons": "The device must check in now and then (for example every 30 days). Key handling is hard to get right." },
+        { "name": "No downloads", "pros": "Nothing to protect.", "cons": "Fails the offline requirement." }
+      ],
+      "pick": "Encrypted files, expiring licence",
+      "because": "The files are small, so downloading is cheap. The check-in renews the licence, and the server can revoke it per device. The play events recorded offline are uploaded later with their original ids."
+    },
+    {
+      "title": "Counting plays exactly once",
+      "question": "Retries, crashes and offline uploads create duplicates. How are royalty counts kept right?",
+      "options": [
+        { "name": "Count in the request", "pros": "Instant totals.", "cons": "Slow, and a retry counts twice." },
+        { "name": "Log, then dedupe by eventId", "pros": "At-least-once delivery is easy. A seen-set or unique key removes duplicates. Replay recomputes any total.", "cons": "Totals are a little delayed. The dedupe window needs memory." },
+        { "name": "Distributed transactions", "pros": "Strong guarantees.", "cons": "Slow and fragile at this event rate." }
+      ],
+      "pick": "Log, then dedupe",
+      "because": "The log is durable, so any bug in the aggregator is fixed by replaying. Royalties are settled monthly, so a few minutes of delay is fine. Also count only plays past a minimum time, such as 30 seconds."
+    }
+  ],
+  "failures": [
+    { "what": "A new album drops and everyone plays it", "impact": "A sudden hot set of chunks that no edge has cached. Misses hit blob storage together.", "fix": "Warm edges before release time, since drops are scheduled. Collapse duplicate misses so one request fills the cache." },
+    { "what": "The CDN has a bad region", "impact": "Playback stalls for the users routed there.", "fix": "Use more than one CDN or edge pool and let the client retry on another host. The buffer hides short outages." },
+    { "what": "The event log or aggregator falls behind", "impact": "Totals are late. Mixes use older history.", "fix": "Nothing user-facing breaks. Scale aggregator partitions, alert on lag, and replay from the log. Never drop events." },
+    { "what": "Search or recommendations are down", "impact": "No search results, a stale home screen.", "fix": "Playback depends only on the API service, catalog and CDN. Serve cached home shelves and fall back to recent and downloaded tracks." }
+  ],
+  "scaling": [
+    { "limit": "Egress bandwidth grows with listeners", "lever": "Add edge capacity and place caches inside ISP networks. Lower the default bitrate to cut bytes." },
+    { "limit": "Play events per second", "lever": "More log partitions by trackId or userId, and batch events in the app before sending." },
+    { "limit": "Catalog is huge but listening is skewed", "lever": "Cache the popular head at the edge and let the long tail come from blob storage. A small share of tracks takes most plays." }
+  ],
+  "recap": {
+    "key": "Audio files are small, so play needs a CDN, small chunks and a buffer. The hard parts are scale of egress, shared playlists, and counting every play once.",
+    "numbers": "With the defaults: about 25M listeners, 4 Tbit/s egress, 200 Gbit/s at the origin, 4 MB per track and about 120K play events per second.",
+    "moves": ["Chunk the audio and serve it from CDN edges", "Keep playlists as versioned documents with merged operations", "Count plays through a log with dedupe by event id", "Compute weekly mixes offline and store them as playlists"]
+  }
+}

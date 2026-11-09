@@ -1,0 +1,190 @@
+{
+  "slug": "typeahead",
+  "title": "Typeahead (Autocomplete)",
+  "group": "Building blocks",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the box that suggests completions while you type, like the ten likely searches after you type 'pizz'. Every keystroke is a request, and the answer must be on screen in under 100 ms, so each request has to be one lookup, never a search. Suggestions come from what people searched before, and must stay fresh, relevant and safe.",
+  "requirements": {
+    "functional": [
+      "Return the top suggestions for the prefix typed so far, best first.",
+      "Rank by how often people search for a phrase, so popular ones come first.",
+      "Pick up new trending phrases within minutes.",
+      "Never suggest unsafe or blocked phrases.",
+      "Optionally re-rank for the person typing, based on their history."
+    ],
+    "nonFunctional": [
+      { "name": "Latency", "target": "Suggestions return in under 100 ms at the 99th percentile, including the network" },
+      { "name": "Availability", "target": "The box works 99.99% of the time, and may show slightly old suggestions" },
+      { "name": "Freshness", "target": "Normal phrases update daily, and trending phrases within about 15 minutes" },
+      { "name": "Scale", "target": "Hundreds of thousands of requests per second at peak" }
+    ],
+    "outOfScope": ["Spelling correction", "Full search results and their ranking", "Voice input and other languages"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts. A request goes out for most keystrokes unless the client debounces. Index size is prefixes times K. About 1 in 4 prefixes is distinct, because queries share beginnings.",
+    "inputs": [
+      { "id": "distinct", "label": "Distinct queries kept", "value": 100000000, "min": 1000000, "max": 10000000000, "log": true },
+      { "id": "avgChars", "label": "Characters per query", "value": 25, "min": 10, "max": 60, "step": 1, "unit": "chars" },
+      { "id": "k", "label": "Suggestions stored per prefix (K)", "value": 10, "min": 5, "max": 20, "step": 1 },
+      { "id": "searchesDay", "label": "Searches per day", "value": 1000000000, "min": 10000000, "max": 10000000000, "log": true },
+      { "id": "reqPerSearch", "label": "Requests per search", "value": 6, "min": 2, "max": 20, "step": 1, "note": "Keystrokes that reach a server, after debounce." },
+      { "id": "hitPct", "label": "Answered by browser, CDN and cache", "value": 80, "min": 0, "max": 99, "step": 1, "unit": "%" }
+    ],
+    "outputs": [
+      { "id": "prefixes", "label": "Distinct prefixes to index", "expr": "distinct * avgChars / 4", "unit": "prefixes", "note": "Upper bound. Shared beginnings cut this a lot." },
+      { "id": "indexGb", "label": "Index size in memory", "expr": "(prefixes * k * 8 + distinct * avgChars) / 1e9", "unit": "GB", "note": "8 bytes per stored suggestion id, plus the query strings once." },
+      { "id": "shards", "label": "Index shards at 32 GB each", "expr": "max(1, ceil(indexGb / 32))", "unit": "shards", "note": "Each shard also needs replicas." },
+      { "id": "rawQps", "label": "Requests per second, average", "expr": "searchesDay * reqPerSearch / 86400", "unit": "per s" },
+      { "id": "peakQps", "label": "Requests per second at peak", "expr": "rawQps * 3", "unit": "per s" },
+      { "id": "originQps", "label": "Reaching the index at peak", "expr": "peakQps * (100 - hitPct) / 100", "unit": "per s", "note": "Only cache misses get here." },
+      { "id": "perShard", "label": "Index load per shard", "expr": "originQps / shards", "unit": "per s" }
+    ]
+  },
+  "api": [
+    { "call": "GET /suggest?q=pizz&limit=10", "does": "Returns the top suggestions for the prefix. Cacheable by prefix." },
+    { "call": "POST /events/search  { q, userId?, ts }", "does": "Logs a completed search for the offline pipeline. Fire and forget." },
+    { "call": "POST /admin/blocklist  { phrase }", "does": "Blocks a phrase so it is never suggested." },
+    { "call": "GET /suggest?q=pizz&userId=", "does": "Same call, with a user. The service re-ranks with the user's recent searches." }
+  ],
+  "data": [
+    { "entity": "QueryCount", "fields": "query, count, lastSeen", "store": "Batch-written key-value store or lake.", "why": "The source of truth for ranking. Rebuilt from logs, so it can be recomputed." },
+    { "entity": "PrefixIndex", "fields": "prefix, [query, score] x K", "store": "In-memory, sorted by prefix, in shards.", "why": "Answers are precomputed top-K lists. A request is one lookup by prefix, with no scoring at read time." },
+    { "entity": "TrendingBoost", "fields": "query, recentCount, window", "store": "In-memory counters with expiry.", "why": "A small, fast layer of what is rising in the last minutes, merged into answers." },
+    { "entity": "UserHistory", "fields": "userId, recent queries", "store": "Key-value store with TTL.", "why": "A short list per user, read only to re-rank the final few suggestions." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Browser or app", "kind": "client", "x": 8, "y": 50, "sub": "debounced requests", "since": 0 },
+    { "id": "cdn", "label": "CDN edge", "kind": "cdn", "x": 29, "y": 50, "sub": "cached by prefix", "since": 3 },
+    { "id": "api", "label": "Suggest service", "kind": "service", "x": 50, "y": 50, "sub": "stateless", "since": 0 },
+    { "id": "cache", "label": "Hot prefix cache", "kind": "cache", "x": 50, "y": 14, "sub": "short prefixes", "since": 3 },
+    { "id": "idxa", "label": "Prefix index A", "kind": "cache", "x": 70, "y": 14, "sub": "top-K per prefix", "since": 1 },
+    { "id": "idxb", "label": "Prefix index B", "kind": "cache", "x": 70, "y": 38, "sub": "next prefix range", "since": 4 },
+    { "id": "batch", "label": "Index builder", "kind": "worker", "x": 91, "y": 26, "sub": "periodic rebuild", "since": 2 },
+    { "id": "counts", "label": "Query counts", "kind": "db", "x": 91, "y": 62, "sub": "phrase and count", "since": 0 },
+    { "id": "logs", "label": "Search log stream", "kind": "queue", "x": 50, "y": 88, "sub": "every search", "since": 2 },
+    { "id": "trend", "label": "Trending counter", "kind": "worker", "x": 70, "y": 88, "sub": "last few minutes", "since": 5 },
+    { "id": "rerank", "label": "Re-ranker", "kind": "service", "x": 29, "y": 14, "sub": "personalise top few", "since": 6 },
+    { "id": "hist", "label": "User history", "kind": "db", "x": 8, "y": 14, "sub": "recent searches", "since": 6 },
+    { "id": "block", "label": "Blocklist", "kind": "db", "x": 29, "y": 88, "sub": "unsafe phrases", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "api", "since": 0, "until": 3 },
+    { "from": "api", "to": "counts", "label": "LIKE query", "since": 0, "until": 1 },
+    { "from": "api", "to": "idxa", "since": 1 },
+    { "from": "counts", "to": "idxa", "label": "load", "since": 1, "until": 2 },
+    { "from": "api", "to": "logs", "label": "log", "dashed": true, "since": 2 },
+    { "from": "logs", "to": "batch", "since": 2 },
+    { "from": "batch", "to": "counts", "label": "counts", "since": 2 },
+    { "from": "batch", "to": "idxa", "label": "publish", "since": 2 },
+    { "from": "client", "to": "cdn", "since": 3 },
+    { "from": "cdn", "to": "api", "label": "miss", "since": 3 },
+    { "from": "api", "to": "cache", "since": 3 },
+    { "from": "api", "to": "idxb", "since": 4 },
+    { "from": "batch", "to": "idxb", "label": "publish", "since": 4 },
+    { "from": "logs", "to": "trend", "since": 5 },
+    { "from": "trend", "to": "api", "label": "merge", "since": 5 },
+    { "from": "api", "to": "rerank", "since": 6 },
+    { "from": "rerank", "to": "hist", "since": 6 },
+    { "from": "api", "to": "block", "label": "filter", "since": 6 }
+  ],
+  "evolution": [
+    { "title": "A database query per keystroke", "problem": "Start with the simplest thing that works: a table of past queries with counts.", "change": "On each keystroke, run a query for phrases that start with the prefix, order by count, and take 10. It works at small scale." },
+    { "title": "Precomputed top-K per prefix", "problem": "A prefix scan reads thousands of rows and sorts them, on every keystroke. At 70K requests per second that is far over 100 ms and melts the database.", "change": "Precompute the answer. An in-memory index maps every prefix to its best K suggestions. A request is one lookup by prefix, and the work moves to build time. A trie or a sorted prefix map both do this.", "numbers": "the estimator shows the index in GB" },
+    { "title": "Build it offline from logs", "problem": "Who fills the index? Counting live on the request path is slow, and searches change what is popular.", "change": "Every search is logged to a stream. A batch builder aggregates counts, ranks, builds the index and publishes a new version to the servers on a schedule. Servers swap to it atomically." },
+    { "title": "Cache at every layer", "problem": "Short prefixes like 'a' or 'pi' are typed by millions. Hitting the index each time wastes work, and the round trip to a far region eats the 100 ms.", "change": "Let the browser and a CDN cache answers by prefix with a short expiry. Keep a cache in front of the index for the hottest prefixes. The client waits a short pause after the last key (debounce) before it asks.", "numbers": "most requests never reach the index" },
+    { "title": "Shard the index by prefix range", "problem": "The index does not fit one machine's memory, and one machine cannot serve every lookup.", "change": "Split the index by prefix range, for example a to f on one shard, g to m on the next. The service picks the shard from the first character or two. Split a range where it gets hot, and keep replicas." },
+    { "title": "A trending layer", "problem": "A daily rebuild shows nothing about the thing that happened an hour ago. A breaking news phrase has a count of zero in yesterday's data.", "change": "A stream job counts searches over the last few minutes. The service merges those few trending phrases into the answer for matching prefixes. The batch index stays the base." },
+    { "title": "Personalise and filter", "problem": "The same prefix means different things to different people, and some phrases must never be suggested.", "change": "A re-ranker reorders only the top few candidates using the user's recent searches. A blocklist removes unsafe phrases, both when building the index and again at serve time." }
+  ],
+  "flows": [
+    {
+      "name": "Type 'pizz'",
+      "steps": [
+        { "say": "The user pauses after 'pizz'. The client waited about 100 ms after the last key before sending, and skips the request if the text changed.", "nodes": ["client"], "edges": [] },
+        { "say": "The browser cache has no answer for this prefix, so the request goes to the CDN, keyed by the prefix.", "nodes": ["client", "cdn"], "edges": [["client", "cdn"]] },
+        { "say": "The CDN misses and forwards the request to the suggest service.", "nodes": ["cdn", "api"], "edges": [["cdn", "api"]] },
+        { "say": "The service checks the hot prefix cache. 'pizz' is popular, so it often hits here.", "nodes": ["api", "cache"], "edges": [["api", "cache"]] },
+        { "say": "On a miss it does one lookup in the index shard that owns this prefix range. The top-K list is already sorted.", "nodes": ["api", "idxa", "idxb"], "edges": [["api", "idxa"], ["api", "idxb"]] },
+        { "say": "It merges any trending phrases that match, and drops anything on the blocklist.", "nodes": ["api", "trend", "block"], "edges": [["trend", "api"], ["api", "block"]] },
+        { "say": "It re-ranks the top few using the user's history and returns the list. The CDN keeps the shared part for a short time.", "nodes": ["api", "rerank", "hist"], "edges": [["api", "rerank"], ["rerank", "hist"]] }
+      ]
+    },
+    {
+      "name": "Build and publish the index",
+      "steps": [
+        { "say": "Each completed search is written to the log stream. This never blocks the user.", "nodes": ["api", "logs"], "edges": [["api", "logs"]] },
+        { "say": "The index builder reads a window of the log, for example the last day.", "nodes": ["logs", "batch"], "edges": [["logs", "batch"]] },
+        { "say": "It adds the new counts to the totals, using decay so old phrases fade.", "nodes": ["batch", "counts"], "edges": [["batch", "counts"]] },
+        { "say": "It drops blocked phrases, then walks every phrase and keeps only the top K at each of its prefixes.", "nodes": ["batch", "block"], "edges": [] },
+        { "say": "It writes the new index files for each shard range and tells the shards to load them.", "nodes": ["batch", "idxa", "idxb"], "edges": [["batch", "idxa"], ["batch", "idxb"]] },
+        { "say": "Meanwhile the trending counter reads the same stream and keeps recent counts for minutes, not days.", "nodes": ["logs", "trend"], "edges": [["logs", "trend"]] },
+        { "say": "The suggest service merges the trending counter into answers until the next rebuild folds those phrases into the index.", "nodes": ["trend", "api"], "edges": [["trend", "api"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "The data structure",
+      "question": "How do we find the best completions of a prefix in one step?",
+      "options": [
+        { "name": "Plain trie, search below the node", "pros": "Natural and compact for shared beginnings.", "cons": "Finding the top K below a node means visiting a whole subtree. Too slow for a popular prefix like 'a'." },
+        { "name": "A trie with top-K stored at every node", "pros": "Walk the prefix, read the list. No search at all.", "cons": "More memory, since each node holds K entries. Pointer-heavy tries are hard on caches and the garbage collector." },
+        { "name": "A sorted map from prefix to top-K list", "pros": "One binary search or hash lookup. Easy to build in batch, ship as a file and shard by key range.", "cons": "Repeats the prefix text. Cap the prefix length and drop rare prefixes to limit size." }
+      ],
+      "pick": "A prefix to top-K map, stored as sorted, immutable files",
+      "because": "The index is rebuilt in batch, so it never needs in-place updates. Immutable sorted files are compact, simple to shard and cheap to swap. A trie is a fine way to build the lists, but the served index can be flat."
+    },
+    {
+      "title": "Freshness and the trending layer",
+      "question": "How quickly should a new phrase appear?",
+      "options": [
+        { "name": "Daily batch only", "pros": "Simple and cheap. The index is always consistent.", "cons": "Blind to anything that started today." },
+        { "name": "Update the index on every search", "pros": "Always fresh.", "cons": "Millions of writes per second into a structure tuned for reads. Counts of rare phrases are noise." },
+        { "name": "Batch base plus a small streaming overlay", "pros": "Stable ranking from the batch, and fast reaction from the overlay of a few hundred trending phrases.", "cons": "Two sources to merge, and a rule for when a trending phrase beats an established one." }
+      ],
+      "pick": "Batch base plus streaming overlay",
+      "because": "Only a tiny share of phrases trend, so the overlay is small and can live in memory on every server. The batch stays the source of truth, and the next rebuild absorbs the trending ones."
+    },
+    {
+      "title": "How to shard the index",
+      "question": "How do we split the prefix space over machines?",
+      "options": [
+        { "name": "Hash of the prefix", "pros": "Spreads load evenly, and no hot ranges.", "cons": "'pi', 'pii' and 'pij' land on different shards. Related prefixes cannot share a lookup or a cache." },
+        { "name": "Prefix ranges (a to f, g to m)", "pros": "Related prefixes live together. A range can be split where it is hot, and maps cleanly to sorted files.", "cons": "Letters are uneven, so some ranges are far hotter. Needs a rebalancing step." },
+        { "name": "Replicate the whole index", "pros": "No routing. Any server answers anything.", "cons": "Only works while the index fits one machine's memory." }
+      ],
+      "pick": "Prefix ranges, with hot ranges split",
+      "because": "Track load per range and split by actual traffic, not by alphabet. Keep the first one or two characters in the cache layer, so the hottest ranges are barely queried at all."
+    },
+    {
+      "title": "Personalisation",
+      "question": "How do we tailor suggestions without a separate index per user?",
+      "options": [
+        { "name": "One global list for everyone", "pros": "Fully cacheable at the CDN. Simple.", "cons": "Ignores what the user cares about." },
+        { "name": "Re-rank the global top candidates", "pros": "Fetch a larger global list, K of 20 to 50, then reorder by the user's history and location. The index stays shared and cacheable.", "cons": "Adds a lookup and a few ms. Personal results cannot be cached at the CDN." },
+        { "name": "A personal index per user", "pros": "Fully tailored.", "cons": "Billions of tiny indexes. Out of reach and rarely worth it." }
+      ],
+      "pick": "Re-rank a larger global top list",
+      "because": "Cache the shared global list at the edge, then apply a light personal re-rank at the service on top of it. Only a few results change, so the benefit is real while the cost stays small."
+    }
+  ],
+  "failures": [
+    { "what": "An index shard is down", "impact": "Prefixes in its range return nothing, so part of the alphabet has no suggestions.", "fix": "Run replicas per shard. If all are down, serve from the cache or CDN, or return an empty list. The search box must still work." },
+    { "what": "A bad index build is published", "impact": "Suggestions are wrong or empty everywhere at once.", "fix": "Version every index. Check size and a sample of known prefixes before publishing. Roll out to a few servers first and keep the previous version so you can roll back instantly." },
+    { "what": "An offensive phrase starts trending", "impact": "A harmful suggestion appears under a harmless prefix, and it spreads fast.", "fix": "Apply the blocklist at serve time too, so a block takes effect in seconds, not at the next build. Add classifiers and a minimum number of distinct users before a phrase can trend." },
+    { "what": "A stampede on a cold cache", "impact": "After a deploy or cache loss, every request hits the index at once.", "fix": "Warm caches from the top prefixes before shifting traffic. Collapse duplicate misses for the same prefix into one lookup." },
+    { "what": "Stale answers after a spike", "impact": "A cached answer shows a phrase that has since been blocked.", "fix": "Keep CDN expiry short, in minutes. Make blocklist changes also purge cached prefixes." }
+  ],
+  "scaling": [
+    { "limit": "Index memory grows with distinct queries and prefix depth", "lever": "Cap indexed prefix length, drop phrases below a count threshold, store ids not strings, and add shards." },
+    { "limit": "Requests grow with every keystroke", "lever": "Debounce on the client, cache by prefix at the browser and CDN, and skip requests when a longer prefix has no results." },
+    { "limit": "Users in many regions", "lever": "Deploy the index and cache per region, and ship the same immutable index files to each. Rank partly by locale." },
+    { "limit": "Batch rebuild takes longer as logs grow", "lever": "Aggregate incrementally by hour, merge into running totals, and only rebuild the prefixes whose top K changed." }
+  ],
+  "recap": {
+    "key": "Make every request one lookup. Precompute the top K suggestions for each prefix offline, serve them from memory behind caches, and add a small trending layer on top.",
+    "numbers": "1B searches a day at 6 requests each is 69K per second, 208K at peak. An 80% cache hit leaves about 42K for the index. The index is about 50 GB, so 2 shards plus replicas.",
+    "moves": ["Precompute top-K per prefix so a read is one lookup", "Build it in batch from the search log and swap versions atomically", "Debounce, then cache at browser, CDN and server", "Shard by prefix range, overlay trending, then personalise and filter last"]
+  }
+}

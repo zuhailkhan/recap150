@@ -1,0 +1,169 @@
+{
+  "slug": "unique-id-generator",
+  "title": "Unique ID Generator",
+  "group": "Building blocks",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design a service that hands out unique 64-bit ids for rows, messages and orders, across many machines and many database shards, with no central bottleneck. Ids should fit in a database integer and sort roughly by creation time. Two machines must never produce the same id.",
+  "requirements": {
+    "functional": [
+      "Produce an id that is unique across all machines and shards.",
+      "Fit in 64 bits, so it works as a normal integer column and in JSON as a string.",
+      "Sort roughly by creation time, so new rows land at the end of an index.",
+      "Generate ids without a network call per id.",
+      "Recover safely from restarts and clock problems."
+    ],
+    "nonFunctional": [
+      { "name": "Throughput", "target": "Thousands of ids per second per machine, with no shared lock" },
+      { "name": "Latency", "target": "Under 1 microsecond per id in the common path" },
+      { "name": "Uniqueness", "target": "Never a duplicate, even across restarts and failover" },
+      { "name": "Availability", "target": "Generation keeps working if the coordination service is briefly down" }
+    ],
+    "outOfScope": ["Ids that must be strictly gap-free (invoice numbers)", "Secret, unguessable tokens", "Cross-machine strict ordering"]
+  },
+  "estimate": {
+    "note": "Assumptions. A 64-bit id has 63 usable bits when kept positive. Giving more bits to one part takes them from another. The estimator shows the trade between lifetime, number of machines and ids per millisecond.",
+    "inputs": [
+      { "id": "tsBits", "label": "Bits for the timestamp", "value": 41, "min": 30, "max": 45, "step": 1, "unit": "bits" },
+      { "id": "machineBits", "label": "Bits for the machine id", "value": 10, "min": 1, "max": 16, "step": 1, "unit": "bits" },
+      { "id": "machines", "label": "Generator machines running", "value": 200, "min": 1, "max": 5000, "log": true },
+      { "id": "demand", "label": "Ids needed per machine per second", "value": 5000, "min": 10, "max": 1000000, "log": true, "unit": "per s" }
+    ],
+    "outputs": [
+      { "id": "seqBits", "label": "Bits left for the sequence", "expr": "63 - tsBits - machineBits", "unit": "bits", "note": "One sign bit stays zero. The rest is shared." },
+      { "id": "perMs", "label": "Ids per millisecond per machine", "expr": "2 ^ seqBits", "unit": "ids", "note": "The sequence counts within one millisecond and resets on the next." },
+      { "id": "years", "label": "Years until the timestamp wraps", "expr": "2 ^ tsBits / 1000 / 86400 / 365", "unit": "years", "note": "Counted from a custom epoch you pick, such as the launch date." },
+      { "id": "maxMachines", "label": "Machine ids available", "expr": "2 ^ machineBits", "unit": "machines" },
+      { "id": "capacity", "label": "Total id capacity per second", "expr": "min(machines, maxMachines) * perMs * 1000", "unit": "per s", "note": "Machines beyond the machine id space cannot get an id and add nothing." },
+      { "id": "needed", "label": "Total ids needed per second", "expr": "machines * demand", "unit": "per s" },
+      { "id": "headroom", "label": "Headroom (capacity / needed)", "expr": "capacity / needed", "unit": "x", "note": "Below 1 means the design cannot keep up." }
+    ]
+  },
+  "api": [
+    { "call": "nextId() -> int64", "does": "Returns a new unique id. In-process, no network. Usually a small library inside each service." },
+    { "call": "GET /ids/next?n=100", "does": "Optional service form: returns a batch of ids in one call, so a caller can avoid a hop per id." },
+    { "call": "lease(machineKey) -> machineId, ttl", "does": "Called at start-up and renewed on a timer. The coordination service gives out a machine id for a limited time." },
+    { "call": "allocateBlock(name, size) -> [from, to]", "does": "Alternative scheme: reserves a range of consecutive numbers from the allocator. The caller hands them out from memory." }
+  ],
+  "data": [
+    { "entity": "Id layout", "fields": "0 | timestamp ms since epoch (41) | machine id (10) | sequence (12)", "store": "Not stored. Computed in memory.", "why": "The id is the data. Decoding it gives the time and the machine that made it, which helps debugging." },
+    { "entity": "Machine lease", "fields": "machineId, ownerKey, expiresAt", "store": "Coordination service, with ephemeral keys.", "why": "Needs strong consistency so two machines cannot hold the same machine id. A tiny amount of data." },
+    { "entity": "Block counter", "fields": "name, nextFree", "store": "Single-row relational table or the coordination service.", "why": "Only for the block alternative. One row per id space, updated once per block, not once per id." }
+  ],
+  "nodes": [
+    { "id": "app", "label": "App servers", "kind": "client", "x": 8, "y": 50, "sub": "need ids for rows", "since": 0 },
+    { "id": "db", "label": "Database", "kind": "db", "x": 88, "y": 22, "sub": "shard 1", "since": 0 },
+    { "id": "db2", "label": "Database 2", "kind": "db", "x": 88, "y": 78, "sub": "shard 2", "since": 1 },
+    { "id": "idgen", "label": "ID generator A", "kind": "service", "x": 36, "y": 22, "sub": "time | machine | seq", "since": 2 },
+    { "id": "idgen2", "label": "ID generator B", "kind": "service", "x": 36, "y": 78, "sub": "time | machine | seq", "since": 2 },
+    { "id": "coord", "label": "Coordination", "kind": "service", "x": 62, "y": 50, "sub": "machine id leases", "since": 3 },
+    { "id": "time", "label": "Clock source", "kind": "external", "x": 62, "y": 12, "sub": "NTP, monotonic", "since": 4 },
+    { "id": "ticket", "label": "Block allocator", "kind": "db", "x": 88, "y": 50, "sub": "ranges of numbers", "since": 5 }
+  ],
+  "edges": [
+    { "from": "app", "to": "db", "label": "insert", "since": 0 },
+    { "from": "app", "to": "db2", "label": "insert", "since": 1 },
+    { "from": "app", "to": "idgen", "label": "next id", "since": 2 },
+    { "from": "app", "to": "idgen2", "label": "next id", "since": 2 },
+    { "from": "idgen", "to": "coord", "label": "lease", "dashed": true, "since": 3 },
+    { "from": "idgen2", "to": "coord", "label": "lease", "dashed": true, "since": 3 },
+    { "from": "time", "to": "idgen", "dashed": true, "since": 4 },
+    { "from": "time", "to": "idgen2", "dashed": true, "since": 4 },
+    { "from": "idgen", "to": "ticket", "label": "block", "dashed": true, "since": 5 },
+    { "from": "idgen2", "to": "ticket", "dashed": true, "since": 5 }
+  ],
+  "evolution": [
+    { "title": "Auto-increment in one database", "problem": "Start with the simplest thing that works: the database numbers each new row 1, 2, 3 with its own counter.", "change": "Ids are small, dense and strictly ordered. It works while there is one database and the write rate is modest." },
+    { "title": "Shards collide", "problem": "One database cannot hold all the data, so rows go to two shards. Each shard counts from 1, and both hand out id 1, 2, 3. A row id is no longer unique. Asking one counter for every id makes it a bottleneck and a single point of failure.", "change": "Let each application server make a random 128-bit UUID. It needs no coordination and the chance of a clash is negligible. Rows go to either shard.", "numbers": "128 bits instead of 64" },
+    { "title": "UUIDs hurt the index", "problem": "A random UUID is twice as large as a 64-bit number, and inserts land at random positions in the primary key index. Pages split, the cache thrashes and writes slow down. You also cannot sort by creation time.", "change": "Build a 64-bit id from three parts: a timestamp in the high bits, a machine id, and a sequence for the same millisecond. Time in front makes ids sort by creation. The machine part means no two machines ever make the same id, with no calls between them.", "numbers": "41 + 10 + 12 bits, see the estimator" },
+    { "title": "Machine ids need a safe owner", "problem": "Two generators that start with the same machine id produce the same ids in the same millisecond. Hand-assigning numbers breaks as soon as a machine is replaced or an autoscaler starts a new one.", "change": "At start-up each generator takes a lease on a machine id from a coordination service. It renews the lease on a timer. If it cannot renew, it stops issuing ids before the lease can be given to someone else.", "numbers": "up to 1024 machine ids with 10 bits" },
+    { "title": "Clocks go backwards", "problem": "The id starts with the clock. If NTP steps the clock back 5 ms, the generator re-uses timestamps that already have ids, and sequences restart at 0. That produces duplicates.", "change": "The generator remembers the last timestamp it used. If the clock is behind it, it waits when the gap is a few milliseconds, and refuses to issue ids when the gap is large, and raises an alarm. It reads a monotonic clock where it can.", "numbers": "wait up to a few ms, refuse beyond that" },
+    { "title": "Block allocation for dense ids", "problem": "Some uses need small, dense numbers, for example a 7-character short code. A 64-bit time-based id is 19 digits and sparse.", "change": "A block allocator keeps one counter. A generator takes a range, say 10,000 numbers, and hands them out from memory, so the allocator is hit once per block. A crash wastes the rest of a block, and ids no longer sort by time." }
+  ],
+  "flows": [
+    {
+      "name": "Make an id and save a row",
+      "steps": [
+        { "say": "The app server has a new order to save. It asks the generator it uses for an id. This is a function call, or a quick call to a nearby service.", "nodes": ["app", "idgen"], "edges": [["app", "idgen"]] },
+        { "say": "The generator reads the current time in milliseconds since its custom epoch.", "nodes": ["idgen", "time"], "edges": [["time", "idgen"]] },
+        { "say": "If this is the same millisecond as the last id, it adds 1 to the sequence. If the sequence overflows, it waits for the next millisecond. In a new millisecond the sequence restarts at 0.", "nodes": ["idgen"], "edges": [] },
+        { "say": "It packs the pieces: timestamp shifted left, machine id shifted, sequence in the low bits. It returns one 64-bit number. No lock across machines was needed.", "nodes": ["idgen", "app"], "edges": [["app", "idgen"]] },
+        { "say": "The app inserts the row into the shard that owns it. Because ids are time ordered, the insert lands at the end of the index.", "nodes": ["app", "db"], "edges": [["app", "db"]] }
+      ]
+    },
+    {
+      "name": "Start up and survive a clock jump",
+      "steps": [
+        { "say": "A new generator starts. It has no machine id yet and issues nothing.", "nodes": ["idgen2"], "edges": [] },
+        { "say": "It asks the coordination service for a lease on a free machine id, with a time to live, and renews it regularly.", "nodes": ["idgen2", "coord"], "edges": [["idgen2", "coord"]] },
+        { "say": "It reads the clock and loads the last timestamp it recorded. If the clock is behind that, it waits before the first id.", "nodes": ["idgen2", "time"], "edges": [["time", "idgen2"]] },
+        { "say": "Later the clock is stepped back by 3 ms. The generator sees time is below its last timestamp and pauses for 3 ms.", "nodes": ["idgen2", "time"], "edges": [["time", "idgen2"]] },
+        { "say": "If the step back is larger than the limit, say 100 ms, it refuses to serve and raises an alert. Callers use another generator.", "nodes": ["idgen2", "app"], "edges": [["app", "idgen2"]] },
+        { "say": "If the lease cannot be renewed, the generator stops before the lease expires, so no one else can start using its machine id.", "nodes": ["idgen2", "coord"], "edges": [["idgen2", "coord"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Which id scheme",
+      "question": "Auto-increment, UUID, time-based 64-bit, or block allocation?",
+      "options": [
+        { "name": "Random UUID", "pros": "No coordination at all. Any machine, any time. Unguessable if random.", "cons": "128 bits. Random inserts fragment indexes. No order by time." },
+        { "name": "Time-based 64-bit (Snowflake style)", "pros": "Half the size, sorted by time, no calls between machines. Decodes to time and machine.", "cons": "Needs machine id assignment and a trustworthy clock. Ordering is only approximate." },
+        { "name": "Blocks from a central counter", "pros": "Dense, small numbers. Simple. One central call per block.", "cons": "The counter is a dependency. Gaps appear after crashes. Not time sorted across machines." }
+      ],
+      "pick": "Time-based 64-bit; blocks for short dense codes",
+      "because": "Most tables want ids that are compact and sort by time without a network call. Short public codes want small dense numbers, so they use blocks, as in the URL shortener."
+    },
+    {
+      "title": "Assigning machine ids",
+      "question": "How does a generator get a machine id that nobody else holds?",
+      "options": [
+        { "name": "Hard-coded or from the host name", "pros": "No dependency. Simple to start.", "cons": "Breaks with autoscaling and replaced hosts. Two hosts can end up with the same number." },
+        { "name": "Lease from a coordination service", "pros": "Strongly consistent. Leases expire when a machine dies, so ids are reused safely.", "cons": "Needs that service at start-up. Needs care about lease expiry and clocks." },
+        { "name": "Random machine bits", "pros": "No coordination. Works at tiny scale.", "cons": "A clash is a matter of probability, not a guarantee. With 10 bits and 200 machines a clash is likely." }
+      ],
+      "pick": "Lease from a coordination service",
+      "because": "Uniqueness is the one promise we cannot break. The service is only needed at start-up and on renew, so ids keep flowing during a short outage, until the lease runs out."
+    },
+    {
+      "title": "Clock going backwards",
+      "question": "What does a generator do when the clock moves back?",
+      "options": [
+        { "name": "Keep going with the last timestamp", "pros": "No pause and no error.", "cons": "The timestamp bits stop meaning time. Any further drift risks a collision with ids already issued." },
+        { "name": "Wait it out for small steps", "pros": "Ids stay unique and time ordered. A few ms of delay is rarely noticed.", "cons": "A large step blocks the generator for a long time." },
+        { "name": "Refuse and fail over", "pros": "Never issues a wrong id. Clear alarm to operators.", "cons": "Needs other generators to take over. Capacity drops while one is out." }
+      ],
+      "pick": "Wait for small steps, refuse for large ones",
+      "because": "A short wait costs almost nothing. Anything bigger means something is wrong with the host, so take it out of service rather than risk a duplicate. Run NTP in slew mode so it rarely steps."
+    },
+    {
+      "title": "What ordering do we promise",
+      "question": "Can we sort by id to get the real order of events?",
+      "options": [
+        { "name": "Strict global order", "pros": "Easy to reason about.", "cons": "Needs one sequencer for everything. That is the bottleneck we avoided." },
+        { "name": "Roughly sorted by time", "pros": "Within a millisecond, ids from different machines can interleave, but they are close. Great for indexes and paging.", "cons": "Two events on two machines can come out in the wrong order if their clocks differ by a few ms." },
+        { "name": "Order by a per-entity sequence", "pros": "Exact order where it matters, such as one conversation.", "cons": "Needs a single writer per entity. Separate from the id scheme." }
+      ],
+      "pick": "Roughly sorted ids; per-entity sequence if order matters",
+      "because": "Ids are for uniqueness and index locality. Do not use them to decide which event happened first across machines. If one conversation must be in order, keep a counter for it."
+    }
+  ],
+  "failures": [
+    { "what": "Clock jumps backwards", "impact": "Timestamps repeat, so sequences restart and the generator can issue an id it has already issued.", "fix": "Store the last timestamp in memory. Wait out small steps, refuse large ones, alert, and fail over to another generator." },
+    { "what": "Two machines share a machine id", "impact": "They produce identical ids in the same millisecond. Rows overwrite or inserts fail.", "fix": "Machine ids come only from a lease. A generator stops before its lease expires. Use unique keys on the id column as a last guard." },
+    { "what": "Sequence overflows in one millisecond", "impact": "A burst creates more than 4096 ids in a single millisecond on one machine.", "fix": "Wait for the next millisecond. If bursts are common, give the sequence more bits, or run more generators." },
+    { "what": "Coordination service is down", "impact": "New generators cannot start. Running ones cannot renew leases.", "fix": "Running generators keep going until the lease ends, so use a lease of minutes. Keep spare generators warm. Run the coordination service on three or five nodes." },
+    { "what": "Epoch or timestamp bits run out", "impact": "After 69 years the timestamp wraps and ids go back to small values.", "fix": "Choose a custom epoch close to launch. Plan a migration to a new layout long before the date. Monitor the remaining years." }
+  ],
+  "scaling": [
+    { "limit": "Machine id space is fixed by its bits", "lever": "Give the machine part more bits, or split it into datacenter and worker. Reuse ids by lease expiry when machines are replaced." },
+    { "limit": "One generator makes up to 4096 ids per millisecond", "lever": "Run more generators. Each is independent, so throughput scales linearly with machines." },
+    { "limit": "Ids need to fit in JavaScript clients", "lever": "A 64-bit number exceeds the safe integer range of 53 bits. Send ids as strings in JSON, or use fewer bits." }
+  ],
+  "recap": {
+    "key": "Pack time, a leased machine id and a per-millisecond sequence into 64 bits, so every machine mints unique, roughly sorted ids with no calls between machines.",
+    "numbers": "41 timestamp bits give about 70 years from the epoch. 10 machine bits allow 1024 machines. 12 sequence bits allow 4096 ids per millisecond per machine, so over 4 million per second each.",
+    "moves": ["Auto-increment fails across shards, UUIDs fail on index locality", "Time | machine | sequence gives unique, sortable 64-bit ids", "Lease machine ids, and wait or refuse when the clock goes back", "Use ID blocks when you need small dense numbers"]
+  }
+}

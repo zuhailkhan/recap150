@@ -1,0 +1,184 @@
+{
+  "slug": "hotstar",
+  "title": "Hotstar (Live Streaming)",
+  "group": "Media and streaming",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a live video service like Hotstar for a big cricket match. Tens of millions of people join the same stream within minutes, watch the same few seconds of video, and leave together. The spike is sharp and the start time is known. This is a general design from public knowledge, not how any company builds it.",
+  "requirements": {
+    "functional": [
+      "Watch one live event stream, a few seconds behind real time.",
+      "Pick or auto-adjust the quality to the viewer's network.",
+      "Log in and check the viewer's subscription before playback.",
+      "Show ads at breaks, personalised where possible.",
+      "Show a live viewer count."
+    ],
+    "nonFunctional": [
+      { "name": "Latency", "target": "Under 15 seconds behind the live action" },
+      { "name": "Spike", "target": "Tens of millions join within about 10 minutes, with no outage" },
+      { "name": "Start time", "target": "Video starts within 3 seconds of pressing play" },
+      { "name": "Degradation", "target": "Lower quality and fewer features before any viewer is refused" }
+    ],
+    "outOfScope": ["Video on demand library", "Payments", "Rights and geo-blocking rules", "Live chat and reactions"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts. The key insight: every viewer asks for one segment every few seconds, so requests scale with viewers divided by segment length, but the origin only sees what the cache tiers let through.",
+    "inputs": [
+      { "id": "peak", "label": "Peak concurrent viewers", "value": 25000000, "min": 1000000, "max": 100000000, "log": true },
+      { "id": "kbps", "label": "Average bitrate (mix of tiers)", "value": 1500, "min": 300, "max": 6000, "step": 100, "unit": "kbit/s", "log": true },
+      { "id": "segSec", "label": "Segment length", "value": 4, "min": 1, "max": 10, "step": 1, "unit": "s" },
+      { "id": "hit", "label": "Edge hit ratio", "value": 99, "min": 90, "max": 99.9, "step": 0.1, "unit": "%" },
+      { "id": "sites", "label": "Edge cache servers asking upstream", "value": 2000, "min": 100, "max": 20000, "log": true },
+      { "id": "ladder", "label": "Quality tiers in the ladder", "value": 6, "min": 3, "max": 10, "step": 1 }
+    ],
+    "outputs": [
+      { "id": "egressTbps", "label": "Egress bandwidth at peak", "expr": "peak * kbps / 1e9", "unit": "Tbit/s" },
+      { "id": "edgeRps", "label": "Segment requests at the edge", "expr": "peak / segSec", "unit": "per s", "note": "One request per viewer per segment. Manifest refreshes add about as many again." },
+      { "id": "missRps", "label": "Edge misses going upstream", "expr": "edgeRps * (1 - hit / 100)", "unit": "per s" },
+      { "id": "naiveOrigin", "label": "Origin load without a shield", "expr": "min(missRps, sites * ladder / segSec)", "unit": "per s", "note": "Every edge server asks the origin for every tier of every segment." },
+      { "id": "originRps", "label": "Origin load with shielding", "expr": "min(missRps, 4 * ladder / segSec)", "unit": "per s", "note": "Assumes 4 shield sites. Each fetches a segment once and serves the rest." },
+      { "id": "loginRps", "label": "Logins per second during the join", "expr": "peak / 600", "unit": "per s", "note": "Assumes everyone joins within 10 minutes. Real spikes are sharper at the start." }
+    ]
+  },
+  "api": [
+    { "call": "POST /login", "does": "Authenticates and returns a short-lived token. Must survive a join spike." },
+    { "call": "GET /events/{id}/play", "does": "Checks entitlement, picks a CDN host and returns the manifest URL and an ad plan." },
+    { "call": "GET /live/{id}/manifest.m3u8", "does": "The playlist of the newest segments per quality tier. Refreshed every segment, cached for a second or so." },
+    { "call": "GET /live/{id}/{tier}/{n}.ts", "does": "One short video segment. Identical for everyone, so highly cacheable." },
+    { "call": "POST /events/{id}/heartbeat", "does": "A viewer reports being present. Feeds the approximate viewer count." }
+  ],
+  "data": [
+    { "entity": "Segment", "fields": "eventId, tier, sequence, bytes", "store": "Origin object store, plus rolling edge caches.", "why": "Written once by the packager, read by millions. Old segments expire after a short window." },
+    { "entity": "Manifest", "fields": "eventId, tier, [sequence, duration] latest N", "store": "In-memory, rewritten each segment.", "why": "A tiny, constantly changing list. Caching it for under one segment keeps it fresh." },
+    { "entity": "Session / entitlement", "fields": "userId, plan, token, expiresAt", "store": "Key-value store with TTL, token signed.", "why": "Looked up at the start. A signed token lets later checks skip the store." },
+    { "entity": "Viewer count", "fields": "eventId, region, approxCount", "store": "In-memory counters, sharded.", "why": "Approximate on purpose. Exact counting at this rate costs far more than it is worth." }
+  ],
+  "nodes": [
+    { "id": "feed", "label": "Venue feed", "kind": "external", "x": 8, "y": 88, "sub": "camera and mixer", "since": 0 },
+    { "id": "encoder", "label": "Encode and package", "kind": "worker", "x": 28, "y": 88, "sub": "tiers and segments", "since": 0 },
+    { "id": "origin", "label": "Origin", "kind": "blob", "x": 48, "y": 88, "sub": "segment store", "since": 0 },
+    { "id": "client", "label": "Viewers", "kind": "client", "x": 90, "y": 50, "sub": "player picks tier", "since": 0 },
+    { "id": "edge", "label": "Edge CDN", "kind": "cdn", "x": 70, "y": 50, "sub": "caches near viewers", "since": 1 },
+    { "id": "shield", "label": "Shield cache", "kind": "cdn", "x": 48, "y": 50, "sub": "one fetch per segment", "since": 2 },
+    { "id": "playback", "label": "Entitlement", "kind": "service", "x": 70, "y": 12, "sub": "login, play, degrade", "since": 3 },
+    { "id": "ads", "label": "Ad decisions", "kind": "external", "x": 48, "y": 12, "sub": "breaks and targeting", "since": 4 },
+    { "id": "counter", "label": "Viewer counter", "kind": "cache", "x": 90, "y": 12, "sub": "approximate", "since": 5 }
+  ],
+  "edges": [
+    { "from": "feed", "to": "encoder", "since": 0 },
+    { "from": "encoder", "to": "origin", "since": 0 },
+    { "from": "origin", "to": "client", "label": "segments", "since": 0, "until": 1 },
+    { "from": "origin", "to": "edge", "label": "miss", "since": 1, "until": 2 },
+    { "from": "edge", "to": "client", "label": "video", "since": 1 },
+    { "from": "origin", "to": "shield", "since": 2 },
+    { "from": "shield", "to": "edge", "label": "fill", "since": 2 },
+    { "from": "client", "to": "playback", "label": "login", "since": 3 },
+    { "from": "playback", "to": "ads", "since": 4 },
+    { "from": "client", "to": "counter", "label": "heartbeat", "dashed": true, "since": 5 },
+    { "from": "counter", "to": "playback", "label": "load", "dashed": true, "since": 6 }
+  ],
+  "evolution": [
+    { "title": "Encode and serve one stream", "problem": "Start with the simplest live path: video comes in, gets turned into something players can fetch, and is served.", "change": "An encoder makes several quality tiers and cuts each into segments of a few seconds. It writes them and a manifest (the list of newest segments) to an origin. Players poll the manifest and fetch segments over HTTP." },
+    { "title": "Edge CDN", "problem": "25 million viewers at 1.5 Mbit/s is tens of Tbit/s. One origin cannot do that, and distant viewers have high latency.", "change": "Put a CDN (caches near viewers) between players and the origin. A segment is the same for everyone, so after the first request each edge serves it from memory.", "numbers": "egress bandwidth in the estimator" },
+    { "title": "Origin shielding", "problem": "Each segment is new, so every edge server misses at the same time and asks the origin for it. Thousands of servers means thousands of identical requests per segment.", "change": "Add a middle cache tier, the shield. Edges ask the shield, and the shield asks the origin. Duplicate requests are collapsed, so the origin sees about one request per segment per tier.", "numbers": "compare origin load with and without the shield" },
+    { "title": "Entitlement and the login spike", "problem": "Everyone logs in and starts playback in the same minutes. Checking a database for each would be the first thing to fall over.", "change": "A separate entitlement service handles login and play. It issues signed, short-lived tokens, so the video path never calls it. It is scaled up before the match, since the start time is known, and kept apart from video delivery.", "numbers": "logins per second in the estimator" },
+    { "title": "Ad insertion", "problem": "Breaks are short and must start for everyone at the same moment. Ads should still differ by viewer.", "change": "The play call returns an ad plan from an ad decision service. Ad segments are stitched into the stream the same way as video, so they also come from the CDN. Ad requests are cached and have a fallback ad on timeout." },
+    { "title": "Approximate viewer count", "problem": "A live count of viewers is wanted, but exact counting of 25M people at one write each is costly.", "change": "Players send periodic heartbeats to sharded in-memory counters. Totals are merged and shown as a rounded number. It can lag a few seconds and be off by a little.", "numbers": "heartbeats are viewers divided by the heartbeat interval" },
+    { "title": "Degrade, do not refuse", "problem": "Even a pre-scaled system can hit a limit mid-match, for example a CDN region or ad service slowing down.", "change": "The counter and health signals feed the entitlement service. It turns on controlled degradation: first drop the highest tiers, then switch off extras like personalised ads and the live count, and only last queue new joins. Existing viewers keep watching." }
+  ],
+  "flows": [
+    {
+      "name": "Join and watch",
+      "steps": [
+        { "say": "The viewer logs in and asks to play. The entitlement service checks the plan and returns a signed token and manifest URL.", "nodes": ["client", "playback"], "edges": [["client", "playback"]] },
+        { "say": "It also asks the ad service for the ad plan for this viewer.", "nodes": ["playback", "ads"], "edges": [["playback", "ads"]] },
+        { "say": "The player fetches the manifest and the newest segments from the edge. Most requests are cache hits.", "nodes": ["edge", "client"], "edges": [["edge", "client"]] },
+        { "say": "On an edge miss the request goes to the shield, which holds one copy of each segment.", "nodes": ["shield", "edge"], "edges": [["shield", "edge"]] },
+        { "say": "Only the shield's miss reaches the origin, about once per segment and tier.", "nodes": ["origin", "shield"], "edges": [["origin", "shield"]] },
+        { "say": "The player measures download speed after each segment and moves up or down a tier. It sends a heartbeat every so often.", "nodes": ["client", "counter"], "edges": [["client", "counter"]] }
+      ]
+    },
+    {
+      "name": "A new segment goes live",
+      "steps": [
+        { "say": "The venue feed delivers live video to the encoder.", "nodes": ["feed", "encoder"], "edges": [["feed", "encoder"]] },
+        { "say": "The encoder produces every quality tier and closes a segment every few seconds.", "nodes": ["encoder", "origin"], "edges": [["encoder", "origin"]] },
+        { "say": "The manifest now lists the new segment. Millions of players ask for it within a second.", "nodes": ["origin", "shield"], "edges": [["origin", "shield"]] },
+        { "say": "The shield fetches it once and fills the edges. Concurrent requests for the same segment wait for that one fetch.", "nodes": ["shield", "edge"], "edges": [["shield", "edge"]] },
+        { "say": "Edges serve the segment to viewers from memory.", "nodes": ["edge", "client"], "edges": [["edge", "client"]] }
+      ]
+    },
+    {
+      "name": "Load rises, quality falls",
+      "steps": [
+        { "say": "Viewers send heartbeats, which also act as a load signal.", "nodes": ["client", "counter"], "edges": [["client", "counter"]] },
+        { "say": "The counter tells the entitlement service how many viewers there are and how fast they are joining.", "nodes": ["counter", "playback"], "edges": [["counter", "playback"]] },
+        { "say": "Past a threshold it lowers the top tiers in new manifests and turns off optional features, such as targeted ads.", "nodes": ["playback", "ads"], "edges": [["playback", "ads"]] },
+        { "say": "Players follow the manifest. Bandwidth and edge load drop and everyone stays on.", "nodes": ["edge", "client"], "edges": [["edge", "client"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Segment length",
+      "question": "How long should each video segment be?",
+      "options": [
+        { "name": "Long, 10 s", "pros": "Few requests and efficient caching. Better compression.", "cons": "Viewers are 30 or more seconds behind live. Slow quality switching." },
+        { "name": "Short, 2 to 4 s", "pros": "Latency around 10 s. Quick quality adaptation.", "cons": "More requests, more manifest refreshes and more work for the edge." },
+        { "name": "Very short chunks (sub-second)", "pros": "Near real-time.", "cons": "Needs special protocols and breaks caching economics at this size." }
+      ],
+      "pick": "Short, 2 to 4 s",
+      "because": "Cricket fans accept a small delay but not a minute. Requests scale as viewers over segment length, and the shield keeps the origin flat, so the extra edge load is affordable. Try the slider."
+    },
+    {
+      "title": "Scale ahead or scale reactively",
+      "question": "How do servers get ready for 25 million viewers?",
+      "options": [
+        { "name": "Autoscale on load", "pros": "No guessing. Works for surprises.", "cons": "New servers take minutes to start and warm, and the spike takes seconds." },
+        { "name": "Pre-scale to a plan", "pros": "The match start time is known, so capacity is ready and warm before the first viewer.", "cons": "Costs money if the match is less popular than planned." },
+        { "name": "Pre-scale, then autoscale on top", "pros": "A big planned base plus headroom for a surprise.", "cons": "Needs load tests and a forecast." }
+      ],
+      "pick": "Pre-scale, then autoscale on top",
+      "because": "The spike is predictable, so be ready early and warm caches, connection pools and DNS. Keep autoscaling for the unplanned part. Rehearse with load tests."
+    },
+    {
+      "title": "Counting concurrent viewers",
+      "question": "The page shows how many are watching. How precise must it be?",
+      "options": [
+        { "name": "Exact counter in a database", "pros": "Correct.", "cons": "Millions of writes per second on one hot key." },
+        { "name": "Sharded counters, merged", "pros": "Spreads writes. Results within a few seconds.", "cons": "Slightly stale and not exact." },
+        { "name": "Sampling or sketches", "pros": "Tiny memory. Good enough for a rounded number.", "cons": "An error margin, and it cannot answer for one user." }
+      ],
+      "pick": "Sharded counters, merged",
+      "because": "Nobody needs the exact count. Count presence with heartbeats and an expiry, shard by viewer id, and merge every few seconds. If load is high, show fewer details first."
+    },
+    {
+      "title": "Degradation order",
+      "question": "When capacity runs short, what do we give up first?",
+      "options": [
+        { "name": "Refuse new viewers", "pros": "Protects those watching.", "cons": "Angry users, retries and an even bigger spike." },
+        { "name": "Lower quality, then features, then admit slowly", "pros": "Every viewer still sees the match. Each step relieves load.", "cons": "Needs a tested ladder and clear thresholds." },
+        { "name": "Do nothing", "pros": "Simple.", "cons": "A hot spot can take down the entire service." }
+      ],
+      "pick": "Lower quality first, queue joins last",
+      "because": "Dropping the top tier saves bandwidth for everyone. Turning off personalised ads and the viewer count saves backend calls. Only after those, slow down new logins with a short wait page."
+    }
+  ],
+  "failures": [
+    { "what": "Login service overloaded at the start", "impact": "People cannot start the stream though video capacity is fine.", "fix": "Pre-scale, use signed tokens so only login hits the service, add jittered client retries, and let the player stay on the last good token." },
+    { "what": "Encoder or feed failure", "impact": "All viewers freeze at once.", "fix": "Run two encoders on separate feeds. The packager switches to the healthy one. Players keep retrying the manifest." },
+    { "what": "A CDN region or provider slows down", "impact": "Viewers in that area buffer.", "fix": "Use several CDN providers and steer new sessions away from the weak one. The player can fall back to another host." },
+    { "what": "Ad service is slow or down", "impact": "A break could hold up the stream.", "fix": "Short timeout, then a default ad from the CDN. Ads must never block live video." },
+    { "what": "Origin gets a surge of misses", "impact": "A cache flush or manifest bug sends millions of requests upstream.", "fix": "Keep the shield between them, collapse duplicate requests, and serve stale segments for a few seconds if the origin is slow." }
+  ],
+  "scaling": [
+    { "limit": "Egress bandwidth in Tbit/s", "lever": "More CDN providers and capacity placed inside ISP networks. Lower the top bitrate for crowded matches." },
+    { "limit": "Requests per second at the edge", "lever": "Longer segments or manifest caching reduce request rate. More edge servers spread it." },
+    { "limit": "Logins in the first minutes", "lever": "Pre-scale, rate-limit with jitter, and push app-side token refresh ahead of the match." }
+  ],
+  "recap": {
+    "key": "A live segment is the same for everyone, so cache it in tiers and let the origin see each segment once. The spike is known, so prepare early, and degrade quality before refusing anyone.",
+    "numbers": "With the defaults: 25M viewers, about 37 Tbit/s egress, 6M edge requests per second, a shield cuts origin load to a handful per second, and about 40K logins per second.",
+    "moves": ["Short segments and a manifest give latency around 10 seconds", "Edge CDN plus a shield tier: one origin fetch per segment", "Pre-scale for the known start and keep login off the video path", "Degrade tiers and features first, refuse nobody"]
+  }
+}

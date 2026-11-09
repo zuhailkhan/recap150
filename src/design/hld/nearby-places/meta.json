@@ -1,0 +1,185 @@
+{
+  "slug": "nearby-places",
+  "title": "Nearby Places",
+  "group": "Building blocks",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the search behind 'restaurants near me': given a point and a radius, return the places inside it, best first, in tens of milliseconds. A plain latitude and longitude range query cannot do this at scale. This is the proximity-search block that ride-hailing, food delivery and dating products reuse, with moving people on top of the same idea.",
+  "requirements": {
+    "functional": [
+      "Search places within a radius of a point, optionally by category.",
+      "Return them ranked by distance and rating, a page at a time.",
+      "Add, edit and remove a place.",
+      "Find moving things such as drivers, which update their position every few seconds."
+    ],
+    "nonFunctional": [
+      { "name": "Latency", "target": "A search returns in under 100 ms at the 99th percentile" },
+      { "name": "Read-heavy", "target": "Searches outnumber place edits by 1000 to 1 or more" },
+      { "name": "Freshness", "target": "A new place appears within minutes. A moving object within seconds" },
+      { "name": "Availability", "target": "Search works 99.95% of the time" }
+    ],
+    "outOfScope": ["Routing and travel time", "Reviews, photos and booking", "Map tile rendering"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts. Places are not spread evenly, so a dense-city cell holds many times the average. The cells scanned per search depend on cell size against radius, and that is the number to watch.",
+    "inputs": [
+      { "id": "places", "label": "Places in the index", "value": 50000000, "min": 100000, "max": 1000000000, "log": true },
+      { "id": "cellKm", "label": "Cell side length", "value": 2, "min": 0.1, "max": 50, "log": true, "unit": "km" },
+      { "id": "areaM", "label": "Area covered by places", "value": 20, "min": 1, "max": 150, "step": 1, "unit": "M km2" },
+      { "id": "skew", "label": "Dense city cell versus average", "value": 20, "min": 1, "max": 1000, "log": true, "unit": "x" },
+      { "id": "radiusKm", "label": "Search radius", "value": 5, "min": 0.5, "max": 50, "log": true, "unit": "km" },
+      { "id": "qps", "label": "Searches per second at peak", "value": 20000, "min": 100, "max": 1000000, "log": true }
+    ],
+    "outputs": [
+      { "id": "perCell", "label": "Places per cell, average", "expr": "places / (areaM * 1e6 / (cellKm * cellKm))", "unit": "places", "note": "Most cells are nearly empty, since most of the world has no restaurants." },
+      { "id": "denseCell", "label": "Places in a dense city cell", "expr": "perCell * skew", "unit": "places", "note": "This is why one fixed cell size does not fit everywhere." },
+      { "id": "cellsPerQuery", "label": "Cells scanned per search", "expr": "(ceil(2 * radiusKm / cellKm) + 1) ^ 2", "unit": "cells", "note": "A square of cells that covers the circle. Tiny cells mean many lookups." },
+      { "id": "candidates", "label": "Candidates in a dense area", "expr": "cellsPerQuery * denseCell", "unit": "places", "note": "Worst case: every scanned cell is a dense one. All must be distance-checked." },
+      { "id": "indexGb", "label": "Cell index in memory", "expr": "places * 16 / 1e9", "unit": "GB", "note": "16 bytes per entry: cell id and place id. The index is small. Place details are separate." },
+      { "id": "lookups", "label": "Cell lookups per second", "expr": "qps * cellsPerQuery", "unit": "per s", "note": "Before caching." },
+      { "id": "servers", "label": "Index servers at 50K lookups per s", "expr": "ceil(lookups / 50000)", "unit": "servers", "note": "Driven by query rate, not by index size." }
+    ]
+  },
+  "api": [
+    { "call": "GET /places/nearby?lat&lng&radius&category&cursor", "does": "Returns places within the radius, ranked, one page at a time, with a cursor." },
+    { "call": "POST /places  { name, lat, lng, category }", "does": "Adds a place. It reaches the index shortly after, not at once." },
+    { "call": "PUT /places/{id}", "does": "Edits a place. Changing its location moves it between cells." },
+    { "call": "POST /locations  { objectId, lat, lng, ts }", "does": "A moving object, such as a driver, reports its position. Fire and forget." },
+    { "call": "GET /objects/nearby?lat&lng&radius", "does": "Returns moving objects near a point from the in-memory live index." }
+  ],
+  "data": [
+    { "entity": "Place", "fields": "placeId, name, lat, lng, category, rating, hours", "store": "Sharded key-value or document store by placeId.", "why": "Details are read by id after the index returns candidates. Rarely updated." },
+    { "entity": "CellIndex", "fields": "cellId, [placeId, lat, lng] x N", "store": "In-memory, sharded by cell id.", "why": "One lookup by cell id returns every place in it. Rebuilt from the Place table, so it can be thrown away." },
+    { "entity": "CellStats", "fields": "cellId, level, count", "store": "Small table or the index's own metadata.", "why": "Tells the splitter which cells are too full and need subdividing." },
+    { "entity": "LiveLocation", "fields": "objectId, cellId, lat, lng, ts", "store": "In-memory store with TTL.", "why": "Overwritten every few seconds. Old positions are worthless, so no disk and no history." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Client", "kind": "client", "x": 8, "y": 50, "sub": "lat, lng, radius", "since": 0 },
+    { "id": "api", "label": "Search service", "kind": "service", "x": 29, "y": 50, "sub": "stateless", "since": 0 },
+    { "id": "cache", "label": "Cell result cache", "kind": "cache", "x": 29, "y": 14, "sub": "hot cells", "since": 3 },
+    { "id": "geo", "label": "Cell index A", "kind": "cache", "x": 70, "y": 12, "sub": "cell to place ids", "since": 1 },
+    { "id": "geo2", "label": "Cell index B", "kind": "cache", "x": 70, "y": 36, "sub": "other cell range", "since": 4 },
+    { "id": "rank", "label": "Filter and rank", "kind": "service", "x": 70, "y": 62, "sub": "distance, rating", "since": 2 },
+    { "id": "places", "label": "Place store", "kind": "db", "x": 91, "y": 62, "sub": "details by id", "since": 0 },
+    { "id": "builder", "label": "Index builder", "kind": "worker", "x": 91, "y": 36, "sub": "place to cell", "since": 1 },
+    { "id": "splitter", "label": "Cell splitter", "kind": "worker", "x": 91, "y": 12, "sub": "split dense cells", "since": 5 },
+    { "id": "devices", "label": "Moving objects", "kind": "client", "x": 8, "y": 88, "sub": "drivers, riders", "since": 6 },
+    { "id": "stream", "label": "Location stream", "kind": "queue", "x": 50, "y": 88, "sub": "position updates", "since": 6 },
+    { "id": "live", "label": "Live index", "kind": "cache", "x": 70, "y": 88, "sub": "in memory, TTL", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "api", "since": 0 },
+    { "from": "api", "to": "places", "label": "range query", "since": 0, "until": 2 },
+    { "from": "places", "to": "builder", "label": "read", "since": 1 },
+    { "from": "builder", "to": "geo", "label": "index", "since": 1 },
+    { "from": "api", "to": "geo", "label": "cell ids", "since": 1 },
+    { "from": "api", "to": "rank", "label": "candidates", "since": 2 },
+    { "from": "rank", "to": "places", "label": "details", "since": 2 },
+    { "from": "api", "to": "cache", "label": "check first", "since": 3 },
+    { "from": "api", "to": "geo2", "since": 4 },
+    { "from": "builder", "to": "geo2", "since": 4 },
+    { "from": "splitter", "to": "geo", "label": "split", "dashed": true, "since": 5 },
+    { "from": "splitter", "to": "geo2", "dashed": true, "since": 5 },
+    { "from": "devices", "to": "stream", "since": 6 },
+    { "from": "stream", "to": "live", "since": 6 },
+    { "from": "api", "to": "live", "label": "nearby objects", "since": 6 }
+  ],
+  "evolution": [
+    { "title": "Range query on latitude and longitude", "problem": "Start with the simplest thing that works: a table of places with lat and lng columns.", "change": "Find places with lat between a and b and lng between c and d, then compute each distance and sort. It works for a small city." },
+    { "title": "Grid cells", "problem": "An index on latitude alone returns a whole band around the planet. An index on longitude does the same. The database must intersect two huge ranges for each search, and 50M places make that far too slow.", "change": "Cut the map into cells, give each one an id, and store the place ids in each cell. A builder fills this index from the place table. A search computes the user's cell id and does a single lookup. Geohash, quadtree, S2 and H3 are different ways to make cell ids.", "numbers": "the estimator shows index size and places per cell" },
+    { "title": "Neighbour cells and an exact filter", "problem": "A cell is a square, a search is a circle. A place 100 m away can sit in the next cell, so one lookup misses it. This is the boundary problem.", "change": "Look up the user's cell and the cells around it that touch the circle, then compute the true distance to each candidate and keep those inside the radius. A filter and rank service does the distance check and orders by distance and rating.", "numbers": "cells scanned per search in the estimator" },
+    { "title": "Cache hot cells", "problem": "Places change rarely, and a few cells, such as city centres, get most of the searches. Recomputing the same answer thousands of times is waste.", "change": "Cache the result per cell and filter, with an expiry of a few minutes. Searches near the same spot are answered from memory. The edit path purges the cell it touched." },
+    { "title": "Shard the cell index", "problem": "The index may fit one machine, but 20K searches per second times dozens of cells each is a million lookups per second.", "change": "Split the index across machines by cell id. A search fans out to the few shards that own its cells and merges the results. Choose the key so that neighbouring cells usually share a shard.", "numbers": "servers needed in the estimator" },
+    { "title": "Dense areas: split cells", "problem": "One cell size cannot fit both a city centre with thousands of places per cell and a desert with none. Big cells make the centre slow. Small cells make the desert wasteful.", "change": "A splitter divides any cell with too many places into four smaller ones, repeatedly, like a quadtree. Sparse areas stay as big cells. Each search then picks cells at the right depth for its area." },
+    { "title": "Moving objects: a live in-memory index", "problem": "Drivers move every few seconds. Millions of position writes a second into a place store, and its index rebuilds, would never keep up. Old positions are useless anyway.", "change": "Devices send positions to a stream. A live index keeps one current entry per object in memory, in the same cell scheme, and moves it between cells when it crosses a border. Nothing is stored long term." }
+  ],
+  "flows": [
+    {
+      "name": "Search restaurants near me",
+      "steps": [
+        { "say": "The client sends its position and a 5 km radius.", "nodes": ["client", "api"], "edges": [["client", "api"]] },
+        { "say": "The service turns the position into a cell id, then lists the cells that cover the circle, the nearby block around it.", "nodes": ["api"], "edges": [] },
+        { "say": "For popular cells it checks the result cache first, and most searches end here.", "nodes": ["api", "cache"], "edges": [["api", "cache"]] },
+        { "say": "On a miss it asks the cell index shards that own those cells for their place ids and coordinates.", "nodes": ["api", "geo", "geo2"], "edges": [["api", "geo"], ["api", "geo2"]] },
+        { "say": "It passes those candidates to the ranker, which computes the exact distance and drops places outside the radius.", "nodes": ["api", "rank"], "edges": [["api", "rank"]] },
+        { "say": "The ranker sorts by a mix of distance and rating, takes a page, and loads names and hours from the place store.", "nodes": ["rank", "places"], "edges": [["rank", "places"]] },
+        { "say": "The page returns with a cursor, and the cell results are cached for the next nearby search.", "nodes": ["api", "cache", "client"], "edges": [["api", "cache"], ["client", "api"]] }
+      ]
+    },
+    {
+      "name": "Add a place and track a driver",
+      "steps": [
+        { "say": "A new place is saved in the place store. It is the source of truth.", "nodes": ["places"], "edges": [] },
+        { "say": "The index builder reads the change and works out its cell id.", "nodes": ["places", "builder"], "edges": [["places", "builder"]] },
+        { "say": "It writes the place into the cell index shard that owns that cell.", "nodes": ["builder", "geo", "geo2"], "edges": [["builder", "geo"], ["builder", "geo2"]] },
+        { "say": "If the cell now has too many places, the splitter divides it into four child cells.", "nodes": ["splitter", "geo", "geo2"], "edges": [["splitter", "geo"], ["splitter", "geo2"]] },
+        { "say": "Separately, a driver's phone sends its position every few seconds.", "nodes": ["devices", "stream"], "edges": [["devices", "stream"]] },
+        { "say": "The stream overwrites that driver's entry in the live index. If the driver crossed a cell border, the entry moves cells.", "nodes": ["stream", "live"], "edges": [["stream", "live"]] },
+        { "say": "A rider's search asks the live index for the cells around the rider and filters by exact distance.", "nodes": ["api", "live"], "edges": [["api", "live"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Which kind of cell",
+      "question": "How do we cut the planet into cells with ids we can look up?",
+      "options": [
+        { "name": "Geohash", "pros": "A string, easy to store and prefix-search. Longer means smaller. Simple to implement.", "cons": "Cells are rectangles that vary with latitude. Cell neighbours across some boundaries share no prefix, so always compute the neighbours." },
+        { "name": "Quadtree", "pros": "Adapts to density: split only the full cells. Natural for dense and sparse areas.", "cons": "A tree to build, balance and shard. Harder to keep consistent across machines than a flat id." },
+        { "name": "S2 or H3 style cells", "pros": "Even-sized cells on a sphere and a clean list of neighbours. Several levels, so an area maps to a set of cell ids.", "cons": "A library to adopt. Harder to explain than a string." }
+      ],
+      "pick": "Fixed hierarchy of cells, split where dense",
+      "because": "Any of the three works. A flat id such as geohash, S2 or H3 gives a key-value lookup. The hierarchy lets you split dense cells by moving to a longer id, which gets the quadtree benefit with a simple key."
+    },
+    {
+      "title": "Choosing the cell size",
+      "question": "How big should a cell be compared with the search radius?",
+      "options": [
+        { "name": "Much smaller than the radius", "pros": "Few wasted candidates, since the cells hug the circle.", "cons": "Dozens or hundreds of cells per search, which means many lookups and a large index." },
+        { "name": "About the radius", "pros": "A search touches about 4 to 9 cells. Few lookups, and a modest number of candidates.", "cons": "Some wasted candidates near corners. The exact distance filter removes them." },
+        { "name": "Much bigger than the radius", "pros": "One or two lookups.", "cons": "Each cell holds many places you then discard. Dense cities get slow." }
+      ],
+      "pick": "About the radius, split where dense",
+      "because": "It balances lookups against candidates. The estimator shows both: shrink the cell and cells per search explode, grow it and candidates explode. Support a few radii by keeping a few levels of the hierarchy."
+    },
+    {
+      "title": "Static places or moving objects",
+      "question": "Does the same index serve restaurants and drivers?",
+      "options": [
+        { "name": "One shared index", "pros": "One system, one set of code.", "cons": "Places change a few times a day, drivers every 4 seconds. A write-heavy load would wreck a read-optimised, cached index." },
+        { "name": "Two indexes, one cell scheme", "pros": "Static: disk-backed or in-memory, cached and built in batch. Moving: in memory only, overwritten constantly, no durability.", "cons": "Two systems to run. Queries needing both must merge results." }
+      ],
+      "pick": "Two indexes, one cell scheme",
+      "because": "Their read and write patterns are opposite. Using the same cell ids lets one search service query both. The live index can be rebuilt from the next round of pings if it is lost, so it needs no persistence."
+    },
+    {
+      "title": "Sharding the cell index",
+      "question": "How do we split the index, and what happens to a search that spans shards?",
+      "options": [
+        { "name": "Hash of the cell id", "pros": "Even load. No hot shards from geography.", "cons": "Neighbouring cells land on different shards, so every search fans out to many." },
+        { "name": "By region or cell prefix", "pros": "Neighbours stay together, so most searches touch one or two shards.", "cons": "A big city makes one shard hot. Needs splitting by load." },
+        { "name": "A copy of everything on every server", "pros": "No fan-out at all. Fine while the index is 1 GB.", "cons": "Stops working when the index or the write rate outgrows one machine." }
+      ],
+      "pick": "Cell prefix ranges, hot ones split",
+      "because": "A static place index is small, so replicate it first. Shard by cell prefix when the query rate or the data demands it. Locality keeps fan-out low, and a dense city can be spread over several shards."
+    }
+  ],
+  "failures": [
+    { "what": "A search near a cell border misses places", "impact": "A restaurant 100 m away is not returned, because it sits in the next cell.", "fix": "Always query the neighbouring cells that touch the circle, then filter by exact distance. Test with points placed on both sides of every border." },
+    { "what": "A dense cell is overloaded", "impact": "A cell in a city centre holds thousands of places. Every search there scans all of them and slows down.", "fix": "Split it into finer cells. Cache that cell's result. Set a ceiling per cell, like a few hundred places, and alert when a cell exceeds it." },
+    { "what": "An index shard is lost", "impact": "Places in a region vanish from search.", "fix": "Keep replicas per shard. The index is derived from the place store, so a shard can be rebuilt. Serve slightly stale results while it rebuilds." },
+    { "what": "The location stream backs up", "impact": "Drivers appear where they were 30 seconds ago.", "fix": "Keep only the newest position per object and drop older ones. Put a timestamp on each entry and ignore entries past their TTL, so a ghost driver cannot be matched." },
+    { "what": "Wrong coordinates and the date line", "impact": "Places with bad data show far from where they are. Searches near longitude 180 or the poles break.", "fix": "Validate on write. Use a library that handles wrap-around, and test near the date line." }
+  ],
+  "scaling": [
+    { "limit": "Query rate: many cell lookups per search", "lever": "Cache per cell, choose cell size close to the radius, and shard by cell prefix so a search touches few shards." },
+    { "limit": "Dense cities and uneven data", "lever": "Adaptive subdivision of cells above a size limit. Spread a hot city across several shards, and replicate the hottest cells." },
+    { "limit": "Write rate from moving objects", "lever": "Keep them in memory only, batch updates, send positions less often when an object is still, and shard the live index by cell." },
+    { "limit": "Users around the world", "lever": "Serve each region from a local index. A place is only searched near where it is, so regional shards rarely need to talk." }
+  ],
+  "recap": {
+    "key": "Turn a two-dimensional search into key lookups. Give every cell an id, look up the cells that cover the circle, then filter by exact distance. Split cells where places are dense.",
+    "numbers": "With 50M places and 2 km cells, a 5 km search scans 36 cells, so 20K searches per second is 720K lookups per second. The cell index is under 1 GB, so load, not size, sets the server count.",
+    "moves": ["Cells give key lookups, so no two-dimensional range scan", "Check neighbour cells, then filter by exact distance", "Choose cells near the radius and split dense ones", "Keep moving objects in a separate in-memory index with the same cells"]
+  }
+}

@@ -1,0 +1,192 @@
+{
+  "slug": "web-crawler",
+  "title": "Web Crawler",
+  "group": "Building blocks",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a crawler that starts from a few seed addresses, downloads pages, finds the links in them and follows those links, until it has collected a large slice of the web. The hard parts are not the download. They are being polite to every site and never fetching the same thing twice.",
+  "requirements": {
+    "functional": [
+      "Start from a list of seed URLs and follow links found in pages.",
+      "Download each page and store the raw content for later processing.",
+      "Obey robots.txt, the file where a site says what may be fetched.",
+      "Never download the same URL, or the same content, twice.",
+      "Come back to pages later, more often when they change often.",
+      "Stay inside limits so a site that makes endless links cannot trap it."
+    ],
+    "nonFunctional": [
+      { "name": "Politeness", "target": "At most one request at a time to a host, with a delay between requests" },
+      { "name": "Throughput", "target": "Finish a first pass of the target set inside the crawl window" },
+      { "name": "Robustness", "target": "Bad HTML, slow servers and dead links never stall the crawl" },
+      { "name": "Extensibility", "target": "New content types or processing steps plug in after the fetch" }
+    ],
+    "outOfScope": ["Executing JavaScript to render pages", "Indexing and ranking the pages", "Crawling behind logins"]
+  },
+  "estimate": {
+    "note": "All numbers are assumptions you can change. Two things shape the design: how fast pages must be fetched to fit the window, and how much memory it takes to remember every URL already seen.",
+    "inputs": [
+      { "id": "pages", "label": "Pages to crawl", "value": 1000000000, "min": 10000000, "max": 100000000000, "log": true },
+      { "id": "days", "label": "Crawl window", "value": 7, "min": 1, "max": 60, "step": 1, "unit": "days" },
+      { "id": "pageKb", "label": "Average page size", "value": 100, "min": 10, "max": 2000, "step": 10, "unit": "KB", "log": true },
+      { "id": "delay", "label": "Delay between hits on one host", "value": 1, "min": 0.1, "max": 10, "step": 0.1, "unit": "s" },
+      { "id": "bits", "label": "Bloom filter bits per URL", "value": 10, "min": 4, "max": 40, "step": 1, "unit": "bits", "note": "A Bloom filter is a compact set that can wrongly say yes, never wrongly say no." }
+    ],
+    "outputs": [
+      { "id": "pps", "label": "Pages per second", "expr": "pages / (days * 86400)", "unit": "per s" },
+      { "id": "hosts", "label": "Hosts active at once", "expr": "ceil(pps * delay)", "unit": "hosts", "note": "Each host gives one page per delay, so this many hosts must have work ready." },
+      { "id": "mbps", "label": "Download bandwidth", "expr": "pps * pageKb * 8 / 1000", "unit": "Mbit/s" },
+      { "id": "storageTb", "label": "Raw page storage, one pass", "expr": "pages * pageKb / 1e9", "unit": "TB", "note": "Before compression." },
+      { "id": "exactGb", "label": "Seen set as exact 16-byte hashes", "expr": "pages * 16 / 1e9", "unit": "GB" },
+      { "id": "bloomGb", "label": "Seen set as a Bloom filter", "expr": "pages * bits / 8 / 1e9", "unit": "GB" },
+      { "id": "fpPct", "label": "Bloom false-positive rate", "expr": "0.6185 ^ bits * 100", "unit": "%", "note": "These URLs are wrongly skipped. Acceptable for a crawler, with the best number of hash functions." }
+    ]
+  },
+  "api": [
+    { "call": "POST /seeds  { urls[] }", "does": "Adds starting URLs to the frontier with a high priority." },
+    { "call": "frontier.next(workerId)", "does": "Internal. Hands a worker one URL whose host is ready to be hit again." },
+    { "call": "frontier.add(url, priority)", "does": "Internal. Accepts a new URL that the dedupe step passed." },
+    { "call": "GET /pages/{urlHash}", "does": "Returns the stored raw page and its fetch time, for the next stage." },
+    { "call": "POST /hosts/{host}/recrawl", "does": "Asks for an early recrawl of a host or a URL." }
+  ],
+  "data": [
+    { "entity": "Frontier entry", "fields": "url, host, priority, depth, nextFetchAt", "store": "Priority queues plus one queue per host.", "why": "Two questions: what is worth fetching next, and is this host ready to be hit again." },
+    { "entity": "Seen URL", "fields": "urlHash", "store": "Bloom filter in memory, backed by a sharded key-value store.", "why": "Only membership is asked. A hash is much smaller than the URL." },
+    { "entity": "Page record", "fields": "urlHash, contentHash, fetchedAt, etag, changeRate, blobKey", "store": "Key-value store, body in blob storage.", "why": "Looked up by URL. The change rate feeds recrawl scheduling." },
+    { "entity": "Host info", "fields": "host, robotsRules, crawlDelay, dnsAnswer, expiresAt", "store": "Cache with expiry.", "why": "Read before every fetch and cheap to refetch when it expires." }
+  ],
+  "nodes": [
+    { "id": "seeds", "label": "Seed URLs", "kind": "client", "x": 6, "y": 50, "since": 0 },
+    { "id": "frontier", "label": "URL frontier", "kind": "queue", "x": 25, "y": 50, "sub": "what to fetch next", "since": 0 },
+    { "id": "hostq", "label": "Per-host queues", "kind": "queue", "x": 25, "y": 12, "sub": "one at a time", "since": 1 },
+    { "id": "sched", "label": "Recrawl scheduler", "kind": "service", "x": 6, "y": 12, "sub": "by change rate", "since": 5 },
+    { "id": "fetcher", "label": "Fetcher workers", "kind": "worker", "x": 44, "y": 50, "sub": "download pages", "since": 0 },
+    { "id": "web", "label": "The web", "kind": "external", "x": 44, "y": 12, "sub": "other people's sites", "since": 0 },
+    { "id": "robots", "label": "robots.txt cache", "kind": "cache", "x": 63, "y": 12, "sub": "per host rules", "since": 2 },
+    { "id": "dns", "label": "DNS cache", "kind": "cache", "x": 82, "y": 12, "sub": "host to address", "since": 2 },
+    { "id": "fp", "label": "Content hashes", "kind": "db", "x": 63, "y": 50, "sub": "same page twice?", "since": 4 },
+    { "id": "blob", "label": "Raw page store", "kind": "blob", "x": 82, "y": 50, "sub": "blob storage", "since": 0 },
+    { "id": "parser", "label": "Parser", "kind": "worker", "x": 44, "y": 88, "sub": "extract links", "since": 0 },
+    { "id": "dedupe", "label": "URL dedupe", "kind": "service", "x": 25, "y": 88, "sub": "normalise, limits", "since": 3 },
+    { "id": "seen", "label": "Seen URLs", "kind": "cache", "x": 6, "y": 88, "sub": "Bloom + sharded KV", "since": 3 }
+  ],
+  "edges": [
+    { "from": "seeds", "to": "frontier", "since": 0 },
+    { "from": "frontier", "to": "fetcher", "since": 0, "until": 1 },
+    { "from": "fetcher", "to": "web", "label": "GET", "since": 0 },
+    { "from": "fetcher", "to": "blob", "label": "store", "since": 0, "until": 4 },
+    { "from": "fetcher", "to": "parser", "since": 0 },
+    { "from": "parser", "to": "frontier", "label": "new links", "since": 0, "until": 3 },
+    { "from": "frontier", "to": "hostq", "since": 1 },
+    { "from": "hostq", "to": "fetcher", "label": "1 at a time", "since": 1 },
+    { "from": "fetcher", "to": "dns", "label": "resolve", "dashed": true, "since": 2 },
+    { "from": "fetcher", "to": "robots", "label": "allowed?", "dashed": true, "since": 2 },
+    { "from": "parser", "to": "dedupe", "since": 3 },
+    { "from": "dedupe", "to": "seen", "since": 3 },
+    { "from": "dedupe", "to": "frontier", "label": "new only", "since": 3 },
+    { "from": "fetcher", "to": "fp", "since": 4 },
+    { "from": "fp", "to": "blob", "since": 4 },
+    { "from": "sched", "to": "frontier", "label": "due again", "since": 5 }
+  ],
+  "evolution": [
+    { "title": "One loop", "problem": "Start with the simplest thing that works: a queue of URLs and one worker.", "change": "Take a URL, download it, save it, pull out the links and push them back on the queue." },
+    { "title": "Politeness: a queue per host", "problem": "Many workers pop URLs from one queue and a thousand of them land on the same site at once. The site slows down or bans us.", "change": "Split the frontier into two layers. A front layer ranks URLs by value. A back layer keeps one queue per host. A host is released to one worker at a time, then rests for a delay.", "numbers": "hosts active at once = pages per second times the delay" },
+    { "title": "DNS and robots.txt caches", "problem": "Every fetch first needs the host's address and its robots.txt rules. Looking both up each time doubles the work and DNS becomes the slowest step.", "change": "Cache DNS answers and each host's parsed robots.txt with an expiry. A URL that is not allowed is dropped before any request is sent." },
+    { "title": "Never queue a URL twice", "problem": "Pages link to each other, so the same URL arrives thousands of times. The frontier grows without end and the crawl loops forever. A calendar page can generate links without limit.", "change": "Normalise each URL, check a depth and length limit, then ask a seen set. Only new URLs enter the frontier. The seen set is a Bloom filter in memory in front of a sharded key-value store.", "numbers": "the estimator compares exact hashes with a Bloom filter" },
+    { "title": "Same page, different URL", "problem": "Mirrors, tracking parameters and printer-friendly copies are one page under many URLs. The seen set cannot catch them, so storage and later processing double up.", "change": "Hash the page body, or a fingerprint that tolerates small changes. If the hash is already known, skip storing and skip following its links again." },
+    { "title": "Priority and recrawl", "problem": "A news front page changes hourly and a dead blog never does. A first-in first-out frontier wastes the window on both.", "change": "A scheduler estimates each page's change rate from past fetches and puts it back into the frontier when it is due. The front layer ranks by page value and how stale it is." }
+  ],
+  "flows": [
+    {
+      "name": "Fetch one URL",
+      "steps": [
+        { "say": "The front layer of the frontier picks a valuable, due URL and routes it to its host's queue.", "nodes": ["frontier", "hostq"], "edges": [["frontier", "hostq"]] },
+        { "say": "A free worker asks for work. The host queue releases a URL only if that host has rested for its delay.", "nodes": ["hostq", "fetcher"], "edges": [["hostq", "fetcher"]] },
+        { "say": "The worker checks the cached robots.txt rules for the host. If the path is disallowed, it stops here.", "nodes": ["fetcher", "robots"], "edges": [["fetcher", "robots"]] },
+        { "say": "It resolves the host name from the DNS cache and falls back to a real lookup only on a miss.", "nodes": ["fetcher", "dns"], "edges": [["fetcher", "dns"]] },
+        { "say": "It downloads the page, with a timeout and a size cap so a slow or huge reply cannot stall it.", "nodes": ["fetcher", "web"], "edges": [["fetcher", "web"]] },
+        { "say": "It hashes the body and asks the content store if this page was seen under another URL.", "nodes": ["fetcher", "fp"], "edges": [["fetcher", "fp"]] },
+        { "say": "A new page goes into the raw page store. A duplicate is dropped.", "nodes": ["fp", "blob"], "edges": [["fp", "blob"]] }
+      ]
+    },
+    {
+      "name": "Discover new links",
+      "steps": [
+        { "say": "The worker passes the downloaded page to the parser.", "nodes": ["fetcher", "parser"], "edges": [["fetcher", "parser"]] },
+        { "say": "The parser extracts every link, and turns relative ones into full URLs.", "nodes": ["parser"], "edges": [] },
+        { "say": "Dedupe normalises each URL: lowercase host, drop fragments and tracking parameters, sort query keys. It rejects ones past the depth and length limits.", "nodes": ["parser", "dedupe"], "edges": [["parser", "dedupe"]] },
+        { "say": "It asks the seen set. The Bloom filter answers from memory, and a maybe is confirmed in the key-value store.", "nodes": ["dedupe", "seen"], "edges": [["dedupe", "seen"]] },
+        { "say": "Only new URLs go to the frontier, with a priority guessed from the source page and depth.", "nodes": ["dedupe", "frontier"], "edges": [["dedupe", "frontier"]] }
+      ]
+    },
+    {
+      "name": "Recrawl a page",
+      "steps": [
+        { "say": "The scheduler compares each page's change rate with its age and finds those that are due.", "nodes": ["sched"], "edges": [] },
+        { "say": "It puts them back in the frontier. Pages that change often come back sooner.", "nodes": ["sched", "frontier"], "edges": [["sched", "frontier"]] },
+        { "say": "The fetch sends the stored ETag. A not-modified reply costs almost nothing and tells the scheduler to wait longer next time.", "nodes": ["frontier", "hostq", "fetcher"], "edges": [["frontier", "hostq"], ["hostq", "fetcher"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Remembering every URL",
+      "question": "How do we know a URL was seen, when there are billions of them?",
+      "options": [
+        { "name": "Exact set in a database", "pros": "No mistakes. Easy to reason about.", "cons": "Billions of random lookups. Big, and the slowest part of the loop." },
+        { "name": "Bloom filter only", "pros": "A few bits per URL, held in memory, answers in microseconds.", "cons": "Some new URLs are wrongly skipped. It cannot delete, and it must be rebuilt as it fills." },
+        { "name": "Bloom filter in front of a sharded store", "pros": "Most 'seen' answers come from memory. Only the maybes reach the store.", "cons": "Two layers to run. The filter and store can drift apart." }
+      ],
+      "pick": "Bloom filter in front of a sharded store",
+      "because": "A wrong skip costs one missed page, and a wrong include costs one duplicate fetch. Use the filter to answer 'definitely new' fast, and the store to settle the rest. Shard by URL hash."
+    },
+    {
+      "title": "Shape of the frontier",
+      "question": "How do we pick the next URL and still be polite?",
+      "options": [
+        { "name": "One FIFO queue", "pros": "Simple. Breadth-first for free.", "cons": "No priorities, and a burst of one site's links hits it all at once." },
+        { "name": "Priority queues only", "pros": "Valuable and stale pages go first.", "cons": "Nothing stops many workers hammering one host." },
+        { "name": "Priority layer, then per-host queues", "pros": "Front layer decides value. Back layer decides who is allowed now. Each concern is separate.", "cons": "More moving parts. Needs a map from host to worker so one host's queue has a single reader." }
+      ],
+      "pick": "Priority layer, then per-host queues",
+      "because": "Politeness is a hard rule and priority is a preference, so they are different layers. Assign each host to one worker with consistent hashing, so its delay is kept without any lock."
+    },
+    {
+      "title": "Same content, many URLs",
+      "question": "How do we avoid storing and following near-identical pages?",
+      "options": [
+        { "name": "Exact content hash", "pros": "Cheap and exact. Catches mirrors and tracking-parameter copies.", "cons": "One changed byte, such as a timestamp, makes a new hash." },
+        { "name": "Similarity fingerprint (SimHash)", "pros": "Near-copies get near fingerprints, so small edits still match.", "cons": "Needs a nearness lookup, and the threshold needs tuning." }
+      ],
+      "pick": "Exact hash first, fingerprint for near copies",
+      "because": "The exact hash is nearly free and catches most copies. Run the heavier fingerprint only on pages that pass it, to catch pages that differ by a banner or a date."
+    },
+    {
+      "title": "Escaping spider traps",
+      "question": "A page produces endless new URLs, such as a calendar with a next-month link forever. What stops the crawler?",
+      "options": [
+        { "name": "Depth and URL length limits", "pros": "Simple and effective. Cuts most loops.", "cons": "Cuts some real deep content." },
+        { "name": "Per-host page budget", "pros": "Bounds the damage from any one site.", "cons": "A genuinely huge site gets under-crawled." },
+        { "name": "Detect repeating patterns", "pros": "Finds traps early, such as the same path pattern many times.", "cons": "Heuristic, and false alarms drop real pages." }
+      ],
+      "pick": "Depth, length and per-host budgets together",
+      "because": "No single rule is perfect, so stack cheap limits. Raise a host's budget if its pages are valuable, and let a human whitelist the huge sites."
+    }
+  ],
+  "failures": [
+    { "what": "A site is slow or hangs", "impact": "Workers wait on it and the whole crawl slows down.", "fix": "Timeouts and size caps on every request. Back the host off exponentially after errors, and let its queue sleep." },
+    { "what": "A spider trap or a link farm", "impact": "The frontier fills with endless useless URLs from one host.", "fix": "Depth, URL length and per-host budgets. Alert when one host's share of the frontier jumps." },
+    { "what": "A worker crashes holding a URL", "impact": "That URL is lost, and its host's queue may be stuck as in flight.", "fix": "Give each handed-out URL a lease. If it is not marked done before the lease ends, the URL goes back to its queue. Fetching is safe to repeat." },
+    { "what": "The seen set is lost", "impact": "Every known URL looks new, and the crawler refetches the web.", "fix": "Keep the sharded store as the source of truth and rebuild the filter from it. Content hashes still stop duplicate storage." },
+    { "what": "Hammering a site by mistake", "impact": "Complaints and IP bans, which block every later fetch.", "fix": "One reader per host queue, a honoured crawl delay, and a global per-host cap. Identify the crawler in its user agent with a contact address." }
+  ],
+  "scaling": [
+    { "limit": "One frontier cannot hold the whole web", "lever": "Shard the frontier by host with consistent hashing. A host then lives on exactly one node, which keeps politeness local." },
+    { "limit": "Seen set memory grows with every URL", "lever": "Shard the filter by URL hash. Use a counting or layered filter, and rebuild it from the store on a schedule." },
+    { "limit": "Bandwidth and one data centre", "lever": "Run crawler clusters in several regions, each owning hosts near it. Compress pages before storing them." }
+  ],
+  "recap": {
+    "key": "Fetching is easy. Politeness (a queue per host with a delay) and never repeating work (URL seen set, content hash, trap limits) are the design.",
+    "numbers": "1B pages in 7 days is about 1,650 pages per second and 1.3 Gbit/s. The seen set is 1.25 GB as a Bloom filter at 10 bits per URL.",
+    "moves": ["Two-layer frontier: priority first, then a queue per host", "Cache DNS and robots.txt, and check before fetching", "Normalise URLs, then Bloom filter plus sharded store", "Hash content to skip copies, and schedule recrawls by change rate"]
+  }
+}

@@ -1,0 +1,187 @@
+{
+  "slug": "google-docs",
+  "title": "Google Docs",
+  "group": "Productivity, maps and payments",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a system like Google Docs: a document in the browser that many people edit at the same moment, with everyone seeing the same text a fraction of a second later. The hard part is not storing text. It is merging simultaneous edits without losing anyone's work.",
+  "requirements": {
+    "functional": [
+      "Create, open and edit a rich text document.",
+      "Several people edit the same document live and see each other's changes and cursors.",
+      "Keep editing offline and merge when the connection returns.",
+      "Share a document with view, comment or edit access.",
+      "Browse and restore earlier versions."
+    ],
+    "nonFunctional": [
+      { "name": "Latency", "target": "A keystroke shows on other screens within 200 ms at the 99th percentile" },
+      { "name": "Convergence", "target": "After edits stop, every client shows exactly the same document" },
+      { "name": "Durability", "target": "An acknowledged edit is never lost" },
+      { "name": "Local feel", "target": "Your own typing appears instantly, never waiting for the server" }
+    ],
+    "outOfScope": ["Spreadsheets and slides", "Comments and suggestions in detail", "Full-text search across documents", "Export formats and printing"]
+  },
+  "estimate": {
+    "note": "All figures are assumptions, not facts. The numbers that matter are not total documents but documents being edited right now, because each one needs a live session. An operation is a small edit such as insert a character at position 12.",
+    "inputs": [
+      { "id": "docs", "label": "Total documents", "value": 1000000000, "min": 1000000, "max": 10000000000, "log": true },
+      { "id": "activePct", "label": "Share being edited right now", "value": 0.05, "min": 0.001, "max": 1, "log": true, "unit": "%" },
+      { "id": "editors", "label": "Editors per active document", "value": 3, "min": 1, "max": 50, "step": 1 },
+      { "id": "opsPerSec", "label": "Operations per second per document", "value": 3, "min": 0.1, "max": 30, "log": true, "note": "All editors added together, after batching keystrokes." },
+      { "id": "opBytes", "label": "Bytes per operation", "value": 100, "min": 20, "max": 1000, "log": true, "unit": "B" },
+      { "id": "snapEvery", "label": "Snapshot every", "value": 500, "min": 50, "max": 10000, "log": true, "unit": "ops" }
+    ],
+    "outputs": [
+      { "id": "activeDocs", "label": "Live sessions", "expr": "docs * activePct / 100", "unit": "documents", "note": "One collaboration session per document being edited." },
+      { "id": "totalOps", "label": "Operations per second, total", "expr": "activeDocs * opsPerSec", "unit": "per s" },
+      { "id": "broadcast", "label": "Broadcast messages per second", "expr": "totalOps * (editors - 1)", "unit": "per s", "note": "Each operation goes to every other editor." },
+      { "id": "sockets", "label": "Open WebSockets", "expr": "activeDocs * editors", "unit": "conns", "note": "One socket per person editing." },
+      { "id": "logMb", "label": "Log per busy document per day", "expr": "opsPerSec * 3600 * opBytes / 1e6", "unit": "MB", "note": "Assumes one busy hour of editing in the day." },
+      { "id": "snapsHour", "label": "Snapshots per document per hour", "expr": "opsPerSec * 3600 / snapEvery", "unit": "per h" },
+      { "id": "replayKb", "label": "Log to replay on open, at most", "expr": "snapEvery * opBytes / 1e3", "unit": "KB", "note": "Snapshot plus this tail rebuilds the document." }
+    ]
+  },
+  "api": [
+    { "call": "GET /docs/{id}", "does": "Checks access, then returns the latest snapshot and the operations after it, plus the revision number." },
+    { "call": "WS connect /docs/{id}/edit?rev", "does": "Opens a socket to the document's session. The server sends anything after rev." },
+    { "call": "op { clientId, baseRev, change }", "does": "Sends one operation made against baseRev. The server orders it, adjusts it and acknowledges the new revision." },
+    { "call": "cursor { position, selection }", "does": "Sends where the cursor is. It is shown to others and never stored." },
+    { "call": "POST /docs/{id}/share  { who, role }", "does": "Grants view, comment or edit access." },
+    { "call": "GET /docs/{id}/versions", "does": "Lists named versions and automatic checkpoints. A restore creates a new revision." }
+  ],
+  "data": [
+    { "entity": "Operation log", "fields": "docId, rev, clientId, change, time", "store": "Append-only log, partition key docId, sorted by rev.", "why": "Edits are only ever appended and read in order. The rev gives a total order for one document." },
+    { "entity": "Snapshot", "fields": "docId, rev, content", "store": "Object storage keyed by docId and rev.", "why": "A full copy at a known revision. Opening is snapshot plus a short tail of operations." },
+    { "entity": "Document", "fields": "docId, ownerId, title, latestRev, createdAt", "store": "Key-value store by docId.", "why": "Small record looked up by id. Not on the typing path." },
+    { "entity": "Permission", "fields": "docId, principal, role", "store": "Key-value store, index both ways.", "why": "Two questions: who can open this, and which documents are shared with me." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Editor in browser", "kind": "client", "x": 6, "y": 50, "sub": "applies edits locally", "since": 0 },
+    { "id": "app", "label": "Doc service", "kind": "service", "x": 28, "y": 50, "sub": "open and save", "since": 0 },
+    { "id": "docdb", "label": "Document store", "kind": "blob", "x": 28, "y": 88, "sub": "snapshots", "since": 0 },
+    { "id": "gw", "label": "Edit gateway", "kind": "service", "x": 28, "y": 31, "sub": "WebSockets", "since": 1 },
+    { "id": "router", "label": "Session router", "kind": "lb", "x": 50, "y": 12, "sub": "docId to one server", "since": 2 },
+    { "id": "session", "label": "Doc session", "kind": "service", "x": 72, "y": 31, "sub": "orders the edits", "since": 2 },
+    { "id": "oplog", "label": "Operation log", "kind": "db", "x": 72, "y": 50, "sub": "append only", "since": 3 },
+    { "id": "snap", "label": "Snapshotter", "kind": "worker", "x": 50, "y": 69, "sub": "every N operations", "since": 3 },
+    { "id": "presence", "label": "Presence", "kind": "cache", "x": 90, "y": 31, "sub": "cursors, not stored", "since": 4 },
+    { "id": "perms", "label": "Sharing and access", "kind": "db", "x": 6, "y": 12, "sub": "who can do what", "since": 5 },
+    { "id": "hist", "label": "Version history", "kind": "service", "x": 90, "y": 69, "sub": "restore a revision", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "app", "label": "open", "since": 0 },
+    { "from": "app", "to": "docdb", "since": 0 },
+    { "from": "client", "to": "gw", "label": "ops", "since": 1 },
+    { "from": "gw", "to": "app", "label": "ops", "since": 1, "until": 2 },
+    { "from": "gw", "to": "router", "since": 2 },
+    { "from": "router", "to": "session", "since": 2 },
+    { "from": "session", "to": "gw", "label": "broadcast", "since": 2 },
+    { "from": "session", "to": "app", "label": "save", "since": 2, "until": 3 },
+    { "from": "session", "to": "oplog", "label": "append", "since": 3 },
+    { "from": "app", "to": "oplog", "label": "tail", "since": 3 },
+    { "from": "oplog", "to": "snap", "since": 3 },
+    { "from": "snap", "to": "docdb", "since": 3 },
+    { "from": "session", "to": "presence", "label": "cursors", "dashed": true, "since": 4 },
+    { "from": "gw", "to": "perms", "label": "allowed?", "since": 5 },
+    { "from": "oplog", "to": "hist", "since": 6 }
+  ],
+  "evolution": [
+    { "title": "Save the whole document", "problem": "Start with what works: the browser loads a document and saves the entire text back to a server when you pause.", "change": "A document service reads and writes one stored copy of the document. Fine for one person at a time." },
+    { "title": "Send operations, not documents", "problem": "Two people save whole copies and the later save silently erases the earlier edits. A save also resends the whole text for one typed letter.", "change": "Each edit becomes a small operation, for example insert 'a' at 12, sent over a WebSocket with the revision it was made against. Your own screen applies it at once.", "numbers": "about 100 bytes per operation instead of the whole document" },
+    { "title": "One session per document", "problem": "With many servers, two edits to the same document can land on different ones. No machine sees them in a single order, so copies drift apart.", "change": "A router maps each document id to one session server (consistent hashing). All edits for that document pass through it, it gives them a revision number, adjusts concurrent ones and broadcasts the result.", "numbers": "the estimator shows how many live sessions exist" },
+    { "title": "Operation log and snapshots", "problem": "Saving the document after every operation is slow, a crash would lose recent edits, and there is no history. Replaying a very long log on open is slow too.", "change": "The session first appends each operation to a durable log, then acknowledges. A worker writes a snapshot every N operations. Opening loads the latest snapshot and replays the short tail.", "numbers": "snapshot interval times bytes per operation is the replay size" },
+    { "title": "Cursors and presence", "problem": "People want to see who is here and where they are typing. Cursor moves are far more frequent than edits and must not fill the log.", "change": "Cursors and selections travel through the same session but go to a small in-memory presence store, only broadcast and never logged. Losing them costs nothing." },
+    { "title": "Sharing and access checks", "problem": "A shared link must not open to everyone, and removing someone must stop their live edits, not just future page loads.", "change": "The gateway checks the permission store when a socket opens and again when access changes, and closes sockets that lose access. Roles are view, comment, edit." },
+    { "title": "Version history", "problem": "Users want to see who changed what and to undo a bad day. Snapshots alone are too coarse.", "change": "A history service reads the log and snapshots to rebuild any revision and group edits into readable versions. Restore writes a new revision on top, so nothing is erased." }
+  ],
+  "flows": [
+    {
+      "name": "Type a character",
+      "steps": [
+        { "say": "You type. Your browser applies it to your screen at once and builds an operation tagged with the revision it was based on.", "nodes": ["client"], "edges": [] },
+        { "say": "The operation goes down the already open WebSocket to an edit gateway.", "nodes": ["client", "gw"], "edges": [["client", "gw"]] },
+        { "say": "The gateway asks the router which server owns this document.", "nodes": ["gw", "router"], "edges": [["gw", "router"]] },
+        { "say": "The router forwards the operation to that document's session.", "nodes": ["router", "session"], "edges": [["router", "session"]] },
+        { "say": "The session adjusts it against any operations it accepted since your base revision, then assigns the next revision number.", "nodes": ["session"], "edges": [] },
+        { "say": "It appends the operation to the log. Only now is it durable.", "nodes": ["session", "oplog"], "edges": [["session", "oplog"]] },
+        { "say": "It broadcasts the adjusted operation back through the gateway to everyone, including an acknowledgement to you.", "nodes": ["session", "gw", "client"], "edges": [["session", "gw"]] },
+        { "say": "The snapshotter notices N operations since the last snapshot and writes a new one.", "nodes": ["oplog", "snap", "docdb"], "edges": [["oplog", "snap"], ["snap", "docdb"]] }
+      ]
+    },
+    {
+      "name": "Open, edit offline, reconnect",
+      "steps": [
+        { "say": "You open the document. The service checks the latest snapshot and the log tail.", "nodes": ["client", "app"], "edges": [["client", "app"]] },
+        { "say": "It loads the snapshot, then replays the operations after it, and returns the text with its revision, say 120.", "nodes": ["app", "docdb", "oplog"], "edges": [["app", "docdb"], ["app", "oplog"]] },
+        { "say": "The connection drops. You keep typing. Edits apply locally and queue up, all based on revision 120.", "nodes": ["client"], "edges": [] },
+        { "say": "The network returns. The browser reconnects and says 'I am at revision 120, with these queued operations'.", "nodes": ["client", "gw"], "edges": [["client", "gw"]] },
+        { "say": "The gateway checks your access has not been removed.", "nodes": ["gw", "perms"], "edges": [["gw", "perms"]] },
+        { "say": "The session sees the document is at 135. It adjusts your queued operations against revisions 121 to 135.", "nodes": ["gw", "router", "session"], "edges": [["gw", "router"], ["router", "session"]] },
+        { "say": "The adjusted operations are appended as 136 and up. Your screen is sent the 15 you missed and applies them.", "nodes": ["session", "oplog"], "edges": [["session", "oplog"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Operational transformation or CRDT",
+      "question": "Two people edit at once. How do we merge so both end with the same text?",
+      "options": [
+        { "name": "Operational transformation", "pros": "A central server picks the order and rewrites each operation to fit what came before. Operations stay small. Simple to reason about with one order.", "cons": "Needs that central server. Getting the rewrite rules right for rich text is famously hard." },
+        { "name": "CRDT", "pros": "Every character gets a unique id, so edits merge in any order with no server. Great for peer-to-peer and long offline stretches.", "cons": "Metadata per character, so documents grow. Deleted text leaves tombstones that need cleaning." },
+        { "name": "Lock a paragraph", "pros": "Trivial to build. No merge logic.", "cons": "People cannot type in the same paragraph. Feels broken for live collaboration." }
+      ],
+      "pick": "A central session that orders operations (OT style)",
+      "because": "We already pin one server per document, so a central order is free. That keeps operations small and the log simple. A CRDT is the better choice if offline or peer-to-peer matters most."
+    },
+    {
+      "title": "Where the session lives",
+      "question": "How do all edits for one document reach one place?",
+      "options": [
+        { "name": "Any server, lock in a database", "pros": "Stateless servers, easy scaling.", "cons": "Every keystroke fights for a lock and waits on the database. Latency is too high." },
+        { "name": "Pin the document to one server", "pros": "Ordering is a counter in memory. Fast. Broadcast stays local.", "cons": "That server is a single point per document. Hot documents cannot be split." },
+        { "name": "Pin, with a standby", "pros": "As above, and the log lets another server take over by replaying from the last revision.", "cons": "Needs a router, failure detection and care that two servers never own one document." }
+      ],
+      "pick": "Pin with a standby, recovered from the log",
+      "because": "One writer per document is the whole trick. A document has a few dozen editors at most, so one server is plenty. The durable log means the session itself holds no truth, so it can be rebuilt."
+    },
+    {
+      "title": "Log and snapshots",
+      "question": "How do we store a document that changes thousands of times?",
+      "options": [
+        { "name": "Only the latest text", "pros": "Smallest and simplest.", "cons": "No history, no recovery from a bad write, no way to merge a late operation." },
+        { "name": "Only the log", "pros": "Complete history. Append is cheap.", "cons": "Opening replays everything. Long documents open slowly." },
+        { "name": "Log plus periodic snapshots", "pros": "Open is snapshot plus a short tail. History is kept and old log can move to cheaper storage.", "cons": "Snapshots cost extra storage and need a job to produce them." }
+      ],
+      "pick": "Log plus snapshots",
+      "because": "Choose the interval so the tail replay is a few hundred operations. Shorter intervals cost more storage, longer ones cost slower opens. The estimator shows the trade."
+    },
+    {
+      "title": "Presence and cursors",
+      "question": "How do we show where other people are without drowning the system?",
+      "options": [
+        { "name": "Treat cursors as operations", "pros": "One mechanism. They stay in order with the text.", "cons": "They bloat the log and slow replay for no value." },
+        { "name": "Ephemeral side channel", "pros": "Throttled, not stored, small. A lost cursor update fixes itself on the next one.", "cons": "Cursor positions need adjusting when text moves, so they may briefly lag." }
+      ],
+      "pick": "Ephemeral side channel, throttled to a few per second",
+      "because": "Cursors are only useful for a moment. Send them through the session but keep them out of the log, and expire a person after missed heartbeats."
+    }
+  ],
+  "failures": [
+    { "what": "A session server crashes", "impact": "Everyone editing its documents is disconnected for a moment.", "fix": "The router reassigns the documents. The new server replays the log from the latest snapshot, and clients reconnect with their last revision and resend unacknowledged operations." },
+    { "what": "Two servers both think they own a document", "impact": "Operations get two different orders and copies diverge.", "fix": "Use a lease with a fencing token. The log only accepts an append from the current owner, and rejects stale ones." },
+    { "what": "A client resends an operation after a lost ack", "impact": "The same edit is applied twice and a letter doubles.", "fix": "Each operation carries a client id and a counter. The session ignores any it has already accepted." },
+    { "what": "A document gets enormous or very busy", "impact": "One session server runs out of memory or CPU, and broadcasts slow.", "fix": "Cap editors per document, move old content to snapshots, and stop sending presence updates above a threshold. Large audiences get read-only viewers." },
+    { "what": "Access removed while editing", "impact": "A person still holds an open socket and keeps typing.", "fix": "Permission changes publish an event. The gateway closes the socket, and the session rejects operations from that user." }
+  ],
+  "scaling": [
+    { "limit": "One session server per document", "lever": "Scale by adding session servers. Shard documents by id with consistent hashing, since documents are independent." },
+    { "limit": "Open sockets per gateway", "lever": "Add gateways, as with any chat system. The router holds the mapping, so gateways stay interchangeable." },
+    { "limit": "Log and snapshot storage grows forever", "lever": "Compact old log segments into snapshots and move them to cold storage. Keep recent ones hot." },
+    { "limit": "Users in many regions", "lever": "Place each document's session near most of its editors. Remote editors pay one round trip, and their own typing stays instant." }
+  ],
+  "recap": {
+    "key": "Send small operations to one session per document that gives them a single order, store them in an append-only log with snapshots, and let each screen apply your own edits instantly.",
+    "numbers": "Assumed: 1B documents, 0.05% active is 500K live sessions, about 1.5M operations per second and 1.5M sockets. A busy document makes about 1 MB of log per day.",
+    "moves": ["Operations instead of whole-document saves", "One session server per document gives a total order", "Append-only log plus snapshots every N operations", "Cursors on an ephemeral channel, access checked at the gateway"]
+  }
+}

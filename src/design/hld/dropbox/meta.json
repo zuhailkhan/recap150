@@ -1,0 +1,178 @@
+{
+  "slug": "dropbox",
+  "title": "Dropbox",
+  "group": "Productivity, maps and payments",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a system like Dropbox: a folder on your computer that stays identical on all your devices. Editing a large file should send only the part that changed, and the same bytes stored by many people should be kept once.",
+  "requirements": {
+    "functional": [
+      "Add, edit, rename and delete files in a synced folder.",
+      "Changes on one device appear on the user's other devices.",
+      "Upload and download large files, and resume if interrupted.",
+      "Handle two devices editing the same file while offline.",
+      "Share a folder or file with other people, with roles.",
+      "Restore older versions of a file."
+    ],
+    "nonFunctional": [
+      { "name": "Efficiency", "target": "Editing a large file sends only the changed blocks" },
+      { "name": "Freshness", "target": "Other online devices hear about a change within a few seconds" },
+      { "name": "Durability", "target": "A file that finished syncing is never lost" },
+      { "name": "Consistency", "target": "Metadata is strongly consistent, so no file is half updated" }
+    ],
+    "outOfScope": ["Real-time document editing", "Desktop client internals such as file watchers", "Full-text search", "Billing and quotas"]
+  },
+  "estimate": {
+    "note": "All figures are assumptions. Savings come from two places: sending only changed blocks, and skipping blocks the system already holds. Assume an edit changes about one block, and about one in five users has a device online.",
+    "inputs": [
+      { "id": "users", "label": "Users", "value": 50000000, "min": 1000000, "max": 1000000000, "log": true },
+      { "id": "filesPerUser", "label": "Files per user", "value": 500, "min": 50, "max": 50000, "log": true },
+      { "id": "avgFileMb", "label": "Average file size", "value": 5, "min": 0.1, "max": 100, "log": true, "unit": "MB" },
+      { "id": "blockMb", "label": "Block size", "value": 1, "min": 0.25, "max": 16, "log": true, "unit": "MB" },
+      { "id": "dedupPct", "label": "Blocks already stored elsewhere", "value": 30, "min": 0, "max": 80, "step": 5, "unit": "%", "note": "The deduplication ratio. It depends heavily on the user mix." },
+      { "id": "changePct", "label": "Files changed per day", "value": 0.5, "min": 0.05, "max": 10, "log": true, "unit": "%" }
+    ],
+    "outputs": [
+      { "id": "storedPb", "label": "Stored after deduplication", "expr": "users * filesPerUser * avgFileMb * (1 - dedupPct / 100) / 1e9", "unit": "PB", "note": "One copy. Multiply by the replication factor." },
+      { "id": "blocksB", "label": "Unique blocks to index", "expr": "users * filesPerUser * ceil(avgFileMb / blockMb) * (1 - dedupPct / 100) / 1e9", "unit": "billion", "note": "Smaller blocks dedupe better but make the index bigger." },
+      { "id": "changedM", "label": "Files changed per day", "expr": "users * filesPerUser * changePct / 100 / 1e6", "unit": "million" },
+      { "id": "wholeTb", "label": "Upload per day, whole files", "expr": "users * filesPerUser * changePct / 100 * avgFileMb / 1e6", "unit": "TB", "note": "What a system that resends files would move." },
+      { "id": "deltaTb", "label": "Upload per day, changed blocks", "expr": "users * filesPerUser * changePct / 100 * min(blockMb, avgFileMb) * (1 - dedupPct / 100) / 1e6", "unit": "TB", "note": "One block per edit, minus blocks already stored." },
+      { "id": "savedPct", "label": "Bandwidth saved", "expr": "100 * (1 - deltaTb / wholeTb)", "unit": "%" },
+      { "id": "conns", "label": "Notification connections", "expr": "users * 0.2", "unit": "conns", "note": "Assumes 20% of users have a device online holding one connection." }
+    ]
+  },
+  "api": [
+    { "call": "POST /commit  { path, baseRev, blocks[hash] }", "does": "Creates a new file revision from a list of block hashes. Fails if baseRev is no longer the latest." },
+    { "call": "POST /blocks/check  { hashes[] }", "does": "Returns which of these block hashes the system does not hold yet." },
+    { "call": "PUT <signed url> block bytes", "does": "Uploads one block straight to the block store, with a short-lived signed address." },
+    { "call": "GET /changes?cursor=", "does": "Returns metadata changes after the cursor, and a new cursor. Long poll when empty." },
+    { "call": "GET <signed url> block", "does": "Downloads one block by its hash." },
+    { "call": "POST /share  { folderId, who, role }", "does": "Shares a folder and sets view or edit access." }
+  ],
+  "data": [
+    { "entity": "File revision", "fields": "fileId, rev, parentRev, path, size, blockHashes[]", "store": "Sharded relational store, by namespace.", "why": "Needs transactions: a commit must replace the block list and bump the revision atomically." },
+    { "entity": "Block", "fields": "hash, size, refCount, location", "store": "Key-value index, by hash.", "why": "One lookup answers 'do we have this block?'. refCount tells when a block can be deleted." },
+    { "entity": "Block bytes", "fields": "hash to the bytes", "store": "Object storage keyed by hash.", "why": "Immutable blobs, named by their own hash. Cheap and durable." },
+    { "entity": "Change journal", "fields": "namespaceId, cursor, fileId, rev", "store": "Ordered log per namespace.", "why": "A device asks for everything after its cursor. Order is per namespace." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Desktop client", "kind": "client", "x": 6, "y": 50, "sub": "splits and hashes", "since": 0 },
+    { "id": "api", "label": "Sync API", "kind": "service", "x": 28, "y": 50, "sub": "auth and routing", "since": 0 },
+    { "id": "blob", "label": "Block store", "kind": "blob", "x": 28, "y": 88, "sub": "objects by hash", "since": 0 },
+    { "id": "meta", "label": "Metadata service", "kind": "service", "x": 50, "y": 31, "sub": "file tree, versions", "since": 1 },
+    { "id": "metadb", "label": "Metadata DB", "kind": "db", "x": 72, "y": 31, "sub": "revisions, block lists", "since": 1 },
+    { "id": "index", "label": "Block index", "kind": "cache", "x": 50, "y": 69, "sub": "hash seen before?", "since": 2 },
+    { "id": "feed", "label": "Change feed", "kind": "queue", "x": 50, "y": 12, "sub": "per namespace", "since": 3 },
+    { "id": "notifier", "label": "Notifier", "kind": "service", "x": 28, "y": 12, "sub": "long poll with cursor", "since": 3 },
+    { "id": "sharing", "label": "Sharing service", "kind": "service", "x": 72, "y": 50, "sub": "folders and roles", "since": 4 }
+  ],
+  "edges": [
+    { "from": "client", "to": "api", "label": "upload", "since": 0 },
+    { "from": "api", "to": "blob", "label": "whole file", "since": 0, "until": 5 },
+    { "from": "api", "to": "meta", "label": "commit", "since": 1 },
+    { "from": "meta", "to": "metadb", "since": 1 },
+    { "from": "api", "to": "index", "label": "known?", "since": 2 },
+    { "from": "meta", "to": "feed", "label": "changed", "since": 3 },
+    { "from": "feed", "to": "notifier", "since": 3 },
+    { "from": "notifier", "to": "client", "label": "ping", "since": 3 },
+    { "from": "meta", "to": "sharing", "label": "access", "since": 4 },
+    { "from": "client", "to": "blob", "label": "signed URL", "since": 5 }
+  ],
+  "evolution": [
+    { "title": "Upload whole files", "problem": "Start with what works: the client uploads each changed file in full to a server that stores it.", "change": "A sync API receives files and writes them to object storage. Another device downloads the whole file." },
+    { "title": "Blocks and a metadata service", "problem": "Fixing one typo in a 1 GB file resends 1 GB. An interrupted upload starts over. Two copies of one file are stored twice.", "change": "The client cuts a file into blocks, hashes each, and uploads only changed ones. A metadata service keeps the file tree and each revision's ordered block hashes. A commit works only if the client's base revision is still the latest.", "numbers": "the estimator compares whole-file and changed-block upload" },
+    { "title": "Deduplicate by hash", "problem": "Different files and different users hold the same bytes: a shared installer, a forwarded attachment. Storing each copy wastes petabytes.", "change": "A block is named by the hash of its content. Before uploading, the client asks the block index which hashes exist already, and sends only the missing ones. One stored block can be referenced by many files.", "numbers": "stored size shrinks by the dedup ratio" },
+    { "title": "Tell other devices", "problem": "Your laptop does not know the phone saved a file. Polling every few seconds from every device is mostly empty requests.", "change": "Every commit appends to a per-namespace change feed. A notifier holds a long-lived connection per device and sends a small ping when the feed moves. The device then asks for changes after its cursor.", "numbers": "open connections come from the estimator" },
+    { "title": "Sharing and permissions", "problem": "Folders are shared between people. A commit by one person must be allowed, and must reach everyone who sees that folder.", "change": "A sharing service stores who holds which role on each shared folder, and the metadata service asks it before accepting a commit or serving a list. Change feeds are per shared folder, so everyone with access listens to the same one." },
+    { "title": "Upload straight to the store", "problem": "Every block byte flows through the API servers, which then need as much bandwidth as the whole product.", "change": "The API only decides what is needed and hands the client short-lived signed addresses. Blocks go directly to and from the block store, and API servers see small requests only." }
+  ],
+  "flows": [
+    {
+      "name": "Edit a file on one device",
+      "steps": [
+        { "say": "The client sees the file changed. It cuts it into blocks, hashes each, and builds the list of hashes.", "nodes": ["client"], "edges": [] },
+        { "say": "It sends the list of hashes to the sync API and asks which are new.", "nodes": ["client", "api"], "edges": [["client", "api"]] },
+        { "say": "The API checks the block index. Hashes already stored are skipped, even if another user uploaded them.", "nodes": ["api", "index"], "edges": [["api", "index"]] },
+        { "say": "The client uploads only the missing blocks, usually one, straight to the block store with signed addresses.", "nodes": ["client", "blob"], "edges": [["client", "blob"]] },
+        { "say": "The client commits the new revision: the full ordered hash list and the revision it was based on.", "nodes": ["client", "api", "meta"], "edges": [["client", "api"], ["api", "meta"]] },
+        { "say": "The metadata service checks the base revision is still current, checks permission, and stores the new revision in one transaction.", "nodes": ["meta", "metadb", "sharing"], "edges": [["meta", "metadb"], ["meta", "sharing"]] },
+        { "say": "It appends the change to the feed. The commit is acknowledged.", "nodes": ["meta", "feed"], "edges": [["meta", "feed"]] }
+      ]
+    },
+    {
+      "name": "Another device catches up",
+      "steps": [
+        { "say": "The change feed moves, and the notifier sends a small ping on the open connection.", "nodes": ["feed", "notifier"], "edges": [["feed", "notifier"]] },
+        { "say": "The ping reaches the other device. It carries no file data, only 'something changed'.", "nodes": ["notifier", "client"], "edges": [["notifier", "client"]] },
+        { "say": "The device asks the sync API for changes after its cursor.", "nodes": ["client", "api"], "edges": [["client", "api"]] },
+        { "say": "The metadata service returns the new revision with its block hash list and a new cursor.", "nodes": ["api", "meta", "metadb"], "edges": [["api", "meta"], ["meta", "metadb"]] },
+        { "say": "The device compares the list with blocks it already has, and downloads only the missing ones from the block store.", "nodes": ["client", "blob"], "edges": [["client", "blob"]] },
+        { "say": "It reassembles the file in a temporary name and swaps it in. If the local file also changed, it keeps both and names one a conflicted copy.", "nodes": ["client"], "edges": [] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Block size and chunking",
+      "question": "How do we cut files into blocks?",
+      "options": [
+        { "name": "Fixed-size blocks", "pros": "Simple. Position tells you the block. Easy to parallelize.", "cons": "Inserting one byte at the start shifts every later block, so everything looks changed." },
+        { "name": "Content-defined blocks", "pros": "Boundaries follow the content using a rolling hash, so an insert changes only nearby blocks.", "cons": "More CPU on the client, and block sizes vary." },
+        { "name": "Whole files", "pros": "No block bookkeeping.", "cons": "Nothing is saved on edit and nothing dedupes except exact copies." }
+      ],
+      "pick": "Content-defined blocks of a few MB, fixed for small files",
+      "because": "Most edits are inserts, which fixed blocks handle badly. Larger blocks mean a smaller index but more resent bytes, smaller blocks the reverse. The estimator shows both sides."
+    },
+    {
+      "title": "Detecting and resolving conflicts",
+      "question": "Two devices edit the same file while offline. What happens?",
+      "options": [
+        { "name": "Last write wins", "pros": "Simple and automatic.", "cons": "Silently destroys someone's work. Unacceptable for user files." },
+        { "name": "Keep both: conflicted copy", "pros": "Nothing is lost. Works for any file type with no understanding of its contents.", "cons": "The user has to merge by hand." },
+        { "name": "Automatic merge", "pros": "No manual work, ideal for text.", "cons": "Needs a merge per file format. Risky for binary files." }
+      ],
+      "pick": "Keep both with a conflicted copy",
+      "because": "The server detects it cheaply: a commit names its base revision, and a stale base is rejected. The losing client saves its version as a second file next to the first, and both sync."
+    },
+    {
+      "title": "How devices hear about changes",
+      "question": "How does a device learn that something changed, cheaply and quickly?",
+      "options": [
+        { "name": "Poll every few seconds", "pros": "Plain HTTP and trivial.", "cons": "Mostly empty requests, and a delay equal to the interval." },
+        { "name": "Long poll with a cursor", "pros": "The server holds the request until something changes. Near-instant and works through proxies.", "cons": "A connection per device and a re-request after each reply." },
+        { "name": "Persistent socket", "pros": "Lowest overhead per message.", "cons": "Sticky routing, heartbeats, and more to run for rare messages." }
+      ],
+      "pick": "Long poll with a cursor",
+      "because": "Changes arrive in bursts with long quiet gaps, so a cheap held request fits. The cursor is the safety net: if a ping is lost, the next request still returns everything after the cursor."
+    },
+    {
+      "title": "Where block data lives",
+      "question": "Should the metadata and the bytes live together?",
+      "options": [
+        { "name": "One store for both", "pros": "One system, one backup.", "cons": "Mixes tiny transactional rows with huge immutable bytes. Scales and fails differently." },
+        { "name": "Split: metadata DB and block store", "pros": "Each uses the right engine. Blocks are immutable and named by hash, so they cache and replicate trivially.", "cons": "Two systems to keep consistent. A commit must not point at a block that is not stored yet." }
+      ],
+      "pick": "Split, with upload before commit",
+      "because": "Upload blocks first, commit metadata second. A crash between them leaves orphan blocks that a later garbage collector removes. It never leaves a revision that points at a missing block."
+    }
+  ],
+  "failures": [
+    { "what": "Upload is interrupted halfway", "impact": "A large file would start over, wasting time and bandwidth.", "fix": "Each block is its own small upload and is stored once it arrives. On retry the client asks which hashes are missing and sends only those." },
+    { "what": "Commit points at a missing block", "impact": "Another device would try to download a block that does not exist.", "fix": "Order the steps: blocks are stored and acknowledged before the commit. The metadata service can verify the block index before accepting." },
+    { "what": "A hash collision or corrupt block", "impact": "Two different contents share a name, or a block rots on disk.", "fix": "Use a strong hash such as SHA-256, verify it on upload and on download, and keep several copies with periodic checks." },
+    { "what": "A device misses pings", "impact": "It stays out of date until something else wakes it.", "fix": "Pings are only hints. On reconnect and on a timer it asks for changes after its cursor, which is always complete." },
+    { "what": "A popular shared block is deleted", "impact": "Removing one user's file would break everyone else's copy of the same block.", "fix": "Keep a reference count per block. Delete the block only when the count is zero and a grace period has passed." }
+  ],
+  "scaling": [
+    { "limit": "Metadata is strongly consistent and grows with files", "lever": "Shard by namespace (a user or shared folder). Commits touch one namespace, so transactions stay on one shard." },
+    { "limit": "The block index has billions of hashes", "lever": "Partition by hash, which spreads evenly, with a Bloom filter in front to answer 'definitely not stored' cheaply." },
+    { "limit": "Millions of open notification connections", "lever": "Add notifier servers and route a device to one by user id. Pings are tiny, and a lost one is repaired by the cursor." },
+    { "limit": "Block store cost", "lever": "Move cold blocks to cheaper storage tiers, compress before upload, and tune block size." }
+  ],
+  "recap": {
+    "key": "Cut files into hash-named blocks, send and store only blocks the system lacks, keep the file tree and block lists in a consistent metadata service, and ping devices to pull changes by cursor.",
+    "numbers": "Assumed: 50M users and 500 files each of 5 MB, 30% deduplication, about 90 PB stored. 0.5% of files change daily, so about 90 TB moves instead of 625 TB. About 10M notification connections.",
+    "moves": ["Content-addressed blocks: upload only what changed", "Dedupe through a block index keyed by hash", "Metadata service with base-revision commits and conflicted copies", "Change feed with cursors, then upload straight to the block store"]
+  }
+}

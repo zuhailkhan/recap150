@@ -1,0 +1,189 @@
+{
+  "slug": "job-scheduler",
+  "title": "Job Scheduler",
+  "group": "Building blocks",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a service that runs jobs later: once at a chosen time, or again and again on a schedule such as every night at 2 am. Millions of jobs are waiting at any moment, many fire at the same second, and workers crash in the middle of a job. Every job must run, and a job must not be lost or silently run twice by accident.",
+  "requirements": {
+    "functional": [
+      "Schedule a one-off job to run at a given time, with a payload.",
+      "Schedule a recurring job with a cron expression.",
+      "Run each due job on a worker, close to its due time.",
+      "Retry a failed job with backoff, then park it after too many failures.",
+      "Cancel or change a job before it runs, and see its status and history."
+    ],
+    "nonFunctional": [
+      { "name": "Timeliness", "target": "Jobs start within 1 to 2 seconds of their due time at the 99th percentile" },
+      { "name": "Durability", "target": "An accepted job is never lost, even if a node dies" },
+      { "name": "Delivery", "target": "At least once. A job may run twice after a crash, so jobs must be idempotent" },
+      { "name": "Scale", "target": "Tens of millions of waiting jobs and thousands firing per second at peak" }
+    ],
+    "outOfScope": ["Multi-step workflows with dependencies (DAGs)", "Running arbitrary user code safely (sandboxing)", "Exactly once execution of side effects"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts. Load is bursty: many jobs are set for the top of the hour. Workers are sized for the peak, not the average. Each worker is assumed to run 20 jobs at once.",
+    "inputs": [
+      { "id": "perDay", "label": "Jobs that fire per day", "value": 50000000, "min": 1000000, "max": 10000000000, "log": true },
+      { "id": "peakX", "label": "Peak versus average rate", "value": 10, "min": 2, "max": 50, "step": 1, "unit": "x" },
+      { "id": "runSec", "label": "Average job duration", "value": 2, "min": 0.1, "max": 600, "log": true, "unit": "s" },
+      { "id": "partitions", "label": "Partitions of the job store", "value": 64, "min": 4, "max": 1024, "log": true },
+      { "id": "pollMs", "label": "Poll interval per partition", "value": 1000, "min": 100, "max": 10000, "log": true, "unit": "ms" }
+    ],
+    "outputs": [
+      { "id": "avgDue", "label": "Jobs due per second, average", "expr": "perDay / 86400", "unit": "per s" },
+      { "id": "peakDue", "label": "Jobs due per second at peak", "expr": "avgDue * peakX", "unit": "per s", "note": "Spikes happen on the hour and at midnight." },
+      { "id": "concurrent", "label": "Jobs running at once at peak", "expr": "peakDue * runSec", "unit": "jobs", "note": "Arrival rate times duration." },
+      { "id": "workers", "label": "Workers needed", "expr": "ceil(concurrent / 20)", "unit": "workers", "note": "Assumes 20 concurrent jobs per worker. Add headroom for failures." },
+      { "id": "pollsPerSec", "label": "Store queries per second", "expr": "partitions * 1000 / pollMs", "unit": "per s", "note": "Each partition is polled for due jobs." },
+      { "id": "perPoll", "label": "Jobs found per poll at peak", "expr": "peakDue * pollMs / 1000 / partitions", "unit": "jobs", "note": "This is the batch each poll must claim and hand out." },
+      { "id": "lateMs", "label": "Average added delay from polling", "expr": "pollMs / 2", "unit": "ms", "note": "A job waits half a poll interval on average." }
+    ]
+  },
+  "api": [
+    { "call": "POST /jobs  { runAt | cron, payload, idemKey, maxAttempts }", "does": "Stores a job. idemKey makes a repeated create return the same job." },
+    { "call": "DELETE /jobs/{id}", "does": "Cancels a job that has not started. Running jobs finish or time out." },
+    { "call": "GET /jobs/{id}", "does": "Returns status (waiting, running, done, failed, parked), attempts and next run." },
+    { "call": "worker: claim -> job, leaseUntil", "does": "A worker receives a job along with a lease. The job is invisible to others until the lease ends." },
+    { "call": "worker: heartbeat(jobId) and complete(jobId, result)", "does": "Heartbeat extends the lease. Complete removes the job or computes the next run for a cron job." }
+  ],
+  "data": [
+    { "entity": "Job", "fields": "jobId, partition, dueAt, state, payload, attempts, leaseUntil, cron, idemKey", "store": "Sharded store with a secondary index on (partition, dueAt).", "why": "The key query is: partition P, state waiting, dueAt up to now, oldest first. A sorted index answers it without scanning." },
+    { "entity": "Run history", "fields": "jobId, attempt, startedAt, endedAt, result, error", "store": "Append-only table or log store.", "why": "Write-heavy and read rarely. Kept apart from the hot job table so the due-time index stays small." },
+    { "entity": "Partition owner", "fields": "partition, ownerNode, leaseUntil", "store": "Coordination service.", "why": "Needs strong consistency, so exactly one scheduler node owns a partition at a time." },
+    { "entity": "Dead letter", "fields": "jobId, lastError, attempts, parkedAt", "store": "Queue or table.", "why": "Failed jobs wait for a human or a replay. They must not block live jobs." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Clients", "kind": "client", "x": 6, "y": 50, "since": 0 },
+    { "id": "api", "label": "Scheduler API", "kind": "service", "x": 26, "y": 50, "sub": "create, cancel, status", "since": 0 },
+    { "id": "store", "label": "Job store", "kind": "db", "x": 48, "y": 50, "sub": "index on due time", "since": 0 },
+    { "id": "sched", "label": "Scheduler A", "kind": "service", "x": 70, "y": 22, "sub": "polls due jobs", "since": 0 },
+    { "id": "sched2", "label": "Scheduler B", "kind": "service", "x": 70, "y": 78, "sub": "polls due jobs", "since": 4 },
+    { "id": "coord", "label": "Coordination", "kind": "service", "x": 70, "y": 50, "sub": "partition owners", "since": 4 },
+    { "id": "queue", "label": "Ready queue", "kind": "queue", "x": 90, "y": 50, "sub": "due jobs", "since": 1 },
+    { "id": "worker", "label": "Workers", "kind": "worker", "x": 90, "y": 72, "sub": "run jobs", "since": 1 },
+    { "id": "dlq", "label": "Dead letter queue", "kind": "queue", "x": 90, "y": 20, "sub": "parked failures", "since": 3 },
+    { "id": "cron", "label": "Cron expander", "kind": "worker", "x": 48, "y": 88, "sub": "computes next run", "since": 5 }
+  ],
+  "edges": [
+    { "from": "client", "to": "api", "since": 0 },
+    { "from": "api", "to": "store", "label": "insert", "since": 0 },
+    { "from": "sched", "to": "store", "label": "poll", "since": 0 },
+    { "from": "sched", "to": "queue", "label": "enqueue", "since": 1 },
+    { "from": "queue", "to": "worker", "since": 1 },
+    { "from": "worker", "to": "store", "label": "done", "since": 1, "until": 2 },
+    { "from": "worker", "to": "store", "label": "lease", "since": 2 },
+    { "from": "queue", "to": "dlq", "label": "give up", "since": 3 },
+    { "from": "coord", "to": "sched", "dashed": true, "since": 4 },
+    { "from": "coord", "to": "sched2", "dashed": true, "since": 4 },
+    { "from": "sched2", "to": "store", "since": 4 },
+    { "from": "sched2", "to": "queue", "since": 4 },
+    { "from": "cron", "to": "store", "label": "next run", "since": 5 }
+  ],
+  "evolution": [
+    { "title": "A table and a poller", "problem": "Start with the simplest thing that works: one table of jobs with a due time, and one process that wakes up every second.", "change": "The poller asks for jobs with dueAt up to now, oldest first, and runs them itself. An index on dueAt keeps this query fast. Without it every poll scans every waiting job." },
+    { "title": "Hand jobs to workers", "problem": "A job that takes 5 minutes blocks the poller, so every other job runs late. The poller is also the only thing that can run anything.", "change": "The poller only finds due jobs and puts them on a ready queue. A pool of workers takes jobs from the queue and runs them. Timeliness and execution now scale on their own.", "numbers": "workers needed, in the estimator" },
+    { "title": "Leases and heartbeats", "problem": "A worker takes a job and dies. The job is stuck as running forever. Or two workers take the same job.", "change": "When a job is claimed it gets a lease: invisible to others until a deadline. The worker sends heartbeats to extend it. If heartbeats stop, the lease runs out and the job becomes due again. The claim itself is one atomic update, so only one worker wins.", "numbers": "lease 30 s, heartbeat every 10 s" },
+    { "title": "Retries, backoff, dead letters", "problem": "A job fails because a downstream service is down. Retrying at once hammers the same service, and a job that always fails would loop forever.", "change": "On failure, set dueAt to now plus a growing delay, such as 1, 2, 4, 8 seconds with random jitter. After a maximum number of attempts, move the job to a dead letter queue for a human to look at or replay." },
+    { "title": "Partitions and owners", "problem": "One poller handles a limited number of jobs per second and is a single point of failure. If it dies, nothing runs.", "change": "Split the job store into partitions by hash of the job id. A coordination service gives each partition to one scheduler node through a lease. If a node dies its lease expires and another takes the partition. More nodes means more partitions each.", "numbers": "polls per second and jobs per poll" },
+    { "title": "Recurring jobs", "problem": "A nightly job at 2 am cannot be one row run forever. If each run is a new row created in advance for all future dates, the table fills with rows that may never be needed.", "change": "Store the cron expression with the job. When a run completes, an expander computes the next time from the expression and writes one new row. Only the next run exists. Time zones and daylight saving are handled here." }
+  ],
+  "flows": [
+    {
+      "name": "Schedule and run a job once",
+      "steps": [
+        { "say": "A client asks for a job at 14:00 with a payload and an idempotency key.", "nodes": ["client", "api"], "edges": [["client", "api"]] },
+        { "say": "The API stores it in the partition chosen by hashing the job id, with state waiting and dueAt 14:00. A repeated create with the same key returns the same job.", "nodes": ["api", "store"], "edges": [["api", "store"]] },
+        { "say": "Scheduler A owns that partition. Each second it asks for waiting jobs with dueAt up to now, oldest first, up to a batch size.", "nodes": ["sched", "store"], "edges": [["sched", "store"]] },
+        { "say": "It marks them claimed with a short lease, in the same atomic update, and puts them on the ready queue.", "nodes": ["sched", "queue"], "edges": [["sched", "queue"]] },
+        { "say": "A free worker takes a job from the queue.", "nodes": ["queue", "worker"], "edges": [["queue", "worker"]] },
+        { "say": "The worker runs it and sends heartbeats to extend the lease while it works.", "nodes": ["worker", "store"], "edges": [["worker", "store"]] },
+        { "say": "It marks the job done. The run is added to history.", "nodes": ["worker", "store"], "edges": [["worker", "store"]] }
+      ]
+    },
+    {
+      "name": "A worker crashes, then retries",
+      "steps": [
+        { "say": "A worker is running a job and sending heartbeats.", "nodes": ["worker", "store"], "edges": [["worker", "store"]] },
+        { "say": "The worker process dies. Heartbeats stop.", "nodes": ["worker"], "edges": [] },
+        { "say": "The lease deadline passes. A scheduler sees a running job with an expired lease and makes it waiting again.", "nodes": ["sched", "store"], "edges": [["sched", "store"]] },
+        { "say": "The job goes back on the queue and another worker runs it. It may have done part of the work already, so the job must be idempotent.", "nodes": ["sched", "queue", "worker"], "edges": [["sched", "queue"], ["queue", "worker"]] },
+        { "say": "This time the job returns an error. The attempt counter goes up and dueAt moves to now plus a backoff with jitter.", "nodes": ["worker", "store"], "edges": [["worker", "store"]] },
+        { "say": "After the last allowed attempt the job moves to the dead letter queue, so an operator can inspect it and replay it after a fix.", "nodes": ["queue", "dlq"], "edges": [["queue", "dlq"]] }
+      ]
+    },
+    {
+      "name": "A recurring job",
+      "steps": [
+        { "say": "A client creates a job with cron expression 0 2 * * * in a named time zone.", "nodes": ["client", "api", "store"], "edges": [["client", "api"], ["api", "store"]] },
+        { "say": "Only one row exists: the next run, 02:00 tomorrow.", "nodes": ["store"], "edges": [] },
+        { "say": "At 02:00 it is claimed and run like any other job.", "nodes": ["sched", "queue", "worker"], "edges": [["sched", "queue"], ["queue", "worker"]] },
+        { "say": "When the run finishes, the expander reads the cron expression and computes the next time after the scheduled time.", "nodes": ["cron", "store"], "edges": [["cron", "store"]] },
+        { "say": "It writes the next row. If the system was down and missed runs, a policy chooses to skip them or run once to catch up.", "nodes": ["cron", "store"], "edges": [["cron", "store"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Finding due jobs fast",
+      "question": "There are tens of millions of waiting jobs. How does a scheduler find the few that are due?",
+      "options": [
+        { "name": "Indexed table, poll", "pros": "Simple and durable. A range query on (partition, dueAt) reads just the due rows.", "cons": "Polling adds delay and load. Hot index at the front, with constant updates." },
+        { "name": "In-memory priority queue per partition", "pros": "Peek the next due time in O(1), sleep exactly until then. Very low latency.", "cons": "Rebuild from the store after a crash. Memory grows with jobs held." },
+        { "name": "Timing wheel", "pros": "Buckets by time slot. Adding a job and expiring a slot are O(1), good for millions of timers.", "cons": "Fixed resolution. Far-future jobs need a hierarchy of wheels or must stay in the store." }
+      ],
+      "pick": "Store as truth, a small in-memory window per partition",
+      "because": "The store holds all jobs and survives crashes. Each scheduler loads the next minute or so of its partition into a heap or wheel, and refreshes it. Far-future jobs cost nothing in memory."
+    },
+    {
+      "title": "Claiming without double runs",
+      "question": "How do we make sure two workers do not run the same job?",
+      "options": [
+        { "name": "Row lock while running", "pros": "Simple to understand. The database enforces it.", "cons": "Holds a transaction for the whole job. A dead worker leaves a lock until the connection drops." },
+        { "name": "Lease with heartbeat", "pros": "No long locks. A dead worker's lease simply expires and the job returns.", "cons": "A slow worker can lose its lease and keep running, so the job may run twice." },
+        { "name": "Lease plus fencing token", "pros": "Each claim has a rising attempt number. Writes from an old attempt are rejected.", "cons": "The job's side effects must check the token. More work for job authors." }
+      ],
+      "pick": "Lease with heartbeat, and idempotent jobs",
+      "because": "Exactly once is not possible across crashes. Aim for at least once and make the work safe to repeat: pass the job id as an idempotency key to anything the job calls. Use a fencing token when the side effect is a database write."
+    },
+    {
+      "title": "Who owns a partition",
+      "question": "How do scheduler nodes share the work without stepping on each other?",
+      "options": [
+        { "name": "One leader for everything", "pros": "Simple. One place decides.", "cons": "Throughput is one node. A failover pauses everything." },
+        { "name": "Sharded ownership by lease", "pros": "Each node owns a set of partitions. Work scales out, and a failure only delays its partitions.", "cons": "Needs a coordination service and rebalancing logic." },
+        { "name": "No owners, claim atomically", "pros": "Any node can poll any partition. No coordination service.", "cons": "Nodes compete for the same rows, wasting queries. Hard to batch efficiently." }
+      ],
+      "pick": "Sharded ownership by lease",
+      "because": "It spreads the load and keeps polling efficient, since a node polls only its own partitions. The atomic claim on the row is still there as a second guard if two nodes briefly think they own the same partition."
+    },
+    {
+      "title": "Retry policy",
+      "question": "How often and how long do we retry a failing job?",
+      "options": [
+        { "name": "Fixed delay", "pros": "Predictable and easy.", "cons": "A struggling dependency gets hit at the same rate forever. Retries can bunch up." },
+        { "name": "Exponential backoff with jitter", "pros": "Pressure falls over time. Random spread avoids waves of retries.", "cons": "Late recovery for a quick blip. Needs a ceiling for the delay." },
+        { "name": "Backoff, then dead letter", "pros": "Bounded effort. Poison jobs are set aside and visible.", "cons": "Someone must watch the dead letter queue and replay." }
+      ],
+      "pick": "Exponential backoff with jitter, capped, then dead letter",
+      "because": "Backoff protects dependencies and jitter prevents synchronized retries. The cap on attempts keeps a poison job from using workers forever. Alert on the depth of the dead letter queue."
+    }
+  ],
+  "failures": [
+    { "what": "A worker dies mid-job", "impact": "The job is stuck running, or has done half its work.", "fix": "The lease expires and the job returns to waiting. Jobs are idempotent, so a rerun is safe. Fencing tokens protect shared writes." },
+    { "what": "A scheduler node dies", "impact": "Its partitions stop being polled and their jobs run late.", "fix": "Its partition lease expires and another node takes over. Keep leases short, around 10 seconds. Alert on the age of the oldest due job." },
+    { "what": "A burst at the top of the hour", "impact": "Millions of jobs are due in the same second, and the queue and store get hammered.", "fix": "Spread with jitter at creation time where the caller allows it. Claim in batches. Scale workers by queue age. Rate limit per tenant." },
+    { "what": "A poison job always fails", "impact": "It retries forever and eats worker time.", "fix": "Cap attempts, back off, then move it to the dead letter queue with the last error. Provide a replay tool." },
+    { "what": "Clock drift between nodes", "impact": "A node with a fast clock claims jobs early. A node with a slow clock runs them late.", "fix": "Compare dueAt to the database or store clock, not the local one. Run time sync on every node. Accept small lateness and measure it." }
+  ],
+  "scaling": [
+    { "limit": "Polling load grows with partitions times poll rate", "lever": "Poll adaptively: sleep until the next known due time, and wake on new inserts. Load a window into memory instead of querying every second." },
+    { "limit": "One hot partition or tenant", "lever": "Partition by a hash of the job id, not by tenant. Cap per-tenant concurrency so one customer cannot take every worker." },
+    { "limit": "The job table grows with history", "lever": "Move finished jobs to the history store, and delete or archive them on a schedule. Keep the hot index small." }
+  ],
+  "recap": {
+    "key": "Keep jobs in a store ordered by due time, partition it so each node polls only its own slice, and run each job under a lease with retries, knowing that execution is at least once.",
+    "numbers": "50M jobs a day is about 580 per second, 5.8K at a 10x peak. At 2 seconds each, 11.6K run at once: about 580 workers at 20 jobs each. 64 partitions find about 90 jobs per poll.",
+    "moves": ["Index jobs by due time and poll by partition", "Separate finding due jobs from running them with a ready queue", "Claim with a lease and heartbeat, and make jobs idempotent", "Retry with backoff and jitter, then dead letter; expand cron one run at a time"]
+  }
+}

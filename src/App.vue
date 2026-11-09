@@ -44,7 +44,7 @@ watch(() => route.fullPath, () => (drawer.value = false))
         <button class="btn quiet" type="button" :aria-label="`Theme: ${theme}. Change theme`" @click="cycleTheme">{{ theme === 'auto' ? 'Auto' : theme === 'light' ? 'Light' : 'Dark' }}</button>
       </header>
       <p v-if="progress.storageError" class="app-banner" role="alert">{{ progress.storageError }}</p>
-      <main id="main" tabindex="-1"><router-view /></main>
+      <main id="main" tabindex="-1"><div class="page"><router-view /></div></main>
     </div>
   </div>
 </template>
@@ -59,6 +59,8 @@ watch(() => route.fullPath, () => (drawer.value = false))
 .appbar .brand span { font: 500 .9em var(--font-mono); letter-spacing: -0.04em; color: var(--ink-3); margin-left: 1px; }
 .app-grow { flex: 1; }
 main { padding: 28px var(--gutter) 88px; min-width: 0; outline: none; }
+/* One centred column. Pages fill it up to their own width, and on a big monitor the spare space is split on both sides. */
+.page { width: 100%; max-width: var(--page-max); margin-inline: auto; min-width: 0; }
 .app-banner { margin: 0; padding: 10px var(--gutter); background: var(--miss-bg); color: var(--miss-fg); font-size: .9rem; }
 .app-nav { position: fixed; z-index: 40; inset: 0 auto 0 0; width: min(88vw, 340px); background: var(--surface); border-right: 1px solid var(--line); overflow-y: auto; overscroll-behavior: contain; visibility: hidden; transform: translateX(-100%); transition: transform .2s, visibility .2s; }
 .app-nav.open { visibility: visible; transform: none; }
@@ -67,8 +69,8 @@ main { padding: 28px var(--gutter) 88px; min-width: 0; outline: none; }
   .shell { grid-template-columns: 296px minmax(0, 1fr); }
   .app-nav { position: sticky; top: 0; height: 100dvh; width: auto; visibility: visible; transform: none; z-index: 1; }
   .appbar .menu, .appbar .brand { display: none; }
-  .appbar { justify-content: flex-end; padding-inline: 40px; }
+  .appbar { justify-content: flex-end; padding-inline: max(40px, calc((100% - var(--page-max)) / 2 + 40px)); }
   main { padding: 40px 40px 120px; }
 }
-@media (min-width: 1700px) { main { padding-inline: 64px; } }
+@media (min-width: 1700px) { main { padding-inline: 64px; } .appbar { padding-inline: max(64px, calc((100% - var(--page-max)) / 2 + 64px)); } }
 </style>

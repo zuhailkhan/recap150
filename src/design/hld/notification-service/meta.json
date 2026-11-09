@@ -1,0 +1,197 @@
+{
+  "slug": "notification-service",
+  "title": "Notification Service",
+  "group": "Building blocks",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design the shared service that other products call to tell users something by push, email or SMS. A caller says who and what, and gets an answer in milliseconds. The service then decides whether to send, renders the message, and delivers it through slow, unreliable outside providers without losing it, spamming anyone or letting a promotion delay a login code. The in-process Observer and Strategy design is in the LLD Notification System. This page is the system around it.",
+  "requirements": {
+    "functional": [
+      "Accept a request to notify a user by push, email or SMS, from any internal service.",
+      "Respect each user's channel opt-outs and quiet hours.",
+      "Render a message from a template, per channel and language.",
+      "Retry failed sends and fall back to a second provider.",
+      "Send the same request only once, even if the caller retries.",
+      "Track sent, delivered and opened for each notification."
+    ],
+    "nonFunctional": [
+      { "name": "API latency", "target": "The API answers in under 50 ms, before anything is sent" },
+      { "name": "Urgent delivery", "target": "An OTP leaves our system within 2 seconds, even during a blast" },
+      { "name": "Delivery", "target": "At least once to the provider, never twice to the user" },
+      { "name": "Isolation", "target": "A slow SMS provider never delays push or email" },
+      { "name": "Durability", "target": "An accepted request is never lost" }
+    ],
+    "outOfScope": ["In-app inbox and notification centre", "Building the audience for a campaign", "Provider contracts, sender reputation and compliance"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts. A provider call takes a few hundred milliseconds, and one worker holds 50 calls in flight. The hard number is not the average rate. It is how long one blast takes to drain through a provider's rate limit.",
+    "inputs": [
+      { "id": "perDay", "label": "Notifications per day", "value": 100000000, "min": 1000000, "max": 10000000000, "log": true },
+      { "id": "peakFactor", "label": "Peak over average", "value": 3, "min": 1, "max": 10, "step": 1, "unit": "x" },
+      { "id": "smsPct", "label": "Share sent by SMS", "value": 5, "min": 1, "max": 30, "step": 1, "unit": "%" },
+      { "id": "callMs", "label": "Provider call latency", "value": 300, "min": 50, "max": 2000, "log": true, "unit": "ms" },
+      { "id": "provLimit", "label": "SMS provider rate limit", "value": 1000, "min": 100, "max": 100000, "log": true, "unit": "per s" },
+      { "id": "blast", "label": "SMS in one marketing blast", "value": 5000000, "min": 100000, "max": 100000000, "log": true }
+    ],
+    "outputs": [
+      { "id": "avgQps", "label": "Notifications per second, average", "expr": "perDay / 86400", "unit": "per s" },
+      { "id": "peakQps", "label": "Notifications per second at peak", "expr": "avgQps * peakFactor", "unit": "per s" },
+      { "id": "smsPeak", "label": "SMS per second at peak", "expr": "peakQps * smsPct / 100", "unit": "per s", "note": "Compare with the provider limit. Above it, SMS queues up." },
+      { "id": "workers", "label": "Sender workers needed", "expr": "ceil(peakQps * callMs / 1000 / 50)", "unit": "workers", "note": "Calls in flight = rate times latency. 50 per worker." },
+      { "id": "provAccounts", "label": "Provider accounts for peak SMS", "expr": "ceil(smsPeak / provLimit)", "unit": "accounts", "note": "More than 1 means you need several senders or providers." },
+      { "id": "depth", "label": "Queue depth one minute into a blast", "expr": "max(0, blast - provLimit * 60)", "unit": "messages" },
+      { "id": "drainMin", "label": "Time to drain the blast", "expr": "blast / provLimit / 60", "unit": "min", "note": "An OTP in the same queue waits this long. Priority lanes avoid it." }
+    ]
+  },
+  "api": [
+    { "call": "POST /notifications  { userId, template, params, priority, idempotencyKey }", "does": "Accepts the request and returns 202 with an id. Nothing is sent yet." },
+    { "call": "GET /notifications/{id}", "does": "Returns the state: queued, sent, delivered, opened, failed or suppressed." },
+    { "call": "PUT /users/{id}/preferences  { channels, quietHours, timezone }", "does": "Stores opt-outs per channel and the hours the user does not want to be disturbed." },
+    { "call": "POST /devices  { userId, pushToken, platform }", "does": "Registers a phone token for push." },
+    { "call": "POST /webhooks/{provider}", "does": "Receives delivery and open receipts from a provider and updates the tracking record." }
+  ],
+  "data": [
+    { "entity": "Notification", "fields": "id, userId, template, params, priority, idempotencyKey, status, attempts", "store": "Key-value store by id.", "why": "Written once on accept and updated as it moves. Always read by id." },
+    { "entity": "Preference", "fields": "userId, channel, enabled, quietStart, quietEnd, timezone", "store": "Key-value store with a cache in front.", "why": "Read on every send, one lookup by user. Must be fast and rarely changes." },
+    { "entity": "Template", "fields": "templateId, channel, locale, version, body", "store": "Config store, cached in memory.", "why": "Few thousand rows. Versioned so a bad edit can be rolled back." },
+    { "entity": "DeliveryEvent", "fields": "notifId, channel, state, at, providerRef", "store": "Append-only wide-column store.", "why": "Many small writes per notification, mostly never read. Cheap appends beat updates." }
+  ],
+  "nodes": [
+    { "id": "producer", "label": "Product services", "kind": "client", "x": 8, "y": 10, "sub": "orders, auth", "since": 0 },
+    { "id": "api", "label": "Notify API", "kind": "service", "x": 29, "y": 10, "sub": "validate, accept", "since": 0 },
+    { "id": "intake", "label": "Intake queue", "kind": "queue", "x": 50, "y": 10, "sub": "durable log", "since": 1 },
+    { "id": "disp", "label": "Dispatcher", "kind": "service", "x": 70, "y": 10, "sub": "policy, render", "since": 2 },
+    { "id": "store", "label": "Prefs and keys", "kind": "cache", "x": 91, "y": 10, "sub": "opt-outs, dedupe", "since": 2 },
+    { "id": "qhi", "label": "Urgent queue", "kind": "queue", "x": 29, "y": 38, "sub": "OTP, alerts", "since": 4 },
+    { "id": "qpush", "label": "Push queue", "kind": "queue", "x": 50, "y": 38, "since": 3 },
+    { "id": "qsms", "label": "SMS queue", "kind": "queue", "x": 70, "y": 38, "since": 3 },
+    { "id": "qemail", "label": "Email queue", "kind": "queue", "x": 91, "y": 38, "since": 3 },
+    { "id": "workers", "label": "Channel workers", "kind": "worker", "x": 50, "y": 64, "sub": "retry, rate limit", "since": 1 },
+    { "id": "prov", "label": "Providers", "kind": "external", "x": 91, "y": 64, "sub": "push, SMS, email", "since": 0 },
+    { "id": "prov2", "label": "Backup provider", "kind": "external", "x": 91, "y": 88, "sub": "failover", "since": 5 },
+    { "id": "dlq", "label": "Dead-letter queue", "kind": "queue", "x": 29, "y": 88, "sub": "gave up, inspect", "since": 5 },
+    { "id": "track", "label": "Delivery tracking", "kind": "db", "x": 50, "y": 88, "sub": "sent, delivered, opened", "since": 6 }
+  ],
+  "edges": [
+    { "from": "producer", "to": "api", "since": 0 },
+    { "from": "api", "to": "prov", "label": "send", "since": 0, "until": 1 },
+    { "from": "api", "to": "intake", "label": "enqueue", "since": 1 },
+    { "from": "intake", "to": "workers", "since": 1, "until": 2 },
+    { "from": "workers", "to": "prov", "label": "call", "since": 1 },
+    { "from": "intake", "to": "disp", "since": 2 },
+    { "from": "disp", "to": "store", "label": "check", "since": 2 },
+    { "from": "disp", "to": "workers", "since": 2, "until": 3 },
+    { "from": "disp", "to": "qpush", "since": 3 },
+    { "from": "disp", "to": "qsms", "since": 3 },
+    { "from": "disp", "to": "qemail", "since": 3 },
+    { "from": "qpush", "to": "workers", "since": 3 },
+    { "from": "qsms", "to": "workers", "since": 3 },
+    { "from": "qemail", "to": "workers", "since": 3 },
+    { "from": "disp", "to": "qhi", "label": "urgent", "since": 4 },
+    { "from": "qhi", "to": "workers", "label": "first", "since": 4 },
+    { "from": "workers", "to": "prov2", "label": "failover", "dashed": true, "since": 5 },
+    { "from": "workers", "to": "dlq", "label": "give up", "dashed": true, "since": 5 },
+    { "from": "workers", "to": "track", "label": "events", "since": 6 },
+    { "from": "prov", "to": "track", "label": "receipts", "dashed": true, "since": 6 }
+  ],
+  "evolution": [
+    { "title": "Call the provider in the request", "problem": "Start with the simplest thing that works: the product service calls the notification API, and the API calls the provider before it answers.", "change": "One API loads the template, picks a channel and calls the provider directly. The caller waits for the provider." },
+    { "title": "Queue and workers", "problem": "A provider call takes 300 ms and sometimes 30 seconds or an error. The caller waits for all of it, and a provider outage fails the caller's own request.", "change": "The API writes the request to a durable queue and returns 202 at once. Workers take requests off the queue and call the provider. A slow provider now only makes the queue longer.", "numbers": "caller latency drops from the provider's to a queue write" },
+    { "title": "Dispatcher: prefs, dedupe, templates", "problem": "Users opted out and some are asleep. Callers retry on timeouts, so the same OTP would be sent twice. Workers should not be doing policy.", "change": "A dispatcher reads each request, checks the user's channel preferences and quiet hours, drops repeats using the idempotency key, and renders the template. Only messages that should go out get through." },
+    { "title": "One queue per channel", "problem": "A single queue is first in, first out. When the SMS provider slows to a crawl, SMS messages pile up at the front and push and email wait behind them.", "change": "The dispatcher writes to a queue per channel. Workers for each channel read only their own queue, so one slow provider fills only its own queue. Each worker also rate limits itself to the provider's limit." },
+    { "title": "An urgent lane", "problem": "A 5M-message marketing blast takes over an hour to drain at 1,000 SMS per second. A login code queued behind it arrives after the user gave up.", "change": "Requests marked urgent go to their own queue, and workers read it first. Bulk traffic uses the normal queues. A blast can be slow because nobody is waiting on it.", "numbers": "the estimator shows the drain time of a blast" },
+    { "title": "Retries, backoff, DLQ and failover", "problem": "Providers return errors and time out. Retrying at once makes an outage worse, and a message that can never be sent would retry forever.", "change": "Workers retry with exponential backoff and jitter. After the last attempt, or on a permanent error, the message goes to a dead-letter queue for a person or a job to inspect. If a provider keeps failing, workers switch to a backup provider." },
+    { "title": "Delivery tracking, off the path", "problem": "Teams ask whether a message was sent, delivered or opened. Updating a row on every step would slow the send path.", "change": "Workers append events and providers post receipts to webhooks. Both write to a tracking store asynchronously. A send never waits for tracking." }
+  ],
+  "flows": [
+    {
+      "name": "Send an OTP",
+      "steps": [
+        { "say": "The auth service asks for an SMS with a template, priority urgent and an idempotency key.", "nodes": ["producer", "api"], "edges": [["producer", "api"]] },
+        { "say": "The API validates it, writes it to the intake queue and answers 202. It has sent nothing yet.", "nodes": ["api", "intake"], "edges": [["api", "intake"]] },
+        { "say": "The dispatcher takes it from the queue.", "nodes": ["intake", "disp"], "edges": [["intake", "disp"]] },
+        { "say": "It checks the opt-out and the dedupe key. A repeated key stops here.", "nodes": ["disp", "store"], "edges": [["disp", "store"]] },
+        { "say": "It renders the template and puts the message on the urgent queue, not the bulk SMS queue.", "nodes": ["disp", "qhi"], "edges": [["disp", "qhi"]] },
+        { "say": "A worker always reads the urgent queue first, even while a blast fills the SMS queue.", "nodes": ["qhi", "workers"], "edges": [["qhi", "workers"]] },
+        { "say": "The worker waits for a token from its rate limiter, then calls the provider.", "nodes": ["workers", "prov"], "edges": [["workers", "prov"]] },
+        { "say": "The worker records 'sent'. Later the provider posts a delivery receipt and the tracking store records 'delivered'.", "nodes": ["workers", "prov", "track"], "edges": [["workers", "track"], ["prov", "track"]] }
+      ]
+    },
+    {
+      "name": "Marketing blast during an outage",
+      "steps": [
+        { "say": "A promo service submits millions of requests, priority normal, as fast as the API accepts them.", "nodes": ["producer", "api", "intake"], "edges": [["producer", "api"], ["api", "intake"]] },
+        { "say": "The dispatcher drops users who opted out or are in quiet hours, then fans the rest onto the SMS queue.", "nodes": ["intake", "disp", "store"], "edges": [["intake", "disp"], ["disp", "store"]] },
+        { "say": "The SMS queue grows to millions. Push and email queues are untouched.", "nodes": ["disp", "qsms"], "edges": [["disp", "qsms"]] },
+        { "say": "Workers pull from the SMS queue no faster than the provider limit allows.", "nodes": ["qsms", "workers"], "edges": [["qsms", "workers"]] },
+        { "say": "The provider starts returning errors. Workers retry with growing delays and jitter.", "nodes": ["workers", "prov"], "edges": [["workers", "prov"]] },
+        { "say": "After repeated failures the worker switches new sends to the backup provider.", "nodes": ["workers", "prov2"], "edges": [["workers", "prov2"]] },
+        { "say": "A message that exhausts its attempts goes to the dead-letter queue. Nothing is dropped silently.", "nodes": ["workers", "dlq"], "edges": [["workers", "dlq"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Queue per channel and priority",
+      "question": "How do we stop one slow provider, or one big blast, from delaying everything else?",
+      "options": [
+        { "name": "One shared queue", "pros": "Simplest to build and operate. Strict arrival order.", "cons": "Head-of-line blocking: the slowest channel and the biggest campaign set everyone's delay." },
+        { "name": "A queue per channel", "pros": "A slow provider only backs up its own queue. Each worker pool scales by its own channel.", "cons": "More queues to run. Inside one channel an OTP still waits behind a blast." },
+        { "name": "Per channel, plus a priority lane", "pros": "Urgent traffic is read first. Bulk traffic can be slow and nobody minds.", "cons": "Needs a rule for what counts as urgent, or every team marks everything urgent. Bulk can starve if urgent is busy." }
+      ],
+      "pick": "Per channel, plus a priority lane",
+      "because": "Both failures are real. Isolate by channel for outages and by priority for blasts. Cap the urgent lane per caller and give bulk a small guaranteed share so it cannot starve."
+    },
+    {
+      "title": "Retries and delivery semantics",
+      "question": "A send times out. Did the provider send it or not?",
+      "options": [
+        { "name": "At most once", "pros": "Never a duplicate.", "cons": "Any timeout loses a message. Unacceptable for an OTP." },
+        { "name": "At least once", "pros": "Nothing is lost. Retry until acknowledged.", "cons": "A timeout after success sends twice." },
+        { "name": "At least once plus idempotency keys", "pros": "Retries are safe where the provider honours a key. The dispatcher also drops repeated caller requests.", "cons": "Not every provider supports keys, so rare duplicates remain." }
+      ],
+      "pick": "At least once plus idempotency keys",
+      "because": "A duplicate code is better than a missing one. Build the key from caller key, user and channel, keep it for a day, and pass it to providers that accept one. Retry with exponential backoff and jitter, capped, then dead-letter."
+    },
+    {
+      "title": "Rate limiting and provider failover",
+      "question": "Providers cap how fast we may send, and users should not be flooded. Where do limits live?",
+      "options": [
+        { "name": "Limit at the API", "pros": "Rejects abuse early and cheaply.", "cons": "Knows nothing about provider capacity. Rejecting a promo here loses it." },
+        { "name": "Limit in the workers", "pros": "Matches the real constraint. A token bucket per provider keeps calls under the cap. Excess waits in the queue.", "cons": "Needs a shared counter across many workers, or a fixed share per worker." },
+        { "name": "Per-user limit in the dispatcher", "pros": "Stops one user getting 20 promos in an hour, whatever the callers do.", "cons": "Needs a counter per user and a policy on which messages count. Never limit urgent messages." }
+      ],
+      "pick": "Provider limit in workers, user limit in dispatcher",
+      "because": "Each limit lives where its information is. Excess work waits in a queue instead of being refused. On repeated errors, a circuit breaker switches a channel to the backup provider and probes the primary now and then."
+    },
+    {
+      "title": "Pull a user's preferences, or push them",
+      "question": "The dispatcher checks preferences on every message. How fresh must they be?",
+      "options": [
+        { "name": "Read the database every time", "pros": "Always correct.", "cons": "A second hot path, and a blast of 5M messages means 5M reads." },
+        { "name": "Cache with a short expiry", "pros": "Fast and cheap. Staleness is bounded by the expiry.", "cons": "A user who just opted out may get one more message." },
+        { "name": "Cache plus invalidate on change", "pros": "Near-instant opt-outs, cheap reads.", "cons": "Needs an invalidation path, and a missed event leaves stale data until expiry." }
+      ],
+      "pick": "Cache plus invalidate on change",
+      "because": "Opt-outs are a legal and trust issue, so they should apply within seconds. Keep a short expiry as a safety net. Check once more at send time for urgent opt-outs."
+    }
+  ],
+  "failures": [
+    { "what": "The SMS provider is down", "impact": "SMS messages fail or time out, and the SMS queue grows.", "fix": "Retry with backoff, trip a circuit breaker and route to the backup provider. Push and email are unaffected because they have their own queues." },
+    { "what": "A worker dies mid-send", "impact": "The message may or may not have gone out.", "fix": "A worker only acknowledges the queue message after the send is recorded. An unacknowledged message returns to the queue and is retried, so the idempotency key matters." },
+    { "what": "A queue backs up for hours", "impact": "Messages are delivered long after they mattered, such as a flash sale alert.", "fix": "Give each message an expiry. Workers drop expired ones and record 'expired'. Alert on the age of the oldest message, not on queue size." },
+    { "what": "A caller bug sends the same promo repeatedly", "impact": "Users are spammed and may unsubscribe or report it.", "fix": "Dedupe by idempotency key and apply a per-user cap in the dispatcher. Keep a kill switch per template." },
+    { "what": "A poison message", "impact": "One malformed message crashes the worker each time it is tried.", "fix": "Count attempts. After the limit, move it to the dead-letter queue with the error, and alert on dead-letter growth." }
+  ],
+  "scaling": [
+    { "limit": "A provider's rate limit caps one channel", "lever": "Get a higher limit, use several accounts or senders, and spread load across providers. Queue the rest. A blast is paced to the limit, not rushed." },
+    { "limit": "The intake queue and dispatcher are one path for all traffic", "lever": "Partition the queue by user id so one dispatcher per partition keeps order for a user, and add partitions to add throughput." },
+    { "limit": "Preference reads on every message", "lever": "Cache by user id with invalidation. Batch lookups for a blast so one read serves many messages." },
+    { "limit": "Tracking writes outnumber sends", "lever": "Write events to an append-only store in batches, partitioned by notification id and time. Keep detail briefly, aggregates longer." }
+  ],
+  "recap": {
+    "key": "Accept fast, send slowly. Put a durable queue between the API and the providers, then isolate by channel and priority so no single slow thing blocks the rest.",
+    "numbers": "100M a day is about 1.2K per second, 3.5K at peak, so about 21 workers at 300 ms a call. A 5M SMS blast at a 1K per second limit takes 83 minutes to drain.",
+    "moves": ["Return 202 after a durable queue write, send later", "Dispatcher checks prefs, dedupes by idempotency key, renders", "A queue per channel plus an urgent lane, so blasts never block OTPs", "Backoff, dead-letter queue and failover, and track delivery off the path"]
+  }
+}

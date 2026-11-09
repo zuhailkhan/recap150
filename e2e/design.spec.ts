@@ -65,12 +65,12 @@ for (const size of sizes) {
         const errors = watchConsole(page)
         await page.goto(`./#/hld/${slug}`)
         await expect(page.locator('h1')).toBeVisible()
-        // the estimator reacts to a slider
-        const before = await page.locator('.est dd').first().innerText()
-        const slider = page.locator('.est input[type=range]').first()
-        await slider.focus()
-        for (let i = 0; i < 12; i++) await slider.press('ArrowRight')
-        await expect.poll(() => page.locator('.est dd').first().innerText()).not.toBe(before)
+        // the estimator reacts: push every slider to its maximum and the outputs must change
+        const outputs = () => page.locator('.est dd').allInnerTexts().then((t) => t.join('|'))
+        const before = await outputs()
+        const sliders = page.locator('.est input[type=range]')
+        for (let k = 0; k < (await sliders.count()); k++) { await sliders.nth(k).focus(); await sliders.nth(k).press('End') }
+        await expect.poll(outputs).not.toBe(before)
         // both steppers (evolution, then request flows) run to the end, and every flow preset runs
         await stepToEnd(page, 0)
         await stepToEnd(page, 1)

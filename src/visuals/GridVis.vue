@@ -5,7 +5,8 @@ const props = defineProps<{ p: GridPanel }>()
 const ptr = (r: number, c: number) => (props.p.pointers ?? []).filter((q) => q.r === r && q.c === c)
 const isEmpty = (v: string | number) => v === '' || v === '.'
 /** A 9x9 board gets 3x3 box lines, which is what a Sudoku reader looks for. */
-const boxed = computed(() => props.p.cells.length === 9 && props.p.cells.every((r) => r.length === 9))
+// Only digit-and-blank boards (Sudoku). A chess board or a labelled 9x9 grid is not made of 3x3 boxes.
+const boxed = computed(() => props.p.cells.length === 9 && props.p.cells.every((r) => r.length === 9 && r.every((v) => /^[1-9.]?$/.test(String(v)))))
 const wide = computed(() => Math.max(0, ...props.p.cells.map((r) => r.length)) >= 8)
 </script>
 

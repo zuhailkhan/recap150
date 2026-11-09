@@ -1,0 +1,214 @@
+{
+  "slug": "zoom",
+  "title": "Zoom",
+  "group": "Media and streaming",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a system like Zoom: live audio and video between people in a meeting. Unlike streaming a film, nothing can be buffered, so the whole path from one mouth to another ear must stay well under half a second. The hard part is moving media between many people cheaply, not storing anything.",
+  "requirements": {
+    "functional": [
+      "Create a meeting and join it with a link.",
+      "Send and receive live audio and video with everyone in the meeting.",
+      "Adapt picture quality to each person's network, without stalling others.",
+      "Share a screen.",
+      "Record a meeting for later.",
+      "Work behind restrictive networks such as corporate firewalls."
+    ],
+    "nonFunctional": [
+      { "name": "Latency", "target": "Mouth-to-ear delay under 300 ms for most participants" },
+      { "name": "Audio first", "target": "Audio stays clear even when video is degraded" },
+      { "name": "Loss tolerance", "target": "Usable at a few percent packet loss" },
+      { "name": "Availability", "target": "A node failure interrupts a meeting for only a few seconds" },
+      { "name": "Meeting size", "target": "Up to a few hundred active participants in one meeting" }
+    ],
+    "outOfScope": ["Chat, whiteboard and polls", "Webinar-style one-way streaming to thousands", "End-to-end encryption keys", "Calendar integrations"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts. Every meeting is the same size, and each receiver shows a few video tiles at once (speaker view), not everyone. Bandwidth, not CPU or storage, sets the fleet size.",
+    "inputs": [
+      { "id": "n", "label": "Participants per meeting", "value": 12, "min": 2, "max": 1000, "log": true },
+      { "id": "meetings", "label": "Concurrent meetings", "value": 100000, "min": 1000, "max": 10000000, "log": true },
+      { "id": "kbps", "label": "Bitrate of one video stream", "value": 1500, "min": 100, "max": 4000, "log": true, "unit": "kbit/s" },
+      { "id": "tiles", "label": "Video tiles a receiver shows", "value": 5, "min": 1, "max": 25, "step": 1, "unit": "tiles" },
+      { "id": "nic", "label": "Network capacity of one SFU node", "value": 10, "min": 1, "max": 100, "log": true, "unit": "Gbit/s" }
+    ],
+    "outputs": [
+      { "id": "meshUp", "label": "Upload per person in a full mesh", "expr": "(n - 1) * kbps / 1000", "unit": "Mbit/s", "note": "Each sender encodes and uploads a copy per peer. A home link breaks first." },
+      { "id": "meshTotal", "label": "Total traffic in a full mesh", "expr": "n * (n - 1) * kbps / 1000", "unit": "Mbit/s", "note": "Grows with n squared." },
+      { "id": "simUp", "label": "Upload per person with an SFU", "expr": "kbps * 1.5 / 1000", "unit": "Mbit/s", "note": "Assume three simulcast layers add about half again to one stream." },
+      { "id": "sfuEgress", "label": "SFU output per meeting", "expr": "n * min(n - 1, tiles) * kbps / 1000", "unit": "Mbit/s", "note": "Each receiver gets at most a few tiles, so growth is nearly linear." },
+      { "id": "totalTbps", "label": "SFU output, all meetings", "expr": "meetings * sfuEgress / 1e6", "unit": "Tbit/s" },
+      { "id": "sfus", "label": "SFU nodes needed", "expr": "ceil(totalTbps * 1000 / (nic * 0.6))", "unit": "nodes", "note": "Run at 60 percent of the network card for headroom." },
+      { "id": "people", "label": "People in meetings at peak", "expr": "meetings * n", "unit": "people" }
+    ]
+  },
+  "api": [
+    { "call": "POST /meetings", "does": "Creates a meeting and returns an id, a join link and a host token." },
+    { "call": "WS /signal?meetingId&token", "does": "Opens the signalling socket. Used for join, leave, mute and the connection handshake." },
+    { "call": "signal offer / answer / candidate", "does": "Swaps the network details two ends need to open a media path (an ICE exchange)." },
+    { "call": "subscribe { trackId, maxLayer }", "does": "Tells the SFU which video to send me and the largest quality I can take." },
+    { "call": "POST /meetings/{id}/recording", "does": "Starts or stops a recording. Allowed for the host only." },
+    { "call": "GET /meetings/{id}", "does": "Returns the meeting state: host, start time, recording status." }
+  ],
+  "data": [
+    { "entity": "Meeting", "fields": "meetingId, hostId, startedAt, sfuId, region, recording", "store": "Key-value store keyed by meetingId.", "why": "Read on every join. Small rows, one key lookup, and it is easy to shard." },
+    { "entity": "Participant (live)", "fields": "meetingId, userId, signalNode, muted, joinedAt", "store": "In-memory store with TTL.", "why": "Changes constantly and is cheap to rebuild. It expires if a signalling node dies." },
+    { "entity": "SFU load", "fields": "sfuId, region, streams, egressMbps", "store": "In-memory store, refreshed by heartbeats.", "why": "Placement needs a fresh view of free capacity. A few seconds of delay is fine." },
+    { "entity": "Recording", "fields": "recordingId, meetingId, segments, status", "store": "Blob storage with a metadata row.", "why": "Big files written once and read rarely. Segments are uploaded as they finish." }
+  ],
+  "nodes": [
+    { "id": "a", "label": "Participant A", "kind": "client", "x": 8, "y": 18, "sub": "sends 3 qualities", "since": 0 },
+    { "id": "b", "label": "Participant B", "kind": "client", "x": 8, "y": 82, "sub": "weak network", "since": 0 },
+    { "id": "sig", "label": "Signalling", "kind": "service", "x": 32, "y": 18, "sub": "HTTP and WebSocket", "since": 0 },
+    { "id": "sfu", "label": "SFU node 1", "kind": "service", "x": 58, "y": 50, "sub": "forwards, no mixing", "since": 1 },
+    { "id": "adapt", "label": "Layer picker", "kind": "worker", "x": 58, "y": 82, "sub": "quality per receiver", "since": 2 },
+    { "id": "turn", "label": "TURN relay", "kind": "service", "x": 32, "y": 82, "sub": "for blocked UDP", "since": 3 },
+    { "id": "place", "label": "Placement", "kind": "service", "x": 58, "y": 18, "sub": "pick node per meeting", "since": 4 },
+    { "id": "sfu2", "label": "SFU node 2", "kind": "service", "x": 84, "y": 18, "sub": "another region", "since": 4 },
+    { "id": "rec", "label": "Recorder", "kind": "worker", "x": 84, "y": 50, "sub": "silent participant", "since": 6 },
+    { "id": "blob", "label": "Recording store", "kind": "blob", "x": 84, "y": 82, "sub": "segments", "since": 6 }
+  ],
+  "edges": [
+    { "from": "a", "to": "sig", "label": "signal", "since": 0 },
+    { "from": "b", "to": "sig", "since": 0 },
+    { "from": "a", "to": "b", "label": "mesh UDP", "since": 0, "until": 1 },
+    { "from": "a", "to": "sfu", "label": "upload", "since": 1 },
+    { "from": "sfu", "to": "b", "label": "forward", "since": 1 },
+    { "from": "sig", "to": "sfu", "label": "room", "since": 1 },
+    { "from": "sfu", "to": "adapt", "label": "layer", "since": 2 },
+    { "from": "b", "to": "turn", "label": "relay", "dashed": true, "since": 3 },
+    { "from": "turn", "to": "sfu", "dashed": true, "since": 3 },
+    { "from": "sig", "to": "place", "label": "pick SFU", "since": 4 },
+    { "from": "place", "to": "sfu", "since": 4 },
+    { "from": "place", "to": "sfu2", "since": 4 },
+    { "from": "sfu", "to": "sfu2", "label": "cascade", "since": 5 },
+    { "from": "sfu", "to": "rec", "label": "copy", "since": 6 },
+    { "from": "rec", "to": "blob", "since": 6 }
+  ],
+  "evolution": [
+    {
+      "title": "Signalling and a full mesh",
+      "problem": "Start with the simplest thing that works: two people, media straight between them. They still need a way to find each other and agree how to connect.",
+      "change": "A signalling service over HTTP and WebSocket creates the meeting and swaps connection details. Media then flows peer to peer over UDP, with no server in the path. UDP is used because a late packet is worthless in a call, so retransmitting it is pointless."
+    },
+    {
+      "title": "A forwarding server (SFU)",
+      "problem": "In a mesh every person uploads a copy to every other person. With 12 people that is 11 uploads each, about 16 Mbit/s up, and traffic grows with n squared.",
+      "change": "Each person uploads once to a server. The SFU (selective forwarding unit) copies packets to the others without decoding. A mixing server (MCU) would decode and re-encode everyone into one picture: CPU heavy, slower, one layout. So we forward.",
+      "numbers": "upload per person drops from (n-1) streams to about one"
+    },
+    {
+      "title": "Simulcast and layer picking",
+      "problem": "One person on a weak connection forces a choice: send everyone a low quality picture, or let that person stall. The sender cannot know each receiver's link.",
+      "change": "The sender encodes the same video at several qualities (simulcast), say three. The SFU has a layer picker that watches each receiver's bandwidth estimate and forwards the best layer that fits, switching up or down within a second. Nobody else is affected."
+    },
+    {
+      "title": "TURN relays for blocked networks",
+      "problem": "Some corporate and hotel networks block UDP or any direct path. Those users cannot reach an SFU at all.",
+      "change": "A TURN relay accepts the connection on a port firewalls allow, such as TCP 443, and passes packets on to the SFU. It costs extra latency and bandwidth, so it is the last resort after direct UDP fails."
+    },
+    {
+      "title": "Placement across an SFU fleet",
+      "problem": "One SFU is limited by its network card, and a meeting in Asia should not be served from Europe. Someone must choose a node for every new meeting.",
+      "change": "A placement service picks an SFU for each meeting, by the region of the first joiners and by spare capacity from heartbeats. Signalling then tells that SFU to expect the room. A meeting lives on one SFU, so state is simple.",
+      "numbers": "the estimator shows SFU nodes needed"
+    },
+    {
+      "title": "Cascading for big meetings",
+      "problem": "A 300-person meeting spread over three continents overloads one SFU, and half the people are far from it.",
+      "change": "Several SFUs share one meeting. Each person connects to a nearby SFU, and the SFUs forward streams to each other, sending only what a remote side needs (cascading). Each cross-link carries a stream once, not once per viewer."
+    },
+    {
+      "title": "Recording as a separate consumer",
+      "problem": "Hosts want recordings, but encoding a file inside the SFU would steal CPU from live media and a recorder crash must not kill the meeting.",
+      "change": "A recorder joins the meeting like a silent participant. It receives streams from the SFU, writes segments to blob storage as they finish, and can lag or fail without touching live traffic."
+    }
+  ],
+  "flows": [
+    {
+      "name": "Join a meeting",
+      "steps": [
+        { "say": "The app opens the link, asks to join and keeps a WebSocket open to signalling.", "nodes": ["a", "sig"], "edges": [["a", "sig"]] },
+        { "say": "Signalling asks placement for the meeting's home. If the meeting is new, it picks a node close to the first joiner with spare capacity.", "nodes": ["sig", "place"], "edges": [["sig", "place"]] },
+        { "say": "Placement reserves a slot on SFU node 1. A far-away second node would be used only for a cascaded meeting.", "nodes": ["place", "sfu", "sfu2"], "edges": [["place", "sfu"], ["place", "sfu2"]] },
+        { "say": "Signalling tells the SFU the room and who may enter, with a short-lived token.", "nodes": ["sig", "sfu"], "edges": [["sig", "sfu"]] },
+        { "say": "The app gets the SFU address, runs the connection handshake, and starts sending media straight to the SFU over UDP.", "nodes": ["a", "sfu"], "edges": [["a", "sfu"]] }
+      ]
+    },
+    {
+      "name": "One speaker, a weak listener",
+      "steps": [
+        { "say": "Participant A sends the same video in three qualities (simulcast) to the SFU.", "nodes": ["a", "sfu"], "edges": [["a", "sfu"]] },
+        { "say": "The layer picker reads B's bandwidth estimate and sees B can only take the lowest layer.", "nodes": ["sfu", "adapt"], "edges": [["sfu", "adapt"]] },
+        { "say": "The SFU forwards the low layer to B and the high layer to everyone else. It never decodes anything.", "nodes": ["sfu", "b"], "edges": [["sfu", "b"]] },
+        { "say": "If B's network blocks UDP, B's packets travel to a TURN relay on a firewall-friendly port, and on to the SFU.", "nodes": ["b", "turn", "sfu"], "edges": [["b", "turn"], ["turn", "sfu"]] },
+        { "say": "For a cross-region meeting, node 1 sends the stream once to node 2, which fans it out to its local people.", "nodes": ["sfu", "sfu2"], "edges": [["sfu", "sfu2"]] },
+        { "say": "The recorder takes a copy from the SFU and writes finished segments to the store. It cannot slow the call.", "nodes": ["sfu", "rec", "blob"], "edges": [["sfu", "rec"], ["rec", "blob"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Mesh, MCU or SFU",
+      "question": "Who moves the media between participants?",
+      "options": [
+        { "name": "Full mesh", "pros": "No media servers to run. Lowest delay for two or three people.", "cons": "Each person uploads n-1 copies and encodes n-1 times. Falls apart past about four people." },
+        { "name": "MCU (mixing server)", "pros": "Each client sends one stream and receives one. Works on weak devices and old hardware.", "cons": "Decoding and re-encoding everyone is CPU heavy and adds delay. One shared layout for all viewers." },
+        { "name": "SFU (forwarding server)", "pros": "One upload per person. No decode on the server, so it is cheap and adds little delay. Each viewer can get their own layers.", "cons": "Clients decode several streams. Needs simulcast and good bandwidth estimation." }
+      ],
+      "pick": "SFU, mesh only for one-to-one",
+      "because": "Server cost is mostly network, and an SFU only copies packets. Client devices today can decode a handful of streams, so the CPU saved on the server is worth more than the CPU spent on clients."
+    },
+    {
+      "title": "Adapting to each receiver",
+      "question": "How do we serve people with very different networks in one meeting?",
+      "options": [
+        { "name": "One quality for all", "pros": "Simplest. One encode per sender.", "cons": "Everyone gets the quality of the weakest link, or the weak person drops out." },
+        { "name": "Simulcast", "pros": "Sender sends a few independent qualities. The SFU just picks one per receiver, and switches at a keyframe.", "cons": "Sender uploads about 1.5 times as much and spends more CPU encoding." },
+        { "name": "Scalable video coding (SVC)", "pros": "One stream built in layers. Less upload than simulcast and smoother switching.", "cons": "Needs codec and device support. More complex to implement and debug." }
+      ],
+      "pick": "Simulcast, SVC where supported",
+      "because": "Simulcast works with every common codec and the SFU stays dumb. Keep the layer logic behind one interface, so SVC can replace it later without changing signalling."
+    },
+    {
+      "title": "One big meeting over several SFUs",
+      "question": "What happens when one meeting is too big or too spread out for a single node?",
+      "options": [
+        { "name": "One SFU, bigger machine", "pros": "No new moving parts. Meeting state in one place.", "cons": "Capped by one network card. Far participants have a long path." },
+        { "name": "Cascade SFUs", "pros": "Each person connects to a near node. Cross-links carry each stream once.", "cons": "Extra hop adds delay. Needs routing of subscriptions between nodes." },
+        { "name": "Limit who sends", "pros": "Only the active few send video. Everyone else listens. Cuts load a lot.", "cons": "A product limit, not a pure fix. Needs speaker detection." }
+      ],
+      "pick": "Cascade, plus forward only active speakers",
+      "because": "In a big meeting only a few people talk at once. Forward the loudest handful in high quality and the rest as thumbnails or nothing. Cascade only when a meeting spans regions or outgrows a node."
+    },
+    {
+      "title": "Transport: UDP first, TCP last",
+      "question": "Which network path should media take?",
+      "options": [
+        { "name": "UDP direct to the SFU", "pros": "No retransmit delay. A lost packet is skipped, not waited for.", "cons": "Blocked by some firewalls. Needs its own congestion control." },
+        { "name": "UDP via TURN", "pros": "Works through NAT that blocks direct paths.", "cons": "Extra hop and extra bandwidth bill for the relay." },
+        { "name": "TCP or WebSocket relay", "pros": "Passes almost every firewall.", "cons": "One lost packet stalls everything behind it, so video freezes under loss." }
+      ],
+      "pick": "Try UDP, then TURN over UDP, then TCP",
+      "because": "Try them in order and keep the first that works, usually in under a second. Audio is tiny, so it survives even the TCP path. The slow path is for the few who need it."
+    }
+  ],
+  "failures": [
+    { "what": "An SFU node dies", "impact": "Every meeting on it loses media at once, maybe thousands of meetings.", "fix": "Clients notice within seconds and ask signalling to rejoin. Placement picks another node, and clients restart the handshake. Meeting state lives in the store, not on the node." },
+    { "what": "Packet loss and congestion", "impact": "Video freezes and audio crackles for one receiver.", "fix": "Ask for a resend of recent packets only when time allows, send some repair data (forward error correction), and drop to a lower layer. Protect audio before video." },
+    { "what": "The signalling socket drops", "impact": "Mute, join and leave stop working. Media may still flow.", "fix": "Keep media and signalling independent. The client reconnects with backoff and resumes the session. Do not tear down media on a signalling blip." },
+    { "what": "TURN relays overloaded", "impact": "Users on locked-down networks fail to connect, and relay bandwidth is costly.", "fix": "Autoscale relays by traffic, rate limit per user, and prefer direct paths. Alert on the share of calls that need a relay." },
+    { "what": "Recorder falls behind", "impact": "Recording has gaps or ends late.", "fix": "Bound its buffer and drop recording frames before affecting live media. Write segments as they finish so a crash loses seconds, not the whole file." }
+  ],
+  "scaling": [
+    { "limit": "An SFU is limited by its network card, not its CPU", "lever": "Add nodes, keep one meeting per node where possible, and forward only a few visible tiles per receiver. Cascade when a meeting outgrows a node." },
+    { "limit": "Signalling holds one open socket per participant", "lever": "Shard by meeting id with consistent hashing. A node holds a few hundred thousand sockets, and its state is rebuilt from the store." },
+    { "limit": "Users in many regions, with a long path to a far SFU", "lever": "Run SFU clusters per region and place a meeting near its first joiners. Join the people far away through a nearby node and cascade." },
+    { "limit": "Relay bandwidth for blocked networks", "lever": "Put relays at the edge in many regions, prefer direct paths, and keep the relayed share low with good connection checks." }
+  ],
+  "recap": {
+    "key": "Keep signalling separate from media. Move media over UDP through an SFU that forwards without decoding, let the sender offer several qualities, and let each receiver be served what fits.",
+    "numbers": "A 12-person meeting needs about 16.5 Mbit/s of upload per person in a mesh, but about 2.3 with an SFU. With 100K such meetings the SFU fleet sends about 9 Tbit/s, roughly 1,500 nodes at 10 Gbit/s.",
+    "moves": ["Separate signalling (HTTP, WebSocket) from media (UDP)", "Replace the mesh with an SFU, not an MCU", "Use simulcast and a per-receiver layer picker", "Place meetings by region, cascade big ones, and record from a separate consumer"]
+  }
+}

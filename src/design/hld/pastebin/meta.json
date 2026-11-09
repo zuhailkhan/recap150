@@ -1,0 +1,173 @@
+{
+  "slug": "pastebin",
+  "title": "Pastebin",
+  "group": "Building blocks",
+  "difficulty": "Easy",
+  "status": "ready",
+  "brief": "Design a service where someone pastes a block of text, gets a short link, and shares it. Anyone with the link reads the text. Pastes can expire, can be private, and strangers will try to abuse the service. Reads far outnumber writes, and the text is much bigger than a URL.",
+  "requirements": {
+    "functional": [
+      "Create a paste from text and get a short link.",
+      "Open the link and read the text.",
+      "Let a paste expire after a chosen time, or never.",
+      "Make a paste public (anyone with the link) or private (owner only).",
+      "Let the owner delete a paste."
+    ],
+    "nonFunctional": [
+      { "name": "Read latency", "target": "A paste opens in under 100 ms at the 99th percentile" },
+      { "name": "Availability", "target": "Reads work 99.95% of the time" },
+      { "name": "Durability", "target": "A paste is never lost before it expires" },
+      { "name": "Size limit", "target": "A paste is at most 1 MB" },
+      { "name": "Abuse", "target": "A single client cannot flood the store or host malware" }
+    ],
+    "outOfScope": ["Syntax highlighting and editing", "Accounts, billing and paste history search"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts. Text is far bigger than a URL, so storage and bandwidth matter here. Expiry keeps storage from growing forever: the number of days you keep pastes sets the size of the store.",
+    "inputs": [
+      { "id": "pastesPerDay", "label": "New pastes per day", "value": 5000000, "min": 100000, "max": 500000000, "log": true },
+      { "id": "avgKb", "label": "Average paste size", "value": 10, "min": 1, "max": 500, "log": true, "unit": "KB" },
+      { "id": "readsPerPaste", "label": "Reads per paste", "value": 5, "min": 1, "max": 100, "log": true },
+      { "id": "keepDays", "label": "Average days a paste lives", "value": 90, "min": 1, "max": 3650, "log": true, "unit": "days", "note": "Pastes with an expiry leave early. This is the average." },
+      { "id": "cdnHit", "label": "Share of reads served by the CDN", "value": 80, "min": 0, "max": 99, "step": 1, "unit": "%" }
+    ],
+    "outputs": [
+      { "id": "writeQps", "label": "Creates per second", "expr": "pastesPerDay / 86400", "unit": "per s" },
+      { "id": "readQps", "label": "Reads per second, average", "expr": "writeQps * readsPerPaste", "unit": "per s" },
+      { "id": "originQps", "label": "Reads reaching our servers", "expr": "readQps * (100 - cdnHit) / 100", "unit": "per s", "note": "The rest is answered by CDN edges near the reader." },
+      { "id": "ingestGb", "label": "New text per day", "expr": "pastesPerDay * avgKb * 1000 / 1e9", "unit": "GB" },
+      { "id": "storageTb", "label": "Body storage in steady state", "expr": "pastesPerDay * keepDays * avgKb * 1000 / 1e12", "unit": "TB", "note": "Pastes created per day, times the days they stay alive." },
+      { "id": "metaGb", "label": "Metadata rows", "expr": "pastesPerDay * keepDays * 300 / 1e9", "unit": "GB", "note": "About 300 bytes per row: id, owner, times, flags, blob key." },
+      { "id": "egressMbps", "label": "Bandwidth out, average", "expr": "readQps * avgKb * 1000 * 8 / 1e6", "unit": "Mbit/s" }
+    ]
+  },
+  "api": [
+    { "call": "POST /pastes  { text, expiresIn?, visibility }", "does": "Stores the text and returns a short id. Rejects bodies over 1 MB." },
+    { "call": "GET /p/{id}", "does": "Returns the text. 404 if unknown, 410 if expired, 403 if private and not the owner." },
+    { "call": "DELETE /pastes/{id}", "does": "Owner deletes the paste early." },
+    { "call": "GET /pastes?mine", "does": "Lists the caller's own pastes." }
+  ],
+  "data": [
+    { "entity": "PasteMeta", "fields": "id, ownerId, blobKey, size, visibility, createdAt, expiresAt, flagged", "store": "Key-value or relational store keyed by id.", "why": "Small rows, one lookup by id. Holds everything the read needs to decide: does it exist, is it expired, who may see it." },
+    { "entity": "PasteBody", "fields": "blobKey -> raw text bytes", "store": "Object (blob) storage.", "why": "Big, immutable, read whole. Object storage is cheap per GB and made for this. Never edited, so it caches well." },
+    { "entity": "ExpiryIndex", "fields": "expiresAt bucket, id", "store": "Index on the metadata store.", "why": "Lets the sweeper find expired pastes by time without scanning every row." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Client", "kind": "client", "x": 8, "y": 50, "since": 0 },
+    { "id": "app", "label": "Paste service", "kind": "service", "x": 34, "y": 50, "sub": "stateless", "since": 0 },
+    { "id": "db", "label": "Metadata DB", "kind": "db", "x": 62, "y": 50, "sub": "row per paste", "since": 0 },
+    { "id": "blob", "label": "Blob storage", "kind": "blob", "x": 62, "y": 12, "sub": "text bodies", "since": 1 },
+    { "id": "idgen", "label": "Short ID service", "kind": "service", "x": 34, "y": 88, "sub": "as in URL Shortener", "since": 2 },
+    { "id": "cdn", "label": "CDN", "kind": "cdn", "x": 34, "y": 12, "sub": "edge copies", "since": 3 },
+    { "id": "sweeper", "label": "Expiry sweeper", "kind": "worker", "x": 90, "y": 50, "sub": "background", "since": 4 },
+    { "id": "limiter", "label": "Rate limiter", "kind": "service", "x": 8, "y": 88, "sub": "per client", "since": 5 },
+    { "id": "queue", "label": "Scan queue", "kind": "queue", "x": 62, "y": 88, "sub": "new pastes", "since": 6 },
+    { "id": "scanner", "label": "Content scanner", "kind": "worker", "x": 90, "y": 88, "sub": "malware, secrets", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "app", "since": 0 },
+    { "from": "app", "to": "db", "since": 0 },
+    { "from": "app", "to": "blob", "label": "text", "since": 1 },
+    { "from": "app", "to": "idgen", "label": "next id", "dashed": true, "since": 2 },
+    { "from": "client", "to": "cdn", "label": "public reads", "since": 3 },
+    { "from": "cdn", "to": "blob", "label": "miss", "since": 3 },
+    { "from": "sweeper", "to": "db", "label": "find expired", "since": 4 },
+    { "from": "sweeper", "to": "blob", "label": "delete", "dashed": true, "since": 4 },
+    { "from": "app", "to": "limiter", "label": "check", "since": 5 },
+    { "from": "app", "to": "queue", "label": "new paste", "dashed": true, "since": 6 },
+    { "from": "queue", "to": "scanner", "since": 6 },
+    { "from": "scanner", "to": "db", "label": "flag", "since": 6 }
+  ],
+  "evolution": [
+    { "title": "One server, one table", "problem": "Start with the simplest thing that works: one server and one database.", "change": "Create writes the text and its settings into one row. Open reads that row by id." },
+    { "title": "Text out of the database", "problem": "Pastes average kilobytes, not bytes. Big text values bloat the table, slow backups and make every row read heavy.", "change": "Store the text in blob storage and keep a small metadata row with a blob key. The row answers 'exists, expired, allowed'. The body is fetched only when needed.", "numbers": "storage in the estimator is mostly bodies" },
+    { "title": "Short unique ids", "problem": "Every paste needs a short, unique, hard-to-guess id, and several servers will create pastes at once.", "change": "Reuse the URL Shortener idea as one box: an ID service hands out unique numbers, written in base 62 and scrambled so ids cannot be walked one by one." },
+    { "title": "CDN for reads", "problem": "A paste is read several times, often by people far from our region, and a public paste never changes after it is written.", "change": "Put a CDN in front of the blob store. Public text is immutable, so edges can keep it. Private pastes skip the CDN and go through the service for the permission check.", "numbers": "the CDN share slider sets how many reads reach us" },
+    { "title": "Expiry", "problem": "Without deletes, storage only grows. A paste that expired must also stop being served at once.", "change": "Lazy delete on read: if now is past expiresAt, answer 410 and queue a delete. A background sweeper walks the expiry index and removes rows and blobs in batches, so cold expired pastes do not live forever." },
+    { "title": "Rate limits and size caps", "problem": "One script can post millions of pastes and fill the store, or upload huge bodies.", "change": "A rate limiter counts creates per client and per address, with a daily byte budget. The service rejects bodies over 1 MB before reading them." },
+    { "title": "Scan for abuse", "problem": "Pastes get used to share malware, leaked credentials and spam. Scanning in the request would slow every create.", "change": "After saving, put the paste id on a queue. A scanner reads the text, and flags the metadata row. Flagged pastes stop being served and are removed from the CDN." }
+  ],
+  "flows": [
+    {
+      "name": "Create a paste",
+      "steps": [
+        { "say": "The client sends text, an expiry and a visibility.", "nodes": ["client", "app"], "edges": [["client", "app"]] },
+        { "say": "The service checks the rate limiter and rejects oversize bodies.", "nodes": ["app", "limiter"], "edges": [["app", "limiter"]] },
+        { "say": "It takes a unique number from the ID service and encodes it as the short id.", "nodes": ["app", "idgen"], "edges": [["app", "idgen"]] },
+        { "say": "It writes the text to blob storage under a key.", "nodes": ["app", "blob"], "edges": [["app", "blob"]] },
+        { "say": "It writes the metadata row: id, blob key, expiry, visibility.", "nodes": ["app", "db"], "edges": [["app", "db"]] },
+        { "say": "It drops the id on the scan queue and returns the link without waiting.", "nodes": ["app", "queue"], "edges": [["app", "queue"]] },
+        { "say": "The scanner later reads the text and flags the row if it is abusive.", "nodes": ["queue", "scanner", "db"], "edges": [["queue", "scanner"], ["scanner", "db"]] }
+      ]
+    },
+    {
+      "name": "Read a public paste",
+      "steps": [
+        { "say": "The reader opens the link. The request goes to the nearest CDN edge.", "nodes": ["client", "cdn"], "edges": [["client", "cdn"]] },
+        { "say": "On a hit the edge answers right away. Most reads end here.", "nodes": ["cdn", "client"], "edges": [] },
+        { "say": "On a miss the edge fetches the text from blob storage and keeps a copy.", "nodes": ["cdn", "blob"], "edges": [["cdn", "blob"]] }
+      ]
+    },
+    {
+      "name": "Read a private or expiring paste",
+      "steps": [
+        { "say": "The request bypasses the CDN and reaches the paste service.", "nodes": ["client", "app"], "edges": [["client", "app"]] },
+        { "say": "The service loads the metadata row by id.", "nodes": ["app", "db"], "edges": [["app", "db"]] },
+        { "say": "It checks expiry and the owner. Expired means 410 plus a queued delete. Not the owner means 403.", "nodes": ["app"], "edges": [] },
+        { "say": "Allowed: it fetches the text using the blob key and returns it.", "nodes": ["app", "blob"], "edges": [["app", "blob"]] },
+        { "say": "Later the sweeper finds anything expired that nobody opened and deletes row and body.", "nodes": ["sweeper", "db", "blob"], "edges": [["sweeper", "db"], ["sweeper", "blob"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Where the text lives",
+      "question": "Do we keep the text in the database row or in object storage?",
+      "options": [
+        { "name": "In the database row", "pros": "One write, one read, one transaction. Simple.", "cons": "Large values bloat the table and buffer pool, slow backups and replication, and cost more per GB." },
+        { "name": "In blob storage, row holds a key", "pros": "Cheap per GB, scales out, and the metadata table stays small and fast.", "cons": "Two writes that can fail halfway. A body can be left without a row." }
+      ],
+      "pick": "Blob storage with a metadata row",
+      "because": "Write the blob first, then the row. A crash in between leaves an orphan blob, which a periodic cleanup can find by comparing keys. The reverse order would serve a row that points at nothing."
+    },
+    {
+      "title": "How expiry is enforced",
+      "question": "How do we stop serving a paste on time and also reclaim its space?",
+      "options": [
+        { "name": "Lazy delete on read only", "pros": "No background work. Exact at the moment of read.", "cons": "A paste nobody reads again is never reclaimed, so storage grows." },
+        { "name": "Background sweeper only", "pros": "Space is reclaimed steadily.", "cons": "Runs in batches, so an expired paste can be served for minutes after its time." },
+        { "name": "Both", "pros": "The read check is exact. The sweeper clears cold data.", "cons": "Two code paths to keep consistent." }
+      ],
+      "pick": "Both",
+      "because": "Correctness comes from the check on read. Cost control comes from the sweeper. Set a CDN max-age no longer than the shortest expiry you allow, or purge the edge when you delete."
+    },
+    {
+      "title": "Public and private pastes",
+      "question": "How do we cache cheaply and still keep private pastes private?",
+      "options": [
+        { "name": "Everything through the service", "pros": "One permission check, no leaks.", "cons": "Every read hits our servers. No edge caching." },
+        { "name": "Public via CDN, private via service", "pros": "The common case is cheap. Private reads are rare and checked.", "cons": "Making a paste private later needs a CDN purge." },
+        { "name": "Signed URLs for private pastes", "pros": "The CDN can serve private text for a short time.", "cons": "A leaked URL works until it expires." }
+      ],
+      "pick": "Public through the CDN, private through the service",
+      "because": "Treat an unguessable id as the secret for public pastes, and an authenticated check for private ones. Keep public text immutable so caching is always safe. If a paste turns private, purge it."
+    }
+  ],
+  "failures": [
+    { "what": "Blob store write succeeds, row write fails", "impact": "An orphan body wastes space but nobody sees it.", "fix": "Write the blob first. A periodic job lists blobs with no row and deletes them after a grace period." },
+    { "what": "Viral paste", "impact": "One link gets a flood of reads and the origin sees the spike.", "fix": "The CDN absorbs it, because public text is immutable. Set a long max-age and let the edges coalesce misses." },
+    { "what": "The sweeper falls behind", "impact": "Expired pastes linger and storage grows. Reads still return 410 correctly.", "fix": "Process the expiry index in small batches, scale workers by backlog, and alert on the age of the oldest expired item." },
+    { "what": "Abuse flood or malware host", "impact": "The store fills with junk or the domain gets blocklisted.", "fix": "Rate limit by client and address, cap sizes, scan after write, take down flagged pastes fast, and offer a report link." },
+    { "what": "Metadata DB is slow or down", "impact": "Private and uncached reads fail. Public CDN hits still work.", "fix": "Replicate the database. The CDN keeps public pastes readable during a short outage." }
+  ],
+  "scaling": [
+    { "limit": "Metadata table outgrows one database", "lever": "Shard by paste id with consistent hashing. Every lookup is by id, so no query crosses shards." },
+    { "limit": "Blob storage cost keeps growing", "lever": "Compress text before storing, set shorter default expiry, and move cold pastes to a cheaper storage class." },
+    { "limit": "Readers across the world", "lever": "More CDN edges and regional read replicas for metadata. Public reads then rarely cross an ocean." }
+  ],
+  "recap": {
+    "key": "A paste is a small row plus a big immutable blob. Cache the blob at the edge, expire lazily and by sweeper, and guard the front door against abuse.",
+    "numbers": "About 58 creates and 290 reads per second. About 50 GB of new text a day. Around 4.5 TB of bodies at 90 days. A CDN at 80 percent leaves about 58 reads per second at origin.",
+    "moves": ["Split metadata row from the text body in blob storage", "Reuse an ID service, base 62 and scrambled", "Public text goes through a CDN, private through the service", "Expire on read and by sweeper, rate limit and scan after write"]
+  }
+}

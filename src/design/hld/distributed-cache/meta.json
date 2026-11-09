@@ -1,0 +1,183 @@
+{
+  "slug": "distributed-cache",
+  "title": "Distributed Cache",
+  "group": "Building blocks",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a cache that many app servers share: a fleet of in-memory nodes that holds hot data so most reads never touch the database. It must spread keys across nodes, survive a node dying, and not make things worse when it misses. A cache that fails badly can take the database down with it.",
+  "requirements": {
+    "functional": [
+      "Get a value by key, and set a value with an optional time to live.",
+      "Delete or invalidate a key.",
+      "Spread keys across many nodes, and add or remove nodes while running.",
+      "Evict old entries when memory is full.",
+      "Keep serving when one node fails."
+    ],
+    "nonFunctional": [
+      { "name": "Latency", "target": "A get takes under 1 ms inside the data centre at the 99th percentile" },
+      { "name": "Hit ratio", "target": "At least 95% of reads are answered by the cache" },
+      { "name": "Availability", "target": "One node failing never takes the cache or the database down" },
+      { "name": "Scale", "target": "Adding a node moves only a small slice of the keys" }
+    ],
+    "outOfScope": ["Strong consistency with the database", "Durable storage: the cache can be rebuilt from the source"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts. Two limits size the fleet: memory for the working set, and operations per second per node. The miss rate decides how much load the database still sees.",
+    "inputs": [
+      { "id": "workingSetGb", "label": "Hot data to keep in memory", "value": 2000, "min": 10, "max": 50000, "log": true, "unit": "GB" },
+      { "id": "hitPct", "label": "Hit ratio", "value": 95, "min": 50, "max": 99.9, "step": 0.5, "unit": "%" },
+      { "id": "rps", "label": "Cache reads per second", "value": 500000, "min": 1000, "max": 5000000, "log": true, "unit": "per s" },
+      { "id": "nodeRamGb", "label": "RAM per cache node", "value": 64, "min": 16, "max": 512, "log": true, "unit": "GB" },
+      { "id": "nodeOps", "label": "Operations one node serves", "value": 100000, "min": 20000, "max": 500000, "log": true, "unit": "per s" },
+      { "id": "copies", "label": "Copies of each key", "value": 2, "min": 1, "max": 3, "step": 1, "note": "1 is no replica. 2 means one replica." }
+    ],
+    "outputs": [
+      { "id": "totalGb", "label": "Memory including replicas", "expr": "workingSetGb * copies", "unit": "GB" },
+      { "id": "nodesMem", "label": "Nodes needed for memory", "expr": "ceil(totalGb / (nodeRamGb * 0.75))", "unit": "nodes", "note": "Keep 25% free for overhead, fragmentation and growth." },
+      { "id": "nodesQps", "label": "Nodes needed for throughput", "expr": "ceil(rps / nodeOps)", "unit": "nodes" },
+      { "id": "nodes", "label": "Nodes to run", "expr": "max(nodesMem, nodesQps)", "unit": "nodes", "note": "Whichever limit is bigger decides." },
+      { "id": "dbQps", "label": "Database load after the cache", "expr": "rps * (100 - hitPct) / 100", "unit": "per s", "note": "Misses per second. This is what the database must survive." },
+      { "id": "shield", "label": "Load shielded from the database", "expr": "1 / (1 - hitPct / 100)", "unit": "x", "note": "At 95% the database sees one read in twenty." },
+      { "id": "movePct", "label": "Keys that move when one node is added", "expr": "100 / (nodes + 1)", "unit": "%", "note": "With consistent hashing. A plain modulo scheme would move almost all of them." }
+    ]
+  },
+  "api": [
+    { "call": "GET key", "does": "Returns the value or a miss." },
+    { "call": "SET key value [ttl]", "does": "Stores the value, replacing any older one. The ttl bounds how stale it can be." },
+    { "call": "DEL key", "does": "Removes the key. Used to invalidate after a database write." },
+    { "call": "MGET keys", "does": "Reads many keys. The client groups them by owning node and sends one request per node." },
+    { "call": "INCR key", "does": "Atomic counter on one node. Useful for rate limits and stats." }
+  ],
+  "data": [
+    { "entity": "CacheEntry", "fields": "key, value bytes, expiresAt, lastUsed, version", "store": "In-memory hash table on a cache node.", "why": "A get is one hash lookup. Expiry and the use stamp let the node evict without scanning." },
+    { "entity": "Ring", "fields": "token -> node, node health, epoch", "store": "Small config shared with clients.", "why": "Clients need to know which node owns a key. It changes rarely and is tiny, so every client keeps a copy." },
+    { "entity": "Source row", "fields": "the real data, owned by the database", "store": "The system of record.", "why": "The cache holds copies only. Losing the cache loses nothing, it just makes reads slow until it warms up." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Users", "kind": "client", "x": 7, "y": 50, "since": 0 },
+    { "id": "app", "label": "App servers", "kind": "service", "x": 28, "y": 50, "sub": "cache client library", "since": 0 },
+    { "id": "db", "label": "Database", "kind": "db", "x": 34, "y": 88, "sub": "source of truth", "since": 0 },
+    { "id": "c1", "label": "Cache node 1", "kind": "cache", "x": 56, "y": 12, "sub": "owns a hash range", "since": 1 },
+    { "id": "c2", "label": "Cache node 2", "kind": "cache", "x": 56, "y": 50, "since": 2 },
+    { "id": "c3", "label": "Cache node 3", "kind": "cache", "x": 56, "y": 88, "since": 2 },
+    { "id": "r1", "label": "Replica of 1", "kind": "cache", "x": 82, "y": 12, "since": 3 },
+    { "id": "r2", "label": "Replica of 2", "kind": "cache", "x": 82, "y": 50, "since": 3 },
+    { "id": "r3", "label": "Replica of 3", "kind": "cache", "x": 82, "y": 88, "since": 3 },
+    { "id": "coalesce", "label": "Miss coalescer", "kind": "service", "x": 7, "y": 88, "sub": "one load per key", "since": 4 },
+    { "id": "local", "label": "Local hot cache", "kind": "cache", "x": 28, "y": 12, "sub": "inside each app", "since": 5 },
+    { "id": "bloom", "label": "Bloom filter", "kind": "service", "x": 7, "y": 12, "sub": "keys that exist", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "app", "since": 0 },
+    { "from": "app", "to": "db", "since": 0 },
+    { "from": "app", "to": "c1", "label": "hash(key)", "since": 1 },
+    { "from": "app", "to": "c2", "label": "hash(key)", "since": 2 },
+    { "from": "app", "to": "c3", "label": "hash(key)", "since": 2 },
+    { "from": "c1", "to": "r1", "label": "copy", "dashed": true, "since": 3 },
+    { "from": "c2", "to": "r2", "label": "copy", "dashed": true, "since": 3 },
+    { "from": "c3", "to": "r3", "label": "copy", "dashed": true, "since": 3 },
+    { "from": "app", "to": "coalesce", "label": "miss", "since": 4 },
+    { "from": "coalesce", "to": "db", "since": 4 },
+    { "from": "app", "to": "local", "label": "hot keys", "since": 5 },
+    { "from": "app", "to": "bloom", "label": "exists?", "since": 6 }
+  ],
+  "evolution": [
+    { "title": "App and database", "problem": "Start with the simplest thing that works: app servers read the database every time.", "change": "Every read is a database query. Fine until reads grow." },
+    { "title": "One cache node", "problem": "Reads are repeated, the database is the slow part, and it caps how many reads we can serve. The same hot rows are fetched again and again.", "change": "Add one in-memory cache. The app uses cache-aside: read the cache, on a miss read the database and store the result with a time to live.", "numbers": "a get takes well under 1 ms, a database read takes several" },
+    { "title": "Spread keys across nodes", "problem": "The working set is hundreds of GB and one node holds maybe 64. One node also caps throughput.", "change": "Run several nodes. Place each key on a node with consistent hashing. The client library hashes the key to find its owner.", "numbers": "the estimator shows nodes by memory and by throughput" },
+    { "title": "Replicas for failover", "problem": "When a node dies, its whole key range misses at once, and every miss goes to the database.", "change": "Each node has a replica that copies its writes. If the node dies, clients switch to the replica, which is already warm." },
+    { "title": "Stop the stampede", "problem": "A popular key expires. In that instant thousands of requests miss together and all hit the database to rebuild the same value.", "change": "Coalesce misses: the first request loads the key, the others wait for it. Add early refresh so hot keys are renewed before they expire." },
+    { "title": "Hot keys", "problem": "One key, such as a celebrity profile, gets more traffic than one node can serve. Adding nodes does not help, because a key lives on one node.", "change": "Keep a tiny local cache inside each app server for the hottest keys, with a short ttl. For known hot keys, also copy them to several nodes." },
+    { "title": "Keys that do not exist", "problem": "Requests for ids that are not in the database always miss, so each one reaches the database. An attacker can send random ids.", "change": "Cache the 'not found' answer for a short time, and put a Bloom filter of existing keys in front. If the filter says no, answer without any lookup." }
+  ],
+  "flows": [
+    {
+      "name": "Read with cache-aside",
+      "steps": [
+        { "say": "The app asks its local cache first. A hit costs nothing.", "nodes": ["app", "local"], "edges": [["app", "local"]] },
+        { "say": "A Bloom filter says whether the key can exist. If not, answer 'not found' now.", "nodes": ["app", "bloom"], "edges": [["app", "bloom"]] },
+        { "say": "The client hashes the key and asks the node that owns it. Most reads end here.", "nodes": ["app", "c2"], "edges": [["app", "c2"]] },
+        { "say": "On a miss the request goes to the coalescer. Many callers for one key collapse into one.", "nodes": ["app", "coalesce"], "edges": [["app", "coalesce"]] },
+        { "say": "The coalescer loads the key from the database once.", "nodes": ["coalesce", "db"], "edges": [["coalesce", "db"]] },
+        { "say": "The app stores the value in the owning node with a ttl, then returns it.", "nodes": ["app", "c2"], "edges": [["app", "c2"]] }
+      ]
+    },
+    {
+      "name": "Write and invalidate",
+      "steps": [
+        { "say": "The app writes the new value to the database first. That is the truth.", "nodes": ["app", "db"], "edges": [["app", "db"]] },
+        { "say": "It then deletes the key in the cache. The next read reloads the fresh value.", "nodes": ["app", "c2"], "edges": [["app", "c2"]] },
+        { "say": "The owning node passes the delete to its replica so a failover does not bring back the old value.", "nodes": ["c2", "r2"], "edges": [["c2", "r2"]] }
+      ]
+    },
+    {
+      "name": "A node fails",
+      "steps": [
+        { "say": "Node 3 stops answering. The client library notices timeouts.", "nodes": ["app", "c3"], "edges": [["app", "c3"]] },
+        { "say": "Its replica holds the same data. The client sends that key range to the replica.", "nodes": ["c3", "r3"], "edges": [["c3", "r3"]] },
+        { "say": "Misses that do happen go through the coalescer, so the database sees one load per key.", "nodes": ["app", "coalesce", "db"], "edges": [["app", "coalesce"], ["coalesce", "db"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Placing keys: modulo or consistent hashing",
+      "question": "Which node owns a key, and what moves when the node count changes?",
+      "options": [
+        { "name": "hash(key) mod N", "pros": "Trivial to write and balanced.", "cons": "Change N and almost every key changes owner. The whole cache goes cold at once." },
+        { "name": "Consistent hashing with virtual nodes", "pros": "Nodes sit on a ring, each with many tokens. A key goes to the next token clockwise. Add or lose a node and only about 1/N of keys move. Many small tokens spread load evenly.", "cons": "More moving parts, and the ring must be shared with every client." }
+      ],
+      "pick": "Consistent hashing with virtual nodes",
+      "because": "Resizing is routine, and it must not empty the cache. When a node dies, its tokens' keys spread across many nodes, not onto one neighbour. Pick a few hundred tokens per node for even load."
+    },
+    {
+      "title": "Who routes: client or proxy",
+      "question": "Where does the key-to-node lookup happen?",
+      "options": [
+        { "name": "Smart client library", "pros": "One network hop. No extra tier to run. Lowest latency.", "cons": "Every language needs the library. Ring changes must reach all clients. Upgrades touch every app." },
+        { "name": "Proxy tier", "pros": "Thin clients. Central place for limits, metrics and failover. Ring changes are invisible to apps.", "cons": "An extra hop and an extra fleet to run and scale." }
+      ],
+      "pick": "Smart client; proxy if many client languages",
+      "because": "Latency is the point of a cache, so skip the hop when you can. Teams with many client languages or tight control needs accept the proxy for its simplicity."
+    },
+    {
+      "title": "Write policy",
+      "question": "How do database and cache stay in step when data changes?",
+      "options": [
+        { "name": "Cache-aside (invalidate on write)", "pros": "Simple. The database stays the truth. A failed cache never blocks a write.", "cons": "A race can leave an old value: a reader loads old data, a writer deletes, then the reader stores the old data. The ttl limits the damage." },
+        { "name": "Write-through", "pros": "Cache and database are updated together, so reads see fresh data.", "cons": "Every write pays both latencies. Data nobody reads still fills the cache." },
+        { "name": "Write-behind", "pros": "Writes return after the cache. A batch flushes to the database later. Very fast writes.", "cons": "Data in the cache only is lost if the node dies before the flush. Reads from the database can be stale." }
+      ],
+      "pick": "Cache-aside",
+      "because": "Most systems value a correct database over a fast write. Use write-through for read-after-write needs, and write-behind only where losing a few seconds of data is acceptable, such as counters."
+    },
+    {
+      "title": "Eviction",
+      "question": "Memory is full. Which entries go?",
+      "options": [
+        { "name": "Exact LRU", "pros": "Removes the entry unused for longest, which fits most access patterns.", "cons": "Needs a linked list updated on every read, so a lock on the hot path. Costly in memory and CPU." },
+        { "name": "Approximate LRU by sampling", "pros": "Sample a few random entries, evict the oldest of them. No global list, no lock, and close to true LRU.", "cons": "Not exact. A scan can still push out useful keys." },
+        { "name": "LFU (least frequently used)", "pros": "Keeps keys that are popular over time and resists one-off scans.", "cons": "Needs counters that age, and a once-hot key can linger." }
+      ],
+      "pick": "Approximate LRU, with ttl on every key",
+      "because": "Sampling 5 to 10 keys gives most of the benefit at almost no cost per read. The ttl bounds staleness and gives memory back without waiting for pressure."
+    }
+  ],
+  "failures": [
+    { "what": "Cache stampede on an expired key", "impact": "Thousands of requests miss together and hit the database for the same value.", "fix": "Coalesce misses so one caller loads while the rest wait. Refresh hot keys before they expire, and add random jitter to ttls so keys do not expire together." },
+    { "what": "A node dies or is added", "impact": "Its key range misses, and the database takes the burst.", "fix": "Replicas keep the range warm. Consistent hashing moves only 1/N of keys. Cap concurrent database loads and warm a new node before it takes traffic." },
+    { "what": "Hot key overloads one node", "impact": "One node is at its limit while the others are idle.", "fix": "Local copies in the app for the hottest keys, short ttl. Copy known hot keys to several nodes and spread reads, or split the key into a few suffixed copies." },
+    { "what": "Cache penetration with missing keys", "impact": "Lookups for keys that never exist always reach the database. Random ids can flood it.", "fix": "Cache 'not found' for a short time. Keep a Bloom filter of valid keys and reject the rest at the front. Rate limit the caller." },
+    { "what": "Stale value after a write", "impact": "A reader sees old data after the database changed.", "fix": "Invalidate on write, keep ttls short, and for critical reads go to the database. Version values so an old write cannot overwrite a newer one." }
+  ],
+  "scaling": [
+    { "limit": "The working set outgrows memory", "lever": "Add nodes and rebalance through the ring. Cache only what has a good hit rate, store compact values, and compress large ones." },
+    { "limit": "One key or node is the bottleneck", "lever": "Replicate hot keys, add read replicas per node, and put a short-lived local cache in the app tier." },
+    { "limit": "Users in several regions", "lever": "Run a cache per region against a regional database replica. Accept that regions may be briefly out of step and use ttls to bound it." }
+  ],
+  "recap": {
+    "key": "A cache is only as good as its worst miss. Place keys with consistent hashing, keep replicas warm, and guard the database against stampedes, hot keys and keys that do not exist.",
+    "numbers": "2 TB hot, one replica, 64 GB nodes: 84 nodes by memory, 5 by throughput. At 95 percent hits the database sees 25K of 500K reads per s. A new node moves about 1 percent of keys.",
+    "moves": ["Cache-aside with a ttl, and invalidate on write", "Consistent hashing with virtual nodes, so resizing moves 1/N of keys", "Replicas for failover, approximate LRU for eviction", "Coalesce misses, copy hot keys locally, cache and filter missing keys"]
+  }
+}

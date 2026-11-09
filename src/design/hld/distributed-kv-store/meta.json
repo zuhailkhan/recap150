@@ -1,0 +1,195 @@
+{
+  "slug": "distributed-kv-store",
+  "title": "Distributed Key-Value Store",
+  "group": "Building blocks",
+  "difficulty": "Hard",
+  "status": "ready",
+  "brief": "Design a key-value store in the style of Amazon's Dynamo paper: it keeps data on many machines, copies each key to several of them, and stays writable even when machines fail or the network splits. It trades strict consistency for availability, and lets the caller choose how strict each read and write should be.",
+  "requirements": {
+    "functional": [
+      "Put a value under a key, get it back, and delete it.",
+      "Store far more data than one machine holds.",
+      "Keep working when nodes fail or are added.",
+      "Let each request choose how many replicas it needs to hear from.",
+      "Detect and resolve concurrent updates to the same key."
+    ],
+    "nonFunctional": [
+      { "name": "Availability", "target": "Writes succeed while a majority of replicas, or any healthy stand-ins, are reachable" },
+      { "name": "Latency", "target": "Reads and writes take under 10 ms at the 99th percentile" },
+      { "name": "Durability", "target": "An acknowledged write survives the loss of any single node" },
+      { "name": "Scale", "target": "Add nodes to add capacity, with no central bottleneck" },
+      { "name": "Consistency", "target": "Eventual by default, and tunable towards strong per request" }
+    ],
+    "outOfScope": ["Multi-key transactions and joins", "Range queries across partitions", "Security and multi-tenant isolation"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts. Size follows from keys, value size and replicas. The quorum rows use a simple model: each replica is slow on 1 percent of requests, and a request waits for as many replicas as its quorum needs.",
+    "inputs": [
+      { "id": "keys", "label": "Keys stored", "value": 10000000000, "min": 10000000, "max": 100000000000, "log": true },
+      { "id": "valueBytes", "label": "Average value size", "value": 1000, "min": 100, "max": 100000, "log": true, "unit": "B" },
+      { "id": "replicas", "label": "Replicas per key (N)", "value": 3, "min": 1, "max": 5, "step": 1 },
+      { "id": "writeQ", "label": "Write quorum (W)", "value": 2, "min": 1, "max": 5, "step": 1, "note": "Replicas that must acknowledge a write." },
+      { "id": "nodeDiskTb", "label": "Disk per node", "value": 4, "min": 1, "max": 30, "step": 1, "unit": "TB" },
+      { "id": "sizeRatio", "label": "Compaction size ratio", "value": 10, "min": 4, "max": 20, "step": 1, "note": "How much bigger each level of sorted files is than the one above." }
+    ],
+    "outputs": [
+      { "id": "totalTb", "label": "Data including replicas", "expr": "keys * valueBytes * replicas / 1e12", "unit": "TB" },
+      { "id": "nodes", "label": "Nodes needed", "expr": "ceil(totalTb / (nodeDiskTb * 0.6))", "unit": "nodes", "note": "Keep 40% of disk free. Compaction needs room to rewrite files." },
+      { "id": "readQ", "label": "Read quorum (R) so that R+W is above N", "expr": "max(1, replicas + 1 - writeQ)", "unit": "replicas", "note": "The smallest R that guarantees a read overlaps the latest write." },
+      { "id": "slowAll", "label": "Writes hit by a slow replica, wait for N", "expr": "100 * (1 - 0.99 ^ replicas)", "unit": "%" },
+      { "id": "slowW", "label": "Same, waiting only for W", "expr": "100 * min(1, ((replicas * 0.01) ^ readQ) / (sqrt(6.283 * readQ) * (readQ / 2.718) ^ readQ))", "unit": "%", "note": "A write is delayed only if enough replicas are slow at once. An approximation." },
+      { "id": "levels", "label": "Levels of sorted files per node", "expr": "max(1, ceil(log10(totalTb * 1e6 / nodes / 64) / log10(sizeRatio)))", "unit": "levels", "note": "Assumes a 64 MB memtable that flushes into the first level." },
+      { "id": "writeAmp", "label": "Write amplification from compaction", "expr": "1 + sizeRatio * levels / 2", "unit": "x", "note": "Each byte is rewritten about this many times. A rough figure for leveled compaction." }
+    ]
+  },
+  "api": [
+    { "call": "put(key, value, context?)", "does": "Writes a value. The context carries the version the caller read, so the store can tell updates apart." },
+    { "call": "get(key) -> [value, context]", "does": "Returns one value, or several conflicting versions if updates were concurrent." },
+    { "call": "delete(key)", "does": "Writes a tombstone marker, which is later removed after every replica has seen it." },
+    { "call": "Consistency per call: R, W", "does": "Choose how many replicas must answer. For example W=2, R=2 with N=3." }
+  ],
+  "data": [
+    { "entity": "Record", "fields": "key, value, vector clock, timestamp, tombstone", "store": "Log-structured files on each node.", "why": "Writes are appends, so they are fast. The version info lets replicas compare copies of the same key." },
+    { "entity": "Ring and membership", "fields": "node, tokens, state, heartbeat counter", "store": "In memory on every node, spread by gossip.", "why": "Every node knows who owns which range, so any node can route a request and no central directory exists." },
+    { "entity": "Hint", "fields": "intended node, key, value, version", "store": "Local file on the stand-in node.", "why": "Holds writes meant for a node that is down, to hand back when it returns." },
+    { "entity": "Merkle tree", "fields": "range -> hash of hashes", "store": "Built in memory per key range.", "why": "Two replicas compare small trees to find which keys differ, instead of comparing every key." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Client", "kind": "client", "x": 6, "y": 50, "since": 0 },
+    { "id": "coord", "label": "Coordinator", "kind": "service", "x": 25, "y": 50, "sub": "any node can act", "since": 2 },
+    { "id": "na", "label": "Node A", "kind": "db", "x": 46, "y": 10, "sub": "replica", "since": 2 },
+    { "id": "nb", "label": "Node B", "kind": "db", "x": 46, "y": 37, "sub": "replica", "since": 0 },
+    { "id": "nc", "label": "Node C", "kind": "db", "x": 46, "y": 63, "sub": "replica", "since": 3 },
+    { "id": "nd", "label": "Node D", "kind": "db", "x": 46, "y": 90, "sub": "stand-in, holds hints", "since": 4 },
+    { "id": "wal", "label": "Write-ahead log", "kind": "blob", "x": 68, "y": 37, "sub": "append first", "since": 0 },
+    { "id": "mem", "label": "Memtable", "kind": "cache", "x": 90, "y": 37, "sub": "sorted, in RAM", "since": 0 },
+    { "id": "sst", "label": "Sorted files", "kind": "blob", "x": 90, "y": 63, "sub": "on disk, compacted", "since": 0 },
+    { "id": "bloom", "label": "Bloom filters", "kind": "cache", "x": 68, "y": 63, "sub": "skip files", "since": 1 },
+    { "id": "merge", "label": "Conflict merge", "kind": "service", "x": 25, "y": 88, "sub": "vector clocks", "since": 5 },
+    { "id": "gossip", "label": "Membership", "kind": "cache", "x": 68, "y": 10, "sub": "gossip, failure detect", "since": 6 }
+  ],
+  "edges": [
+    { "from": "client", "to": "nb", "since": 0, "until": 2 },
+    { "from": "nb", "to": "wal", "since": 0 },
+    { "from": "wal", "to": "mem", "since": 0 },
+    { "from": "mem", "to": "sst", "label": "flush", "since": 0 },
+    { "from": "nb", "to": "bloom", "label": "read", "since": 1 },
+    { "from": "bloom", "to": "sst", "since": 1 },
+    { "from": "client", "to": "coord", "since": 2 },
+    { "from": "coord", "to": "na", "since": 2 },
+    { "from": "coord", "to": "nb", "since": 2 },
+    { "from": "coord", "to": "nc", "since": 3 },
+    { "from": "na", "to": "nb", "label": "read repair", "dashed": true, "since": 3 },
+    { "from": "coord", "to": "nd", "label": "if down", "dashed": true, "since": 4 },
+    { "from": "nd", "to": "nc", "label": "hand back", "dashed": true, "since": 4 },
+    { "from": "coord", "to": "merge", "since": 5 },
+    { "from": "merge", "to": "client", "label": "merge", "since": 5 },
+    { "from": "na", "to": "gossip", "dashed": true, "since": 6 },
+    { "from": "nb", "to": "gossip", "dashed": true, "since": 6 },
+    { "from": "nb", "to": "nc", "label": "sync", "dashed": true, "since": 6 }
+  ],
+  "evolution": [
+    { "title": "One node, a log-structured engine", "problem": "Start with one machine. Random in-place disk writes are slow, and a crash can lose what is in memory.", "change": "Append every write to a write-ahead log (a file that lets us replay after a crash), then put it in a sorted in-memory table (the memtable). When the memtable is full it is flushed to disk as an immutable sorted file." },
+    { "title": "Bloom filters and compaction", "problem": "Flushes pile up files. A read may check many of them, and old versions and deleted keys waste space.", "change": "Compaction merges files into larger sorted ones and drops old versions. A Bloom filter per file says 'definitely not here', so most files are skipped without a disk read.", "numbers": "write amplification in the estimator" },
+    { "title": "Partition across nodes", "problem": "The data is terabytes, and no machine holds it or serves its traffic.", "change": "Place keys on a ring with consistent hashing and virtual nodes. Any node can be the coordinator for a request: it hashes the key, finds the owner and forwards. Adding a node moves only a slice.", "numbers": "nodes needed for the data size" },
+    { "title": "Replicate and tune quorums", "problem": "A single owner is a single copy. If it dies, the data is gone and the range is unavailable. Waiting for every replica makes one slow node stall everything.", "change": "Copy each key to the next N nodes on the ring. A write returns after W acknowledgements, a read after R replies. With R + W above N the sets overlap, so a read sees the latest write. Read repair fixes stale replicas.", "numbers": "the quorum rows in the estimator" },
+    { "title": "Sloppy quorum and hinted handoff", "problem": "If a replica is down, writes needing W acks start to fail, even though healthy nodes exist. For a shopping cart that is the wrong choice.", "change": "Write to the next healthy node on the ring instead, tagged with a hint naming the intended owner. When the owner returns, the stand-in hands the data back. Availability goes up, and a strict quorum is no longer guaranteed." },
+    { "title": "Versions and conflicts", "problem": "Two clients can write the same key at once on different replicas, during a split or while a node is down. Which one wins?", "change": "Each value carries a version. Last-write-wins uses timestamps and silently drops one update. Vector clocks (a counter per node) can tell 'newer' from 'concurrent', and keep both versions for the client to merge." },
+    { "title": "Anti-entropy and gossip", "problem": "Hints can be lost and replicas drift apart. Nodes must also learn who is alive without a central directory.", "change": "Replicas compare Merkle trees (hashes of hashes of key ranges) and sync only the ranges that differ. Nodes gossip: each periodically swaps its view with a random peer, so membership and failures spread in a few rounds." }
+  ],
+  "flows": [
+    {
+      "name": "Write (N=3, W=2)",
+      "steps": [
+        { "say": "The client sends put to any node. That node becomes the coordinator for this request.", "nodes": ["client", "coord"], "edges": [["client", "coord"]] },
+        { "say": "It hashes the key onto the ring. The owners are the next three nodes: A, B and C.", "nodes": ["coord"], "edges": [] },
+        { "say": "It sends the write to all three at once.", "nodes": ["coord", "na", "nb", "nc"], "edges": [["coord", "na"], ["coord", "nb"], ["coord", "nc"]] },
+        { "say": "On each node the write is appended to the log first, which makes it durable.", "nodes": ["nb", "wal"], "edges": [["nb", "wal"]] },
+        { "say": "Then it goes into the memtable. Later the memtable is flushed to a sorted file.", "nodes": ["wal", "mem", "sst"], "edges": [["wal", "mem"], ["mem", "sst"]] },
+        { "say": "As soon as two replicas confirm, the coordinator answers the client. The third catches up.", "nodes": ["coord", "client"], "edges": [] }
+      ]
+    },
+    {
+      "name": "Read (R=2) with a conflict",
+      "steps": [
+        { "say": "The coordinator asks the replicas for the key.", "nodes": ["client", "coord", "na", "nb"], "edges": [["client", "coord"], ["coord", "na"], ["coord", "nb"]] },
+        { "say": "On a node, the Bloom filters rule out most files, so only a few are read.", "nodes": ["nb", "bloom", "sst"], "edges": [["nb", "bloom"], ["bloom", "sst"]] },
+        { "say": "It compares the version of each reply. If one is behind, it is stale.", "nodes": ["coord"], "edges": [] },
+        { "say": "A stale replica gets the newer value in the background. This is read repair.", "nodes": ["na", "nb"], "edges": [["na", "nb"]] },
+        { "say": "If two versions are concurrent, neither wins. Both are returned to the client.", "nodes": ["coord", "merge"], "edges": [["coord", "merge"]] },
+        { "say": "The client merges them, for example by taking the union of a cart, and writes the result back.", "nodes": ["merge", "client"], "edges": [["merge", "client"]] }
+      ]
+    },
+    {
+      "name": "Write while a node is down",
+      "steps": [
+        { "say": "Node C is down. Gossip has told the coordinator, or its call has timed out.", "nodes": ["coord", "nc"], "edges": [["coord", "nc"]] },
+        { "say": "A and B accept the write. The coordinator also sends it to Node D, the next healthy node, with a hint for C.", "nodes": ["coord", "nd"], "edges": [["coord", "nd"]] },
+        { "say": "Three acknowledgements arrive, so the write succeeds. This is a sloppy quorum.", "nodes": ["coord", "client"], "edges": [] },
+        { "say": "C comes back. D notices through gossip and hands the data over.", "nodes": ["nd", "nc"], "edges": [["nd", "nc"]] },
+        { "say": "If anything was lost on the way, anti-entropy finds the differing ranges and repairs them.", "nodes": ["nb", "nc"], "edges": [["nb", "nc"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Quorums: R, W and N",
+      "question": "How many replicas must a read and a write contact?",
+      "options": [
+        { "name": "W=1, R=1 (fast)", "pros": "Lowest latency and highest availability.", "cons": "A read can miss the latest write. Data can be lost if the one replica dies before copying." },
+        { "name": "R + W > N, such as 2 and 2 of 3", "pros": "Every read set overlaps every write set, so a read sees the newest acknowledged write. Survives one node loss.", "cons": "Every request waits for the slower of two replicas. Fewer nodes can be down." },
+        { "name": "W=N, R=1", "pros": "Reads are fast and consistent.", "cons": "A single down node blocks all writes." }
+      ],
+      "pick": "N=3, R=2, W=2 by default, adjusted per use case",
+      "because": "It tolerates one failure on both paths and keeps overlap. A read-heavy table can use W=3, R=1. A logging table can use W=1. Even with overlap, sloppy quorums and concurrent writes mean it is not a linearizable store."
+    },
+    {
+      "title": "Resolving conflicts",
+      "question": "Two replicas hold different values for one key. Which is right?",
+      "options": [
+        { "name": "Last write wins", "pros": "Simple. One value, no work for the client.", "cons": "Needs clocks that agree. Clock skew picks a loser, and a concurrent update is silently lost." },
+        { "name": "Vector clocks, client merges", "pros": "Detects true concurrency and keeps both. Nothing is lost silently.", "cons": "Clients must write merge code. Clocks grow with the number of writers and need pruning." },
+        { "name": "CRDTs (merge-safe data types)", "pros": "Merging is automatic and always converges.", "cons": "Only some shapes fit, such as counters and sets. More complex values."}
+      ],
+      "pick": "Vector clocks where merging matters, else LWW",
+      "because": "A shopping cart should never lose an item, so merge it. A session timestamp can use last write wins. Make that a per-table choice, and be clear about what you accept losing."
+    },
+    {
+      "title": "Local storage engine",
+      "question": "How does one node store data so writes are fast?",
+      "options": [
+        { "name": "B-tree (update in place)", "pros": "Fast, predictable reads. Familiar.", "cons": "Random writes to disk and page splits. Slower for write-heavy loads." },
+        { "name": "LSM tree (log, memtable, sorted files)", "pros": "Writes are sequential appends, so they are very fast. Compaction keeps reads manageable.", "cons": "Write amplification, read cost across files, and background compaction spikes." }
+      ],
+      "pick": "LSM tree with Bloom filters",
+      "because": "The store is write-heavy with simple key lookups. Sequential writes win, and Bloom filters recover most of the read cost. Throttle compaction so it does not hurt foreground latency."
+    },
+    {
+      "title": "Failure detection and repair",
+      "question": "How do nodes learn about failures and fix divergence without a central brain?",
+      "options": [
+        { "name": "Central coordinator", "pros": "One consistent view of who is alive.", "cons": "A single point of failure, and a scaling limit." },
+        { "name": "Gossip plus Merkle trees", "pros": "No single point. Info spreads in a few rounds. Trees find only the keys that differ.", "cons": "Views are briefly inconsistent. Detection is probabilistic, so a slow node may be wrongly marked dead." }
+      ],
+      "pick": "Gossip with Merkle-tree anti-entropy",
+      "because": "It matches the design goal of no central part. Use hints for quick repair of short outages, and Merkle trees as the safety net for everything else."
+    }
+  ],
+  "failures": [
+    { "what": "A node is down for a while", "impact": "Writes for its ranges go to stand-ins. Reads may reach stale replicas.", "fix": "Hinted handoff returns the writes later. Read repair and Merkle sync fix the rest. Limit how long hints are kept, then do a full repair." },
+    { "what": "Network partition", "impact": "Both sides accept writes to the same key, so versions diverge.", "fix": "Keep writing, tag versions with vector clocks, and merge when the partition heals. This is the availability choice. Use a strict quorum for tables that cannot diverge." },
+    { "what": "Slow or flapping node", "impact": "It is marked dead and alive in turns, causing hint storms and repeated repair.", "fix": "Use an adaptive failure detector, require several observers to agree before marking dead, and limit repair bandwidth." },
+    { "what": "Compaction falls behind", "impact": "Files pile up, so reads touch more files and latency rises. Disk can fill.", "fix": "Throttle writes when the backlog is high. Keep disk headroom, and schedule compaction off peak. Watch files per read." },
+    { "what": "Deleted data comes back", "impact": "A replica missed the delete, and repair copies the old value onto the others.", "fix": "Deletes are tombstones kept for longer than the longest repair interval. Only then purge them." }
+  ],
+  "scaling": [
+    { "limit": "Adding nodes shifts data", "lever": "Virtual nodes spread the moved ranges across many peers. Stream data in the background and cap the rate so foreground traffic stays healthy." },
+    { "limit": "One partition is hot", "lever": "Cache the hot key, split it into suffixed keys, or give the range more tokens. A single key still lives on N nodes, so hot keys need a cache in front." },
+    { "limit": "Cross-region latency", "lever": "Place replicas in each region and use local quorums for most operations. Replicate to other regions asynchronously, accept brief divergence, and merge." }
+  ],
+  "recap": {
+    "key": "Spread keys with consistent hashing, copy each to N nodes, let R plus W above N give overlap, and stay writable with hints and versions. Each node stores data in an LSM tree.",
+    "numbers": "10B keys of 1 KB with 3 replicas is 30 TB, so about 13 nodes at 4 TB with 40 percent free. With N=3 and W=2 the read quorum is 2. Compaction rewrites each byte about 26 times over 5 levels.",
+    "moves": ["Log, memtable, sorted files, Bloom filters and compaction on each node", "Consistent hashing with virtual nodes, N replicas, quorums R and W", "Sloppy quorum and hinted handoff for availability, vector clocks for conflicts", "Merkle-tree anti-entropy and gossip for repair and membership"]
+  }
+}

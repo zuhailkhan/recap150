@@ -1,0 +1,180 @@
+{
+  "slug": "distributed-rate-limiter",
+  "title": "Distributed Rate Limiter",
+  "group": "Building blocks",
+  "difficulty": "Medium",
+  "status": "ready",
+  "brief": "Design a limiter that caps how many requests each client can make, across a fleet of many servers. A client that goes over gets a clear 429 answer. The check must be cheap, because it runs before every request. The single-process algorithms (token bucket, windows) are covered in the LLD Rate Limiter. This page is about doing it across machines.",
+  "requirements": {
+    "functional": [
+      "Limit requests per client key (API key, user or IP) per rule, such as 100 per minute.",
+      "Different rules per endpoint and per plan, changeable without a deploy.",
+      "Reject excess requests with 429 and a Retry-After header.",
+      "Tell every caller how much budget is left, using response headers.",
+      "Work the same no matter which gateway a request lands on."
+    ],
+    "nonFunctional": [
+      { "name": "Added latency", "target": "The check adds under 2 ms at the 99th percentile" },
+      { "name": "Accuracy", "target": "Within a few percent of the limit; never block a client far under its limit" },
+      { "name": "Availability", "target": "A limiter failure must not take the API down" },
+      { "name": "Scale", "target": "Hundreds of thousands of checks per second, millions of keys" }
+    ],
+    "outOfScope": ["The counting algorithms themselves (see the LLD Rate Limiter)", "Billing and quota plans", "DDoS protection at network level"]
+  },
+  "estimate": {
+    "note": "Assumptions, not facts. The key question: how many operations does the central store see? Checking on every request costs one operation each. Batching only helps when the same keys repeat within one sync interval.",
+    "inputs": [
+      { "id": "rps", "label": "API requests per second", "value": 200000, "min": 1000, "max": 10000000, "log": true },
+      { "id": "clients", "label": "Distinct client keys tracked", "value": 10000000, "min": 10000, "max": 1000000000, "log": true },
+      { "id": "active", "label": "Keys sending in a given second", "value": 2000, "min": 100, "max": 1000000, "log": true },
+      { "id": "gateways", "label": "Gateway servers", "value": 20, "min": 2, "max": 500, "log": true },
+      { "id": "syncMs", "label": "Local counter sync interval", "value": 1000, "min": 100, "max": 5000, "log": true, "unit": "ms" },
+      { "id": "bytes", "label": "Counter bytes per client key", "value": 200, "min": 50, "max": 1000, "step": 10, "unit": "B", "note": "Key, count and expiry for all of its rules." }
+    ],
+    "outputs": [
+      { "id": "memGb", "label": "Counter memory", "expr": "clients * bytes / 1e9", "unit": "GB", "note": "Only recently active keys need to be in memory; the rest expire." },
+      { "id": "centralOps", "label": "Store ops/s, check every request", "expr": "rps", "unit": "per s", "note": "One atomic operation per request." },
+      { "id": "shardsNow", "label": "Store nodes needed, no batching", "expr": "ceil(centralOps / 100000)", "unit": "nodes", "note": "Assumes about 100K simple ops per second per node." },
+      { "id": "keysPerSync", "label": "Keys one gateway syncs each time", "expr": "min(rps / gateways * syncMs / 1000, active)", "unit": "keys", "note": "Capped by the keys that are actually active." },
+      { "id": "batchedOps", "label": "Store ops/s with local batching", "expr": "gateways * keysPerSync * 1000 / syncMs", "unit": "per s", "note": "Each gateway sends one batch of deltas per interval." },
+      { "id": "savedPct", "label": "Store load saved by batching", "expr": "(1 - batchedOps / centralOps) * 100", "unit": "%", "note": "Little saving if traffic is spread over huge numbers of keys." },
+      { "id": "shardsBatched", "label": "Store nodes needed with batching", "expr": "ceil(batchedOps / 100000)", "unit": "nodes" }
+    ]
+  },
+  "api": [
+    { "call": "check(key, rule, cost=1) -> allow|deny", "does": "Internal call from gateway code. Updates the counter and returns the verdict with remaining budget and reset time." },
+    { "call": "Response headers: RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset", "does": "Sent on every response so well-behaved clients can pace themselves." },
+    { "call": "429 Too Many Requests + Retry-After: 12", "does": "The rejection. Retry-After says how many seconds to wait. Add jitter on the client side." },
+    { "call": "PUT /rules/{ruleId}  { match, limit, windowSec }", "does": "Admin call. Stores a rule and pushes it to every gateway." },
+    { "call": "GET /rules?version=", "does": "Gateways fetch rules at start-up and when the pushed version changes." }
+  ],
+  "data": [
+    { "entity": "Rule", "fields": "ruleId, match (route, plan), limit, windowSec, failMode, version", "store": "Small relational or config store.", "why": "Few rows, changed rarely, read by every gateway. Cached in memory with a version number." },
+    { "entity": "Counter", "fields": "key = ruleId:clientKey:windowId, count, expiresAt", "store": "In-memory key-value store with TTL.", "why": "Hot, tiny and disposable. The TTL cleans up old windows. Losing it only resets budgets." },
+    { "entity": "Block entry", "fields": "clientKey or network, reason, until", "store": "In-memory key-value store with TTL.", "why": "Checked first and cheaply. Written by the abuse detector, expires on its own." }
+  ],
+  "nodes": [
+    { "id": "client", "label": "Clients", "kind": "client", "x": 6, "y": 50, "since": 0 },
+    { "id": "lb", "label": "Load balancer", "kind": "lb", "x": 25, "y": 50, "since": 1 },
+    { "id": "gw", "label": "Gateway A", "kind": "service", "x": 46, "y": 22, "sub": "limiter middleware", "since": 0 },
+    { "id": "gw2", "label": "Gateway B", "kind": "service", "x": 46, "y": 78, "sub": "limiter middleware", "since": 1 },
+    { "id": "app", "label": "Backend services", "kind": "service", "x": 89, "y": 50, "since": 0 },
+    { "id": "store", "label": "Counter store", "kind": "cache", "x": 72, "y": 22, "sub": "atomic increments", "since": 1 },
+    { "id": "rules", "label": "Rules service", "kind": "service", "x": 46, "y": 50, "sub": "limits as config", "since": 3 },
+    { "id": "store2", "label": "Region 2 store", "kind": "cache", "x": 72, "y": 78, "sub": "local counters", "since": 4 },
+    { "id": "abuse", "label": "Abuse detector", "kind": "worker", "x": 25, "y": 88, "sub": "hot keys, blocks", "since": 5 }
+  ],
+  "edges": [
+    { "from": "client", "to": "gw", "since": 0, "until": 1 },
+    { "from": "gw", "to": "app", "label": "allowed", "since": 0 },
+    { "from": "client", "to": "lb", "since": 1 },
+    { "from": "lb", "to": "gw", "since": 1 },
+    { "from": "lb", "to": "gw2", "since": 1 },
+    { "from": "gw2", "to": "app", "since": 1 },
+    { "from": "gw", "to": "store", "label": "check", "since": 1, "until": 2 },
+    { "from": "gw2", "to": "store", "label": "check", "since": 1, "until": 2 },
+    { "from": "gw", "to": "store", "label": "sync", "dashed": true, "since": 2 },
+    { "from": "gw2", "to": "store", "label": "sync", "dashed": true, "since": 2, "until": 4 },
+    { "from": "rules", "to": "gw", "label": "push", "since": 3 },
+    { "from": "rules", "to": "gw2", "label": "push", "since": 3 },
+    { "from": "gw2", "to": "store2", "label": "sync", "dashed": true, "since": 4 },
+    { "from": "store", "to": "store2", "label": "async merge", "dashed": true, "since": 4 },
+    { "from": "gw2", "to": "abuse", "dashed": true, "since": 5 },
+    { "from": "abuse", "to": "rules", "since": 5 }
+  ],
+  "evolution": [
+    { "title": "Counters inside one gateway", "problem": "Start with the simplest thing that works: one gateway counts requests per key in a local map and rejects the extra ones.", "change": "Use a token bucket or window per key, in memory. Fast and exact, because only one process ever counts." },
+    { "title": "Central counter, atomic", "problem": "With 20 gateways, each counts its own share. A key limited to 100 a minute can send 100 to each gateway, so 2000 get through. Sticky routing breaks when a gateway dies or the key spreads.", "change": "Keep one counter per key in a shared store. Update it with a single atomic operation: an increment with expiry, or a small server-side script. A plain read then write lets two gateways read 99 and both allow the 100th.", "numbers": "the estimator: one store operation per request" },
+    { "title": "Local counters, batched sync", "problem": "Every request now pays a network hop, about a millisecond, and the store sees all of the traffic. At 200K requests per second that is several store nodes, and a slow store slows the API.", "change": "Each gateway counts locally and sends its deltas to the store every second, then reads back the global total. It can overshoot the limit slightly between syncs. You trade a little accuracy for latency and load.", "numbers": "see store ops with batching" },
+    { "title": "Rules as pushed config", "problem": "Limits differ per plan and endpoint, and they change during incidents. Redeploying gateways to change a number is too slow.", "change": "A rules service holds the limits. It pushes new versions to every gateway, which keep a copy in memory and keep working with the last version if the service is down." },
+    { "title": "Regions with their own stores", "problem": "A gateway in another continent that calls one central store pays 100 ms or more per sync, and the store becomes a cross-ocean dependency.", "change": "Each region has its own store. Regions merge counts asynchronously. Each region may spend its share of the limit, so a global limit is approximate by the merge delay." },
+    { "title": "Catch abuse across many keys", "problem": "An attacker rotates through thousands of IPs. Each one stays under its per-key limit, so the limiter never fires, while the total hurts you.", "change": "Gateways report their busiest keys to a detector that looks for patterns across keys, then writes block entries and tighter rules back through the rules service. Limits are also stacked: per account, per IP and per network range." }
+  ],
+  "flows": [
+    {
+      "name": "A normal request",
+      "steps": [
+        { "say": "A client sends a request with its API key.", "nodes": ["client", "lb"], "edges": [["client", "lb"]] },
+        { "say": "The load balancer picks any gateway. They are all equal.", "nodes": ["lb", "gw"], "edges": [["lb", "gw"]] },
+        { "say": "The gateway builds the key (rule, client, window) from its in-memory rules. Rules arrived by push earlier, so no lookup is needed.", "nodes": ["rules", "gw"], "edges": [["rules", "gw"]] },
+        { "say": "It checks the local counter first. If the local count plus the last known global count is under the limit, the request is allowed with no network call.", "nodes": ["gw"], "edges": [] },
+        { "say": "Every second the gateway sends its count deltas to the store and reads back the global totals.", "nodes": ["gw", "store"], "edges": [["gw", "store"]] },
+        { "say": "The request is forwarded. The response carries RateLimit-Remaining and RateLimit-Reset.", "nodes": ["gw", "app"], "edges": [["gw", "app"]] }
+      ]
+    },
+    {
+      "name": "A client over the limit",
+      "steps": [
+        { "say": "A client has used up its budget for this window and sends another request.", "nodes": ["client", "lb", "gw2"], "edges": [["client", "lb"], ["lb", "gw2"]] },
+        { "say": "Gateway B sees the local plus global count is at the limit.", "nodes": ["gw2"], "edges": [] },
+        { "say": "It rejects at once. The backend never sees the request, which is the point.", "nodes": ["gw2", "lb", "client"], "edges": [["lb", "gw2"]] },
+        { "say": "The reply is 429 with Retry-After set to the seconds left in the window. The client should wait that long, plus some random jitter.", "nodes": ["gw2", "client"], "edges": [] },
+        { "say": "Meanwhile gateways report their busiest keys to the detector, which sees this key still hammering.", "nodes": ["gw2", "abuse"], "edges": [["gw2", "abuse"]] },
+        { "say": "It asks the rules service for a block entry. The new version is pushed to every gateway.", "nodes": ["abuse", "rules", "gw", "gw2"], "edges": [["abuse", "rules"], ["rules", "gw"], ["rules", "gw2"]] }
+      ]
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "Exact or approximate counting",
+      "question": "Do we ask the central store on every request, or count locally and sync?",
+      "options": [
+        { "name": "Central check per request", "pros": "Exact. Simple to reason about. One atomic operation decides.", "cons": "A network hop on every request and the store sees all traffic. A store hiccup is a latency hiccup." },
+        { "name": "Local counters, periodic sync", "pros": "No hop on the hot path. Store load drops with batching.", "cons": "Can overshoot by roughly the traffic of one interval across all gateways." },
+        { "name": "Leased slices of the budget", "pros": "A gateway reserves a chunk of tokens from the store and spends it locally. Overshoot is bounded by the leases.", "cons": "Unused leased tokens are stranded. Small limits split badly across many gateways." }
+      ],
+      "pick": "Local counters for high limits, central check for low ones",
+      "because": "A limit of 10,000 per minute can tolerate 2% error and should be fast. A limit of 3 password tries must be exact, so pay the hop. Choose per rule, not for the whole system."
+    },
+    {
+      "title": "Fail open or fail closed",
+      "question": "The counter store is unreachable. Do we let requests through or block them?",
+      "options": [
+        { "name": "Fail open", "pros": "The API stays up. Users never notice a limiter problem.", "cons": "There is no protection while the store is down. Abuse and runaway clients get through." },
+        { "name": "Fail closed", "pros": "Protection stays on. Safe for costly or sensitive actions.", "cons": "A limiter outage becomes a full outage. The protection layer is now a single point of failure." },
+        { "name": "Degrade to local limits", "pros": "Each gateway keeps enforcing its own share, so there is still a rough cap.", "cons": "Less accurate, and a client spread across gateways may exceed the real limit." }
+      ],
+      "pick": "Local fallback; fail closed for sensitive rules",
+      "because": "Availability matters more than precision for most APIs. Set failMode per rule: login and SMS-sending stay closed, ordinary reads fall back to local counting."
+    },
+    {
+      "title": "Where the limiter lives",
+      "question": "At the edge gateway, as middleware in each service, or as a library?",
+      "options": [
+        { "name": "API gateway", "pros": "One place. Bad traffic never reaches services. Easy to keep consistent.", "cons": "Only sees the request, not the cost inside. Limits cannot depend on deep service state." },
+        { "name": "Middleware in each service", "pros": "Knows the real cost, such as expensive queries. Each team owns its limits.", "cons": "Many copies to keep consistent. Rejected requests have already used a connection." },
+        { "name": "Sidecar or shared library", "pros": "Reusable and close to the service, with local state per instance.", "cons": "Versioning across languages and teams. Rollouts are slow." }
+      ],
+      "pick": "Gateway for coarse, middleware for costly calls",
+      "because": "The gateway protects everything cheaply. Services add their own limits where cost depends on what the call does. Both use the same rules service and counter store."
+    },
+    {
+      "title": "What to key on",
+      "question": "Per IP, per account, or something else? How do we stop abuse spread over many IPs?",
+      "options": [
+        { "name": "Per IP", "pros": "Works before login. Needs no identity.", "cons": "Many users share one IP (offices, mobile carriers). Attackers rotate IPs cheaply." },
+        { "name": "Per account or API key", "pros": "Fair per customer. Hard to dodge once authenticated.", "cons": "Useless before login and when accounts are free to create." },
+        { "name": "Layered keys plus a detector", "pros": "Limit by key, account and network range. A detector spots patterns across keys.", "cons": "More counters to store. Needs tuning to avoid blocking honest bursts." }
+      ],
+      "pick": "Layered keys plus a detector",
+      "because": "No single key covers all attackers. Cheap per-key limits stop the common case, and the detector deals with distributed abuse using the same store."
+    }
+  ],
+  "failures": [
+    { "what": "The counter store goes down", "impact": "Gateways cannot sync. Either everything is blocked or nothing is limited.", "fix": "Per-rule failMode. Default to local counting with the last known totals. Run replicas, and alert when gateways are on fallback." },
+    { "what": "One key is extremely hot", "impact": "A single counter takes all the writes of a giant client and its store shard saturates.", "fix": "Split the counter into a few sub-counters that are summed on read, or give hot keys local-only counting with a lease." },
+    { "what": "A bad rule is pushed", "impact": "A typo sets a limit of 1 per minute and blocks every customer within seconds.", "fix": "Validate rules, roll out by percentage, keep the last good version, and add a global kill switch that sets the limiter to log-only." },
+    { "what": "Clients retry in lockstep", "impact": "Everyone gets Retry-After: 1 and returns at the same instant, creating a spike each second.", "fix": "Add jitter to Retry-After and document backoff. Use a sliding window so budget returns gradually instead of all at the window edge." },
+    { "what": "Counter read then write race", "impact": "Two gateways read 99, both write 100, and the limit is exceeded.", "fix": "Do the update in the store as one atomic step: an increment that returns the new value, or a script that checks and increments together. Set the expiry in the same step, so a crash cannot leave a key that never expires." }
+  ],
+  "scaling": [
+    { "limit": "One store node tops out at around 100K operations per second", "lever": "Shard counters by key with consistent hashing, so one key always lives on one shard. Batch local deltas to cut operations." },
+    { "limit": "Memory grows with active keys", "lever": "Expire counters with their window and keep only recent keys. Use a compact key and a small integer value." },
+    { "limit": "Global limits across continents", "lever": "Give each region a share of the budget and merge asynchronously. Accept a small overshoot, or split the limit per region up front." }
+  ],
+  "recap": {
+    "key": "One atomic counter per key beats counting per gateway, and local counters synced in batches keep the hop off the hot path at the cost of a small overshoot.",
+    "numbers": "200K requests per second means 200K store operations per second if you check each time, about 2 nodes. With local batching it drops to around 40K. Counters for 10M keys need about 2 GB.",
+    "moves": ["Count in a shared store with an atomic increment, never read then write", "Count locally and sync every second to avoid a hop per request", "Push rules as versioned config; fail open or closed per rule", "Return 429 with Retry-After, and catch many-IP abuse with a detector"]
+  }
+}
