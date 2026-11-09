@@ -121,8 +121,19 @@
 @supports not selector(::-webkit-scrollbar) {
   * { scrollbar-width: thin; scrollbar-color: var(--sb-thumb) var(--sb-track); }
 }
-/* the sidebar always shows its bar and keeps its space, so the list never jumps when it overflows */
+/* the sidebar's bar only appears while the pointer is over the sidebar. Its space stays reserved, so the list never jumps. */
 .app-nav { overflow-y: auto; scrollbar-gutter: stable; }
+@supports selector(::-webkit-scrollbar) {
+  .app-nav::-webkit-scrollbar-track { background: transparent; }
+  .app-nav::-webkit-scrollbar-thumb { background: transparent; background-clip: padding-box; }
+  .app-nav.sb-show::-webkit-scrollbar-thumb { background: var(--sb-thumb); background-clip: padding-box; }
+  .app-nav.sb-show::-webkit-scrollbar-thumb:hover { background: var(--sb-thumb-hover); background-clip: padding-box; }
+  .app-nav.sb-show::-webkit-scrollbar-thumb:active { background: var(--ink); background-clip: padding-box; }
+}
+@supports not selector(::-webkit-scrollbar) {
+  .app-nav { scrollbar-color: transparent transparent; }
+  .app-nav.sb-show { scrollbar-color: var(--sb-thumb) var(--sb-track); }
+}
 
 /* ---------- base ---------- */
 *, *::before, *::after { box-sizing: border-box; }

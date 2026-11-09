@@ -6,6 +6,8 @@ import { progress } from '@/recap/store'
 
 const route = useRoute()
 const drawer = ref(false)
+/** the sidebar's scrollbar is only drawn while the pointer is over the sidebar */
+const navHover = ref(false)
 type Theme = 'auto' | 'light' | 'dark'
 const theme = ref<Theme>('auto')
 
@@ -29,7 +31,7 @@ watch(() => route.fullPath, () => (drawer.value = false))
 <template>
   <a class="skip" href="#main">Skip to content</a>
   <div class="shell">
-    <aside id="nav" class="app-nav" :class="{ open: drawer }" aria-label="Site">
+    <aside id="nav" class="app-nav" :class="{ open: drawer, 'sb-show': navHover }" aria-label="Site" @pointerenter="navHover = true" @pointerleave="navHover = false">
       <AppSidebar @navigate="drawer = false" />
     </aside>
     <div v-if="drawer" class="scrim" @click="drawer = false"></div>
