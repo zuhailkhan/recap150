@@ -10,7 +10,7 @@ test('works offline after the first visit', async ({ page, context }) => {
 
   await context.setOffline(true)
   await page.reload()
-  await expect(page.locator('h1')).toContainText('See the idea')
+  await expect(page.locator('h1')).toContainText('Watch it run')
 
   // a problem the page has never opened: its code chunks must come from the cache
   await page.goto('./#/p/lru-cache')

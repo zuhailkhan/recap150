@@ -40,8 +40,8 @@ const tracks = computed(() => (['lld', 'hld'] as const).map((t) => {
   <div class="home">
     <section class="hero-sec">
       <div class="copy">
-        <h1>See the idea.<br />Then keep it.</h1>
-        <p class="lede">A visual explainer for each of the {{ OFFICIAL.length }} NeetCode problems, plus low-level and high-level system design for the products people actually get asked about. Short daily reviews bring the hard ones back sooner.</p>
+        <h1>Watch it run.<br />Know why it works.</h1>
+        <p class="lede">Every one of the {{ OFFICIAL.length }} NeetCode problems, stepped through on the real code, plus the low-level and high-level design questions that come after. A few minutes of review a day brings the shaky ones back before you forget them.</p>
         <div class="cta">
           <router-link class="btn primary" to="/recap">{{ totalDue ? `Review ${totalDue} due ${totalDue === 1 ? 'card' : 'cards'}` : 'Start a recap' }}</router-link>
           <router-link class="btn" to="/p/two-sum">Try an explainer</router-link>
@@ -95,9 +95,9 @@ const tracks = computed(() => (['lld', 'hld'] as const).map((t) => {
 </template>
 
 <style scoped>
-.home { max-width: 1240px; display: grid; gap: 80px; }
+.home { display: grid; gap: 80px; }
 .hero-sec { display: grid; gap: 40px; align-items: center; }
-@media (min-width: 1060px) { .hero-sec { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 64px; } }
+@media (min-width: 1060px) { .hero-sec { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 64px; min-height: max(620px, calc(100dvh - 140px)); } }
 h1 { font-size: clamp(2.8rem, 1.6rem + 5vw, 5.4rem); line-height: .96; letter-spacing: -0.05em; margin-bottom: .3em; }
 .lede { font-size: 1.2rem; line-height: 1.5; max-width: 40ch; color: var(--ink-2); margin-bottom: 28px; }
 .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; }
@@ -105,13 +105,14 @@ h1 { font-size: clamp(2.8rem, 1.6rem + 5vw, 5.4rem); line-height: .96; letter-sp
 .status { margin: 0; max-width: 46ch; font-size: .95rem; }
 
 .trk { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 0; }
-.trk li { display: grid; gap: 8px; padding: 22px 0; border-top: 1px solid var(--line); align-content: start; justify-items: start; }
+.trk li { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 22px 0; border-top: 1px solid var(--line); }
 .trk li:last-child { border-bottom: 1px solid var(--line); }
 @media (min-width: 900px) { .trk { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 40px; } .trk li { border-bottom: 1px solid var(--line); } }
 .trk h3 { margin: 0; font-size: 1.3rem; letter-spacing: -0.02em; }
 .trk p { margin: 0; max-width: 40ch; }
 .n { font: 500 .9rem var(--font-mono); color: var(--ink-2); } .n b { color: var(--ink); font-size: 1.2rem; }
-.trk .btn { margin-top: 6px; }
+.trk .btn { margin-top: auto; }
+.trk .n { margin-bottom: 6px; }
 
 .rows { list-style: none; margin: 18px 0 0; padding: 0; }
 .row { display: grid; grid-template-columns: minmax(0, 1fr) 76px 64px; gap: 4px 16px; align-items: center; padding: 13px 0; border-top: 1px solid var(--line); }

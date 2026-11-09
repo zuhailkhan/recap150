@@ -71,8 +71,8 @@ main { padding: 28px var(--gutter) 88px; min-width: 0; outline: none; }
   .shell { grid-template-columns: 296px minmax(0, 1fr); }
   .app-nav { position: sticky; top: 0; height: 100dvh; width: auto; visibility: visible; transform: none; z-index: 1; }
   .appbar .menu, .appbar .brand { display: none; }
-  .appbar { justify-content: flex-end; padding-inline: max(40px, calc((100% - var(--page-max)) / 2 + 40px)); }
+  .appbar { justify-content: flex-end; }
   main { padding: 40px 40px 120px; }
 }
-@media (min-width: 1700px) { main { padding-inline: 64px; } .appbar { padding-inline: max(64px, calc((100% - var(--page-max)) / 2 + 64px)); } }
+@media (min-width: 1700px) { main { padding-inline: 64px; } }
 </style>

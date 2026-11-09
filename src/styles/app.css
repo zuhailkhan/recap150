@@ -48,7 +48,7 @@
   --radius: 10px;
   --radius-s: 7px;
   --gutter: 16px;
-  --page-max: 1280px;
+  --page-max: 1440px;
   --shadow: 0 1px 0 rgb(18 26 35 / 6%);
   color-scheme: light;
 }
@@ -104,7 +104,6 @@
 }
 
 /* a wider page column on very large monitors */
-@media (min-width: 2000px) { :root { --page-max: 1520px; } }
 
 /* ---------- custom scrollbars: slim, always visible, themed ---------- */
 :root { --sb-thumb: color-mix(in srgb, var(--ink) 30%, transparent); --sb-thumb-hover: color-mix(in srgb, var(--ink) 55%, transparent); --sb-track: color-mix(in srgb, var(--ink) 5%, transparent); }

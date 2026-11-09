@@ -31,11 +31,11 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer) })
 </template>
 
 <style scoped>
-.hero { padding: 22px 22px 14px; min-height: 340px; display: grid; align-content: space-between; gap: 16px; }
-.inner { display: grid; gap: 22px; min-width: 0; }
-.empty { min-height: 250px; }
-.panels { display: grid; gap: 20px; min-width: 0; }
-.say { display: flex; gap: 12px; align-items: flex-start; margin: 0; min-height: 4.2em; font: 500 1.05rem/1.4 var(--font-ui); color: var(--ink); }
+.hero { padding: 22px 22px 14px; display: grid; grid-template-rows: 1fr auto; gap: 16px; height: 580px; box-sizing: border-box; }
+.inner { display: grid; grid-template-rows: minmax(0, 1fr) 5.8em; gap: 22px; min-width: 0; }
+
+.panels { display: grid; gap: 20px; min-width: 0; align-content: start; grid-template-rows: 124px minmax(0, 1fr); }
+.say { display: flex; gap: 12px; align-items: flex-start; margin: 0; font: 500 1.05rem/1.4 var(--font-ui); color: var(--ink); }
 .say .badge { margin-top: 2px; }
 .to { justify-self: end; font-size: .86rem; color: var(--ink-2); }
 </style>

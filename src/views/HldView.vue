@@ -150,7 +150,7 @@ const flowRun = (m: HldMeta) => (args: unknown[]): TraceResult => {
 
 <style scoped>
 .wrap { max-width: 720px; }
-.problem { display: grid; gap: 56px; max-width: 1240px; min-width: 0; }
+.problem { display: grid; gap: 56px; min-width: 0; }
 section { min-width: 0; }
 .hd { display: grid; gap: 28px; min-width: 0; }
 @media (min-width: 1020px) { .hd { grid-template-columns: minmax(0, 1.2fr) minmax(300px, 1fr); gap: 56px; align-items: start; } }
