@@ -106,6 +106,24 @@
 /* a wider page column on very large monitors */
 @media (min-width: 2000px) { :root { --page-max: 1520px; } }
 
+/* ---------- custom scrollbars: slim, always visible, themed ---------- */
+:root { --sb-thumb: color-mix(in srgb, var(--ink) 30%, transparent); --sb-thumb-hover: color-mix(in srgb, var(--ink) 55%, transparent); --sb-track: color-mix(in srgb, var(--ink) 5%, transparent); }
+.stage { --sb-thumb: color-mix(in srgb, #e6ecf2 28%, transparent); --sb-thumb-hover: color-mix(in srgb, #e6ecf2 55%, transparent); --sb-track: color-mix(in srgb, #e6ecf2 6%, transparent); }
+@supports selector(::-webkit-scrollbar) {
+  *::-webkit-scrollbar { width: 12px; height: 12px; }
+  *::-webkit-scrollbar-track { background: var(--sb-track); border-radius: 999px; margin: 2px; }
+  /* a 12px slot with a 3px inset makes a slim 6px pill, still easy to grab */
+  *::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; min-height: 40px; min-width: 40px; }
+  *::-webkit-scrollbar-thumb:hover { background: var(--sb-thumb-hover); background-clip: padding-box; }
+  *::-webkit-scrollbar-thumb:active { background: var(--ink); background-clip: padding-box; }
+  *::-webkit-scrollbar-corner { background: transparent; }
+}
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: var(--sb-thumb) var(--sb-track); }
+}
+/* the sidebar always shows its bar and keeps its space, so the list never jumps when it overflows */
+.app-nav { overflow-y: auto; scrollbar-gutter: stable; }
+
 /* ---------- base ---------- */
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
